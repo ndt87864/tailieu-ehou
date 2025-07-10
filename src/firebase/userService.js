@@ -9,10 +9,7 @@ import {
   updateDoc, 
   deleteDoc,
   serverTimestamp,
-  increment,
-  orderBy,
-  limit as fsLimit,
-  startAfter
+  increment
 } from "firebase/firestore";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
@@ -937,34 +934,64 @@ export const getUserGrowthData = async (months = 12) => {
 
 export const updateUserOnlineStatus = async (userId, isOnline) => {
   try {
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.error("updateUserOnlineStatus: Invalid userId", { userId });
+      throw new Error("Invalid userId for updateUserOnlineStatus");
+    }
+    if (typeof isOnline !== 'boolean') {
+      console.error("updateUserOnlineStatus: isOnline must be boolean", { isOnline });
+      throw new Error("isOnline must be a boolean");
+    }
     const userRef = doc(db, COLLECTIONS.USERS, userId);
-    await updateDoc(userRef, {
+    const payload = {
       isOnline: isOnline,
       lastActivityTime: new Date().toISOString()
-    });
+    };
+    try {
+      await updateDoc(userRef, payload);
+    } catch (error) {
+      // Nếu lỗi là document chưa tồn tại thì tạo mới document với merge
+      if (error.code === 'not-found' || error.message?.includes('No document to update')) {
+        try {
+          await setDoc(userRef, payload, { merge: true });
+        } catch (setDocError) {
+          console.error("updateUserOnlineStatus: setDoc failed", { userId, payload, setDocError });
+          throw setDocError;
+        }
+      } else {
+        console.error("updateUserOnlineStatus: updateDoc failed", { userId, payload, error });
+        throw error;
+      }
+    }
     return true;
   } catch (error) {
-    console.error("Error updating user online status:", error);
+    console.error("Error updating user online status:", { userId, isOnline, error });
     throw error;
   }
 };
 
 export const setUserOffline = async (userId) => {
   try {
-    if (!userId) return false;
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.error("setUserOffline: Invalid userId", { userId });
+      return false;
+    }
     return await updateUserOnlineStatus(userId, false);
   } catch (error) {
-    console.error("Error setting user offline:", error);
+    console.error("Error setting user offline:", { userId, error });
     return false;
   }
 };
 
 export const setUserOnline = async (userId) => {
   try {
-    if (!userId) return false;
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      console.error("setUserOnline: Invalid userId", { userId });
+      return false;
+    }
     return await updateUserOnlineStatus(userId, true);
   } catch (error) {
-    console.error("Error setting user online:", error);
+    console.error("Error setting user online:", { userId, error });
     return false;
   }
 };
@@ -1104,32 +1131,6 @@ export const updateUserExcelPercentage = async (userId, excelPercentage) => {
     return true;
   } catch (error) {
     console.error("Error updating user Excel percentage:", error);
-    throw error;
-  }
-};
-
-export const getUsersByPage = async ({ limit = 10, startAfterDoc = null } = {}) => {
-  try {
-    let q = query(
-      collection(db, COLLECTIONS.USERS),
-      orderBy("createdAt", "desc"),
-      fsLimit(limit)
-    );
-    if (startAfterDoc) {
-      q = query(
-        collection(db, COLLECTIONS.USERS),
-        orderBy("createdAt", "desc"),
-        startAfter(startAfterDoc),
-        fsLimit(limit)
-      );
-    }
-    const querySnapshot = await getDocs(q);
-    const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
-    const hasMore = querySnapshot.docs.length === limit;
-    return { users, lastVisible, hasMore };
-  } catch (error) {
-    console.error("Error getting users by page:", error);
     throw error;
   }
 };
