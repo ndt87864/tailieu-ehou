@@ -374,7 +374,6 @@ const AdminUserManagement = () => {
             err
           );
         }
-        // ...existing code...
         await signOut(tempAuth);
         if (currentAdmin) {
           await auth.updateCurrentUser(currentAdmin);
@@ -636,10 +635,13 @@ const AdminUserManagement = () => {
     return counts;
   };
 
-  // Returns the filtered list of users based on activeFilter and userSearch
-  const getFilteredUsers = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [gotoPageInput, setGotoPageInput] = useState(1);
+  const USERS_PER_PAGE = 10;
+
+  // Tính toán filteredUsers dựa trên search và filter
+  const filteredUsers = (() => {
     let filtered = users;
-    // Lọc theo search (email, tên, SĐT)
     if (search.trim()) {
       const keyword = search.trim();
       filtered = filtered.filter(
@@ -649,7 +651,6 @@ const AdminUserManagement = () => {
           (u.phoneNumber && u.phoneNumber.includes(keyword))
       );
     }
-    // Filter by activeFilter
     if (activeFilter === "admin") {
       filtered = filtered.filter((u) => u.role === "admin");
     } else if (activeFilter === "premium-full") {
@@ -670,7 +671,25 @@ const AdminUserManagement = () => {
       );
     }
     return filtered;
+  })();
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / USERS_PER_PAGE)
+  );
+
+  // Lấy user cho trang hiện tại
+  const getFilteredUsers = () => {
+    const startIdx = (currentPage - 1) * USERS_PER_PAGE;
+    const endIdx = startIdx + USERS_PER_PAGE;
+    return filteredUsers.slice(startIdx, endIdx);
   };
+
+  // Khi search/filter đổi, về trang 1
+  useEffect(() => {
+    setCurrentPage(1);
+    setGotoPageInput(1);
+  }, [search, activeFilter]);
 
   // Toggle the online status of a user by userId
   const toggleUserOnlineStatus = (userId) => {
@@ -745,7 +764,7 @@ const AdminUserManagement = () => {
 
           {/* Main content with padding */}
           <main
-            className={`p-4 md:p-6 ${
+            className={`p-4 md:p-6 pb-10 ${
               isDarkMode
                 ? "bg-gray-900 text-white"
                 : "bg-slate-100 text-gray-900"
@@ -1235,6 +1254,71 @@ const AdminUserManagement = () => {
                     />
                   )}
                 </div>
+                {getFilteredUsers().length > 0 && (
+                  <div className="flex justify-center items-center gap-2 mt-6 mb-4">
+                    <button
+                      onClick={() => {
+                        setCurrentPage((p) => Math.max(1, p - 1));
+                        setGotoPageInput((p) => Math.max(1, p - 1));
+                      }}
+                      disabled={currentPage === 1}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === 1
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-500 text-white"
+                      }`}
+                    >
+                      Trước
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={gotoPageInput}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (val === "") setGotoPageInput("");
+                        else
+                          setGotoPageInput(
+                            Math.max(1, Math.min(totalPages, Number(val)))
+                          );
+                      }}
+                      onBlur={() => {
+                        let page = Number(gotoPageInput);
+                        if (!page || page < 1) page = 1;
+                        if (page > totalPages) page = totalPages;
+                        setCurrentPage(page);
+                        setGotoPageInput(page);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          let page = Number(gotoPageInput);
+                          if (!page || page < 1) page = 1;
+                          if (page > totalPages) page = totalPages;
+                          setCurrentPage(page);
+                          setGotoPageInput(page);
+                        }
+                      }}
+                      className="w-14 px-2 py-1 border rounded text-center mx-1"
+                      style={{ width: 48 }}
+                    />
+                    <span>/ {totalPages}</span>
+                    <button
+                      onClick={() => {
+                        setCurrentPage((p) => Math.min(totalPages, p + 1));
+                        setGotoPageInput((p) => Math.min(totalPages, p + 1));
+                      }}
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === totalPages
+                          ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-500 text-white"
+                      }`}
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </main>
