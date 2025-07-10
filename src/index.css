@@ -1,0 +1,40 @@
+/* Add or update these CSS variable definitions in your index.css */
+
+:root {
+  /* Default theme variables */
+  --color-primary: #16a34a; /* default theme (green) */
+}
+
+.theme-default {
+  --color-primary: #16a34a; /* green-600 */
+}
+
+.theme-blue {
+  --color-primary: #2563eb; /* blue-600 */
+}
+
+.theme-red {
+  --color-primary: #dc2626; /* red-600 */
+}
+
+.theme-purple {
+  --color-primary: #9333ea; /* purple-600 */
+}
+
+.theme-yellow {
+  --color-primary: #ca8a04; /* yellow-600 */
+}
+
+.theme-brown {
+  --color-primary: #b45309; /* amber-700 */
+}
+
+.theme-black {
+  --color-primary: #1f2937; /* gray-800 */
+}
+
+.theme-white {
+  --color-primary: #f3f4f6; /* gray-100 */
+}
+
+/* ...existing code... */

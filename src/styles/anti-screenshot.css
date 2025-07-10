@@ -1,0 +1,90 @@
+
+.anti-screenshot-blur {
+  filter: blur(10px);
+  transition: filter 0.03s ease-out; /* Giảm thời gian chuyển đổi đến mức tối thiểu */
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none; /* Ngăn tương tác khi đang mờ */
+}
+
+.screenshot-warning {
+  animation: fadeInOut 3s ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Lớp phủ bảo vệ chống chụp ảnh */
+.screenshot-protection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  background-color: transparent;
+  mix-blend-mode: difference; /* Tạo hiệu ứng nhiễu khi chụp màn hình */
+  contain: strict;
+}
+
+/* CSS chống chọn nội dung */
+.prevent-select {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  cursor: default !important;
+}
+
+/* Lớp bảo vệ chức năng kéo thả */
+[data-protected="true"] {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+}
+
+/* CSS cho thiết bị di động */
+@media (max-width: 768px) {
+  img {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -khtml-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    pointer-events: none !important;
+    -webkit-user-drag: none !important;
+    user-drag: none !important;
+  }
+  
+  body, html {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    overflow: hidden auto !important;
+  }
+  
+  .mobile-protected {
+    position: relative;
+  }
+  
+  .mobile-protected::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: transparent;
+    z-index: 2;
+    pointer-events: none;
+  }
+}
