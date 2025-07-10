@@ -5,9 +5,7 @@ const roleOptions = [
     value: "fuser",
     label: "Người dùng miễn phí",
     getClass: (isDarkMode) =>
-      isDarkMode
-        ? "bg-blue-900 text-blue-200"
-        : "bg-blue-100 text-blue-800",
+      isDarkMode ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800",
   },
   {
     value: "puser",
@@ -40,9 +38,7 @@ const subscriptionOptions = [
     value: "partial",
     label: "Trả phí theo mục",
     getClass: (isDarkMode) =>
-      isDarkMode
-        ? "bg-teal-700 text-teal-200"
-        : "bg-teal-100 text-teal-800",
+      isDarkMode ? "bg-teal-700 text-teal-200" : "bg-teal-100 text-teal-800",
   },
 ];
 
@@ -122,8 +118,10 @@ const UserRoleCell = ({
                   type="button"
                   className={`px-2 py-1 text-xs font-semibold rounded focus:outline-none border transition-all ${
                     userData.role === role.value
-                      ? role.getClass(isDarkMode) + " border-green-500 ring-2 ring-green-300"
-                      : role.getClass(isDarkMode) + " opacity-70 border-transparent hover:opacity-100"
+                      ? role.getClass(isDarkMode) +
+                        " border-green-500 ring-2 ring-green-300"
+                      : role.getClass(isDarkMode) +
+                        " opacity-70 border-transparent hover:opacity-100"
                   }`}
                   onClick={() => handleRoleClick(role.value)}
                 >
@@ -142,8 +140,10 @@ const UserRoleCell = ({
                     type="button"
                     className={`px-2 py-1 text-xs font-semibold rounded focus:outline-none border transition-all ${
                       userData.subscriptionType === opt.value
-                        ? opt.getClass(isDarkMode) + " border-green-500 ring-2 ring-green-300"
-                        : opt.getClass(isDarkMode) + " opacity-70 border-transparent hover:opacity-100"
+                        ? opt.getClass(isDarkMode) +
+                          " border-green-500 ring-2 ring-green-300"
+                        : opt.getClass(isDarkMode) +
+                          " opacity-70 border-transparent hover:opacity-100"
                     }`}
                     onClick={() => handleSubscriptionClick(opt.value)}
                   >
@@ -153,22 +153,23 @@ const UserRoleCell = ({
               </div>
             </div>
           )}
-          {userData.role === "puser" && userData.subscriptionType === "partial" && (
-            <button
-              type="button"
-              onClick={() => {
-                handleManageCategories(userData);
-                setEditing(false);
-              }}
-              className={`w-full inline-flex items-center justify-center px-2 py-1 border border-transparent text-xs font-medium rounded shadow-sm mt-1 ${
-                isDarkMode
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-blue-100 hover:bg-blue-200 text-blue-800"
-              }`}
-            >
-              Tùy chỉnh danh mục
-            </button>
-          )}
+          {userData.role === "puser" &&
+            userData.subscriptionType === "partial" && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleManageCategories(userData);
+                  setEditing(false);
+                }}
+                className={`w-full inline-flex items-center justify-center px-2 py-1 border border-transparent text-xs font-medium rounded shadow-sm mt-1 ${
+                  isDarkMode
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                }`}
+              >
+                Tùy chỉnh danh mục
+              </button>
+            )}
           <button
             type="button"
             onClick={() => setEditing(false)}
