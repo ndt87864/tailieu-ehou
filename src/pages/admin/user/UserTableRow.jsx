@@ -1,6 +1,5 @@
 import React from "react";
 import UserRoleCell from "./UserRoleCell";
-import UserActionCell from "./UserActionCell";
 import UserExcelCell from "./UserExcelCell";
 import UserDeleteCell from "./UserDeleteCell";
 
@@ -102,13 +101,6 @@ const UserTableRow = ({
         userData={userData}
         isDarkMode={isDarkMode}
         getRoleName={getRoleName}
-      />
-    </td>
-    {/* Thao tác */}
-    <td className="px-6 py-4 whitespace-nowrap text-sm">
-      <UserActionCell
-        userData={userData}
-        isDarkMode={isDarkMode}
         handleRoleChange={handleRoleChange}
         handleSubscriptionTypeChange={handleSubscriptionTypeChange}
         handleManageCategories={handleManageCategories}

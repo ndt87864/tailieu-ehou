@@ -1972,11 +1972,6 @@ const AdminUserManagement = () => {
                                           : "bg-blue-100 text-blue-800"
                                       }`
                                 }`}
-                                style={{
-                                  whiteSpace: "pre-line",
-                                  wordBreak: "break-word",
-                                  maxWidth: "220px",
-                                }}
                               >
                                 {(() => {
                                   // Split role string into words, group by 16, join with line breaks

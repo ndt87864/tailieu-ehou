@@ -18,7 +18,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { UserRoleProvider } from "./context/UserRoleContext";
 import { SidebarProvider } from "./context/SidebarContext";
-import AdminUserManagement from "./pages/admin/AdminUserManagement";
+import AdminUserManagement from "./pages/admin/user/AdminUserManagement";
 import CategoryManagement from "./pages/admin/CategoryManagement";
 import DocumentManagement from "./pages/admin/DocumentManagement";
 import QuestionManagement from "./pages/admin/QuestionManagement";
