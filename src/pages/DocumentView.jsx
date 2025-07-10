@@ -9,7 +9,6 @@ import { auth } from "../firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import * as XLSX from "xlsx";
 import UserHeader from "../components/UserHeader";
-import UserManagementContent from "../components/admin/UserManagementContent";
 import { useUserRole } from "../context/UserRoleContext";
 import { registerScreenshotDetection } from "../utils/screenshotDetection";
 import ThemeColorPicker from "../components/ThemeColorPicker";
@@ -56,7 +55,8 @@ function DocumentView() {
   const [error, setError] = useState(null);
   const [openMain, setOpenMain] = useState(-1);
   const [search, setSearch] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);  const [windowWidth, setWindowWidth] = useState(
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1024
   );
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
@@ -68,7 +68,8 @@ function DocumentView() {
     return false;
   };
 
-  const idleCallback = window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
+  const idleCallback =
+    window.requestIdleCallback || ((cb) => setTimeout(cb, 1));
 
   // Reload user data function - not memoized to avoid dependency issues
   const reloadUserData = async () => {
@@ -105,14 +106,20 @@ function DocumentView() {
 
   const checkIsPremiumUser = useCallback((user) => {
     if (!user) return false;
-    return user.role === "premium" || user.role === "puser" || user.isPremium === true;
+    return (
+      user.role === "premium" ||
+      user.role === "puser" ||
+      user.isPremium === true
+    );
   }, []);
 
   const fetchUserSubscriptionType = useCallback(async (userId) => {
     try {
       const userDocRef = doc(db, "users", userId);
       const userDoc = await getDoc(userDocRef);
-      return userDoc.exists() ? userDoc.data().subscriptionType || "free" : "free";
+      return userDoc.exists()
+        ? userDoc.data().subscriptionType || "free"
+        : "free";
     } catch (error) {
       console.error("❌ Error fetching subscription type:", error);
       return "free";
@@ -149,20 +156,29 @@ function DocumentView() {
   const filteredQuestions = useMemo(() => {
     return questions.filter(
       (q) =>
-        (q.question && q.question.toLowerCase().includes(search.toLowerCase())) ||
+        (q.question &&
+          q.question.toLowerCase().includes(search.toLowerCase())) ||
         (q.answer && q.answer.toLowerCase().includes(search.toLowerCase()))
     );
   }, [questions, search]);
 
   const excelButtonState = useMemo(() => {
     if (permissionLoading || excelPermission === null) {
-      return { show: false, enabled: false, reason: "Đang kiểm tra quyền truy cập..." };
+      return {
+        show: false,
+        enabled: false,
+        reason: "Đang kiểm tra quyền truy cập...",
+      };
     }
     if (!userDataCache) {
       return { show: false, enabled: false, reason: "Vui lòng đăng nhập" };
     }
     if (userDataCache?.isExcelEnabled === false) {
-      return { show: false, enabled: false, reason: "Quyền tải Excel đã bị tắt" };
+      return {
+        show: false,
+        enabled: false,
+        reason: "Quyền tải Excel đã bị tắt",
+      };
     }
     const hasSubscriptionOrAdmin =
       userDataCache?.role === "admin" ||
@@ -171,7 +187,11 @@ function DocumentView() {
       userDataCache?.role === "puser";
 
     if (!hasSubscriptionOrAdmin) {
-      return { show: false, enabled: false, reason: "Tính năng dành cho tài khoản Premium" };
+      return {
+        show: false,
+        enabled: false,
+        reason: "Tính năng dành cho tài khoản Premium",
+      };
     }
 
     const downloadPercentage = excelPermission?.percentage || 100;
@@ -189,7 +209,7 @@ function DocumentView() {
   // Load User Data - Only depend on user.uid to avoid infinite loops
   useEffect(() => {
     let isCancelled = false;
-    
+
     const loadUserData = async () => {
       if (!user?.uid) {
         if (!isCancelled) setUserDataCache(null);
@@ -224,7 +244,7 @@ function DocumentView() {
     };
 
     loadUserData();
-    
+
     return () => {
       isCancelled = true;
     };
@@ -232,15 +252,15 @@ function DocumentView() {
   // Check Excel Permission - Only when userDataCache or categories change
   useEffect(() => {
     let isCancelled = false;
-    
+
     const checkPermission = async () => {
       if (!userDataCache || !categories?.length) {
         if (!isCancelled) setPermissionLoading(true);
         return;
       }
-      
+
       if (!isCancelled) setPermissionLoading(true);
-      
+
       try {
         if (userDataCache?.isExcelEnabled === false) {
           if (!isCancelled) {
@@ -252,24 +272,33 @@ function DocumentView() {
           }
           return;
         }
-        
-        if (userDataCache?.role === "admin" || userDataCache?.subscriptionType === "full") {
+
+        if (
+          userDataCache?.role === "admin" ||
+          userDataCache?.subscriptionType === "full"
+        ) {
           if (!isCancelled) {
             setExcelPermission({
               allowed: true,
-              reason: userDataCache?.role === "admin" ? "Admin có quyền tải Excel" : "User full subscription có quyền tải Excel",
+              reason:
+                userDataCache?.role === "admin"
+                  ? "Admin có quyền tải Excel"
+                  : "User full subscription có quyền tải Excel",
               percentage: userDataCache?.excelPercentage || 100,
             });
             setPermissionLoading(false);
           }
           return;
         }
-        
-        const result = await checkExcelDownloadPermission(userDataCache, categories);
+
+        const result = await checkExcelDownloadPermission(
+          userDataCache,
+          categories
+        );
         if (result.allowed && userDataCache?.excelPercentage !== undefined) {
           result.percentage = userDataCache.excelPercentage;
         }
-        
+
         if (!isCancelled) {
           setExcelPermission(result);
           setPermissionLoading(false);
@@ -277,27 +306,32 @@ function DocumentView() {
       } catch (error) {
         console.error("❌ Error checking Excel permission:", error);
         if (!isCancelled) {
-          setExcelPermission({ allowed: false, reason: "Lỗi kiểm tra quyền truy cập" });
+          setExcelPermission({
+            allowed: false,
+            reason: "Lỗi kiểm tra quyền truy cập",
+          });
           setPermissionLoading(false);
         }
       }
     };
-    
+
     checkPermission();
-    
+
     return () => {
       isCancelled = true;
     };
-  }, [userDataCache?.uid, categories]);// Main Data Loading - Simplified dependencies to prevent excessive re-renders
+  }, [userDataCache?.uid, categories]); // Main Data Loading - Simplified dependencies to prevent excessive re-renders
   useEffect(() => {
     let isCancelled = false;
-    
+
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const documentViewOptimizer = await import("../utils/documentViewOptimizer");
+        const documentViewOptimizer = await import(
+          "../utils/documentViewOptimizer"
+        );
         const startTime = performance.now();
 
         const [categoriesData] = await Promise.all([
@@ -309,7 +343,7 @@ function DocumentView() {
         ]);
 
         if (isCancelled) return;
-        
+
         if (!categoriesData?.length) throw new Error("Không thể tải danh mục");
         setCategories(categoriesData);
 
@@ -325,13 +359,15 @@ function DocumentView() {
 
         if (!category) throw new Error("Không tìm thấy danh mục này");
         if (isCancelled) return;
-        
+
         setSelectedCategory(category);
         setOpenMain(categoriesData.indexOf(category));
 
-        const docsData = await documentViewOptimizer.getCachedDocumentsByCategory(category.id);
-        if (!docsData?.length) throw new Error("Danh mục này không có tài liệu");
-        
+        const docsData =
+          await documentViewOptimizer.getCachedDocumentsByCategory(category.id);
+        if (!docsData?.length)
+          throw new Error("Danh mục này không có tài liệu");
+
         if (isCancelled) return;
         setDocuments({ [category.id]: docsData });
 
@@ -340,36 +376,49 @@ function DocumentView() {
 
         const docWithCategory = { ...doc, categoryId: category.id };
         if (isCancelled) return;
-        setSelectedDocument(docWithCategory);        // ✅ Sử dụng userDataCache hoặc user, ưu tiên userDataCache
+        setSelectedDocument(docWithCategory); // ✅ Sử dụng userDataCache hoặc user, ưu tiên userDataCache
         const currentUser = userDataCache || user;
-        const accessResult = checkVipDocumentAccess(currentUser, docWithCategory);
+        const accessResult = checkVipDocumentAccess(
+          currentUser,
+          docWithCategory
+        );
         if (isCancelled) return;
         setVipAccessResult(accessResult);
-
 
         if (doc.isVip && !accessResult.hasAccess) {
           if (!isCancelled) {
             setQuestions([]);
-            setViewState({ limitedView: false, viewLimitExceeded: false, viewsRemaining: 0 });
+            setViewState({
+              limitedView: false,
+              viewLimitExceeded: false,
+              viewsRemaining: 0,
+            });
           }
         } else {
-          const result = await documentViewOptimizer.loadDocumentWithParallelQueries(
-            category.id,
-            doc.id,
-            isAdmin,
-            isPuser,
-            currentUser,
-            doc
-          );
+          const result =
+            await documentViewOptimizer.loadDocumentWithParallelQueries(
+              category.id,
+              doc.id,
+              isAdmin,
+              isPuser,
+              currentUser,
+              doc
+            );
 
           if (!isCancelled) {
             if (result.vipAccessDenied) {
               setQuestions([]);
-              setViewState({ limitedView: false, viewLimitExceeded: false, viewsRemaining: 0 });
+              setViewState({
+                limitedView: false,
+                viewLimitExceeded: false,
+                viewsRemaining: 0,
+              });
               // ✅ Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
-              setVipAccessResult({ 
-                hasAccess: false, 
-                reason: result.vipAccessReason || "Tài liệu VIP này không có trong gói trả phí của bạn." 
+              setVipAccessResult({
+                hasAccess: false,
+                reason:
+                  result.vipAccessReason ||
+                  "Tài liệu VIP này không có trong gói trả phí của bạn.",
               });
             } else {
               setQuestions(result.questions || []);
@@ -382,7 +431,9 @@ function DocumentView() {
           }
         }
 
-        console.log(`⏱ fetchData completed in ${performance.now() - startTime}ms`);
+        console.log(
+          `⏱ fetchData completed in ${performance.now() - startTime}ms`
+        );
       } catch (err) {
         console.error("❌ fetchData error:", err);
         if (!isCancelled) setError(err.message || "Không thể tải dữ liệu.");
@@ -395,7 +446,7 @@ function DocumentView() {
     if (categorySlug && documentSlug) {
       fetchData();
     }
-    
+
     return () => {
       isCancelled = true;
     };
@@ -424,7 +475,10 @@ function DocumentView() {
     if (!isAdmin && !isPuser) {
       const handleContextMenu = (e) => e.preventDefault();
       const handleKeyDown = (e) => {
-        if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C" || e.keyCode === 67)) {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          (e.key === "c" || e.key === "C" || e.keyCode === 67)
+        ) {
           e.preventDefault();
         }
       };
@@ -480,7 +534,7 @@ function DocumentView() {
           break;
       }
     }
-  }, [isDarkMode, themeColor]);  // Event Handlers
+  }, [isDarkMode, themeColor]); // Event Handlers
   const reloadQuestions = async () => {
     if (!selectedDocument || !selectedCategory) return;
 
@@ -488,34 +542,50 @@ function DocumentView() {
       setLoading(true);
       setError(null);
 
-      const documentViewOptimizer = await import("../utils/documentViewOptimizer");
+      const documentViewOptimizer = await import(
+        "../utils/documentViewOptimizer"
+      );
       documentViewOptimizer.clearQuestionsCache(selectedDocument.id);
 
       const currentUser = userDataCache || user;
-      const accessResult = checkVipDocumentAccess(currentUser, selectedDocument);
+      const accessResult = checkVipDocumentAccess(
+        currentUser,
+        selectedDocument
+      );
       setVipAccessResult(accessResult);
 
       if (selectedDocument.isVip && !accessResult.hasAccess) {
         setQuestions([]);
-        setViewState({ limitedView: false, viewLimitExceeded: false, viewsRemaining: 0 });
+        setViewState({
+          limitedView: false,
+          viewLimitExceeded: false,
+          viewsRemaining: 0,
+        });
       } else {
-        const result = await documentViewOptimizer.loadDocumentWithParallelQueries(
-          selectedCategory.id,
-          selectedDocument.id,
-          isAdmin,
-          isPuser,
-          currentUser,
-          selectedDocument
-        );
+        const result =
+          await documentViewOptimizer.loadDocumentWithParallelQueries(
+            selectedCategory.id,
+            selectedDocument.id,
+            isAdmin,
+            isPuser,
+            currentUser,
+            selectedDocument
+          );
 
         if (result.vipAccessDenied) {
           console.log("🚫 VIP access denied in reload result");
           setQuestions([]);
-          setViewState({ limitedView: false, viewLimitExceeded: false, viewsRemaining: 0 });
+          setViewState({
+            limitedView: false,
+            viewLimitExceeded: false,
+            viewsRemaining: 0,
+          });
           // ✅ Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
-          setVipAccessResult({ 
-            hasAccess: false, 
-            reason: result.vipAccessReason || "Tài liệu VIP này không có trong gói trả phí của bạn." 
+          setVipAccessResult({
+            hasAccess: false,
+            reason:
+              result.vipAccessReason ||
+              "Tài liệu VIP này không có trong gói trả phí của bạn.",
           });
         } else {
           setQuestions(result.questions || []);
@@ -549,10 +619,14 @@ function DocumentView() {
       const downloadPercentage = excelPermission.percentage || 100;
 
       if (downloadPercentage < 100) {
-        const limitedCount = Math.floor(filteredQuestions.length * (downloadPercentage / 100));
+        const limitedCount = Math.floor(
+          filteredQuestions.length * (downloadPercentage / 100)
+        );
         dataToExport = filteredQuestions.slice(0, limitedCount);
         if (limitedCount < filteredQuestions.length) {
-          alert(`Tài khoản được tải ${downloadPercentage}% câu hỏi (${limitedCount}/${filteredQuestions.length} câu).`);
+          alert(
+            `Tài khoản được tải ${downloadPercentage}% câu hỏi (${limitedCount}/${filteredQuestions.length} câu).`
+          );
         }
       }
 
@@ -565,10 +639,17 @@ function DocumentView() {
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       const documentTitle = selectedDocument?.title || "Document";
-      XLSX.utils.book_append_sheet(workbook, worksheet, documentTitle.substring(0, 30));
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        documentTitle.substring(0, 30)
+      );
 
-      const percentageSuffix = downloadPercentage < 100 ? `_${downloadPercentage}percent` : "";
-      const fileName = `${selectedCategory?.title || "Category"} - ${documentTitle}${percentageSuffix}.xlsx`;
+      const percentageSuffix =
+        downloadPercentage < 100 ? `_${downloadPercentage}percent` : "";
+      const fileName = `${
+        selectedCategory?.title || "Category"
+      } - ${documentTitle}${percentageSuffix}.xlsx`;
 
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
@@ -581,12 +662,16 @@ function DocumentView() {
   if (error) {
     return (
       <div
-        className={`min-h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"} flex items-center justify-center`}
+        className={`min-h-screen ${
+          isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"
+        } flex items-center justify-center`}
       >
         <div className="text-center">
           <div
             className={`${
-              isDarkMode ? "bg-red-900/30 border-red-700" : "bg-red-100 border-red-400"
+              isDarkMode
+                ? "bg-red-900/30 border-red-700"
+                : "bg-red-100 border-red-400"
             } border text-red-500 px-4 py-3 rounded relative`}
             role="alert"
           >
@@ -600,7 +685,10 @@ function DocumentView() {
             >
               Tải lại trang
             </button>
-            <Link to="/" className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-md text-center">
+            <Link
+              to="/"
+              className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-md text-center"
+            >
               Quay về trang chủ
             </Link>
           </div>
@@ -641,10 +729,18 @@ function DocumentView() {
                 />
               </svg>
             </div>
-            <h3 className={`text-xl font-bold mb-2 ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
+            <h3
+              className={`text-xl font-bold mb-2 ${
+                isDarkMode ? "text-red-400" : "text-red-600"
+              }`}
+            >
               Cảnh báo bảo mật!
             </h3>
-            <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} mb-2`}>
+            <p
+              className={`${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              } mb-2`}
+            >
               Chụp ảnh màn hình đã bị phát hiện và bị cấm!
             </p>
           </div>
@@ -682,12 +778,17 @@ function DocumentView() {
             setDocuments={setDocuments}
             isOpen={isSidebarOpen}
             setIsOpen={setIsSidebarOpen}
-            hideDocumentTree={categorySlug === "admin" && documentSlug === "users"}
+            hideDocumentTree={
+              categorySlug === "admin" && documentSlug === "users"
+            }
           />
         </div>
 
         {isSidebarOpen && windowWidth < 770 && (
-          <div className="fixed inset-0 z-10 bg-black/50" onClick={() => setIsSidebarOpen(false)} />
+          <div
+            className="fixed inset-0 z-10 bg-black/50"
+            onClick={() => setIsSidebarOpen(false)}
+          />
         )}
 
         <div className="theme-content-container flex-1 shadow-sm flex flex-col">
@@ -709,7 +810,11 @@ function DocumentView() {
 
           <div className="flex-1 flex flex-col">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
-              <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>
+              <p
+                className={`text-sm ${
+                  isDarkMode ? "text-gray-400" : "text-slate-500"
+                }`}
+              >
                 {loading
                   ? ""
                   : `Hiển thị từ 1 đến ${filteredQuestions.length} trong tổng số ${filteredQuestions.length} câu hỏi`}
@@ -718,7 +823,9 @@ function DocumentView() {
                 {excelButtonState.show && (
                   <button
                     onClick={exportToExcel}
-                    disabled={loading || !excelButtonState.enabled || permissionLoading}
+                    disabled={
+                      loading || !excelButtonState.enabled || permissionLoading
+                    }
                     className={`flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${
                       !excelButtonState.enabled || permissionLoading
                         ? "bg-gray-400 cursor-not-allowed"
@@ -752,9 +859,12 @@ function DocumentView() {
                     )}
                     <span>
                       Excel
-                      {excelButtonState.enabled && excelButtonState.percentage < 100 && (
-                        <span className="ml-1 text-xs">({excelButtonState.percentage}%)</span>
-                      )}
+                      {excelButtonState.enabled &&
+                        excelButtonState.percentage < 100 && (
+                          <span className="ml-1 text-xs">
+                            ({excelButtonState.percentage}%)
+                          </span>
+                        )}
                     </span>
                   </button>
                 )}
@@ -773,7 +883,9 @@ function DocumentView() {
                   />
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 absolute right-3 top-2.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                    className={`h-5 w-5 absolute right-3 top-2.5 ${
+                      isDarkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -788,26 +900,39 @@ function DocumentView() {
                 </div>
               </div>
             </div>
-
-            {search && filteredQuestions.length === 0 && viewState.limitedView && (
-              <div
-                className={`mt-4 p-4 rounded-lg ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"} text-center shadow-sm`}
-              >
-                <p className="mb-2">Không tìm thấy kết quả phù hợp với tìm kiếm của bạn.</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Lưu ý: Bạn đang xem phiên bản giới hạn. Kết quả tìm kiếm có thể nằm trong phần nội dung chỉ dành cho tài khoản premium.
-                </p>
-              </div>
-            )}            {!loading && viewState.limitedView && (
+            {search &&
+              filteredQuestions.length === 0 &&
+              viewState.limitedView && (
+                <div
+                  className={`mt-4 p-4 rounded-lg ${
+                    isDarkMode
+                      ? "bg-gray-800 border border-gray-700"
+                      : "bg-white border border-gray-200"
+                  } text-center shadow-sm`}
+                >
+                  <p className="mb-2">
+                    Không tìm thấy kết quả phù hợp với tìm kiếm của bạn.
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Lưu ý: Bạn đang xem phiên bản giới hạn. Kết quả tìm kiếm có
+                    thể nằm trong phần nội dung chỉ dành cho tài khoản premium.
+                  </p>
+                </div>
+              )}{" "}
+            {!loading && viewState.limitedView && (
               <div
                 className={`mx-auto max-w-4xl px-4 mb-6 ${
-                  isDarkMode ? "bg-yellow-900/30 border border-yellow-700" : "bg-yellow-50 border border-yellow-200"
+                  isDarkMode
+                    ? "bg-yellow-900/30 border border-yellow-700"
+                    : "bg-yellow-50 border border-yellow-200"
                 } rounded-lg py-3`}
               >
                 <div className="flex items-center">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 mr-2 ${isDarkMode ? "text-yellow-500" : "text-yellow-400"}`}
+                    className={`h-5 w-5 mr-2 ${
+                      isDarkMode ? "text-yellow-500" : "text-yellow-400"
+                    }`}
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -817,7 +942,11 @@ function DocumentView() {
                       clipRule="evenodd"
                     />
                   </svg>
-                  <p className={`text-sm ${isDarkMode ? "text-yellow-200" : "text-yellow-700"}`}>
+                  <p
+                    className={`text-sm ${
+                      isDarkMode ? "text-yellow-200" : "text-yellow-700"
+                    }`}
+                  >
                     {viewState.viewLimitExceeded ? (
                       user ? (
                         <>
@@ -825,7 +954,9 @@ function DocumentView() {
                           <a
                             href="/pricing"
                             className={`font-medium underline ml-1 ${
-                              isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                              isDarkMode
+                                ? "text-yellow-300 hover:text-yellow-400"
+                                : "text-yellow-800 hover:text-yellow-900"
                             }`}
                           >
                             Nâng cấp tài khoản Premium
@@ -838,7 +969,9 @@ function DocumentView() {
                           <Link
                             to="/login"
                             className={`font-medium underline ml-1 ${
-                              isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                              isDarkMode
+                                ? "text-yellow-300 hover:text-yellow-400"
+                                : "text-yellow-800 hover:text-yellow-900"
                             }`}
                           >
                             Đăng nhập
@@ -847,7 +980,9 @@ function DocumentView() {
                           <Link
                             to="/register"
                             className={`font-medium underline mx-1 ${
-                              isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                              isDarkMode
+                                ? "text-yellow-300 hover:text-yellow-400"
+                                : "text-yellow-800 hover:text-yellow-900"
                             }`}
                           >
                             đăng ký
@@ -857,11 +992,15 @@ function DocumentView() {
                       )
                     ) : user ? (
                       <>
-                        Bạn đang xem bản giới hạn (50% câu hỏi). Bạn còn {viewState.viewsRemaining} lượt xem tài liệu này hôm nay.
+                        Bạn đang xem bản giới hạn (50% câu hỏi). Bạn còn{" "}
+                        {viewState.viewsRemaining} lượt xem tài liệu này hôm
+                        nay.
                         <a
                           href="/pricing"
                           className={`font-medium underline ml-1 ${
-                            isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                            isDarkMode
+                              ? "text-yellow-300 hover:text-yellow-400"
+                              : "text-yellow-800 hover:text-yellow-900"
                           }`}
                         >
                           Nâng cấp tài khoản
@@ -870,11 +1009,15 @@ function DocumentView() {
                       </>
                     ) : (
                       <>
-                        Bạn đang xem bản giới hạn (50% câu hỏi). Bạn còn {viewState.viewsRemaining} lượt xem tài liệu này hôm nay.
+                        Bạn đang xem bản giới hạn (50% câu hỏi). Bạn còn{" "}
+                        {viewState.viewsRemaining} lượt xem tài liệu này hôm
+                        nay.
                         <Link
                           to="/login"
                           className={`font-medium underline ml-1 ${
-                            isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                            isDarkMode
+                              ? "text-yellow-300 hover:text-yellow-400"
+                              : "text-yellow-800 hover:text-yellow-900"
                           }`}
                         >
                           Đăng nhập
@@ -883,7 +1026,9 @@ function DocumentView() {
                         <Link
                           to="/register"
                           className={`font-medium underline mx-1 ${
-                            isDarkMode ? "text-yellow-300 hover:text-yellow-400" : "text-yellow-800 hover:text-yellow-900"
+                            isDarkMode
+                              ? "text-yellow-300 hover:text-yellow-400"
+                              : "text-yellow-800 hover:text-yellow-900"
                           }`}
                         >
                           đăng ký
@@ -895,20 +1040,29 @@ function DocumentView() {
                 </div>
               </div>
             )}
-
             {loading ? (
               <div className="mx-auto max-w-4xl px-4 py-8 rounded-lg">
                 <div
                   className={`border rounded-lg overflow-hidden shadow-sm p-6 ${
-                    isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-200"
                   }`}
                 >
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500 mb-4" />
-                    <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"} text-center`}>
+                    <p
+                      className={`${
+                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                      } text-center`}
+                    >
                       Đang tải dữ liệu tài liệu...
                     </p>
-                    <p className={`${isDarkMode ? "text-gray-400" : "text-gray-500"} text-sm text-center mt-2`}>
+                    <p
+                      className={`${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      } text-sm text-center mt-2`}
+                    >
                       Chúng tôi đang chuẩn bị nội dung theo yêu cầu của bạn.
                     </p>
                   </div>
@@ -916,18 +1070,36 @@ function DocumentView() {
               </div>
             ) : (
               <>
-                {selectedDocument?.isVip && vipAccessResult && !vipAccessResult.hasAccess ? (
+                {selectedDocument?.isVip &&
+                vipAccessResult &&
+                !vipAccessResult.hasAccess ? (
                   <div className="mx-auto max-w-4xl px-4 py-12 text-center rounded-lg">
-                    <div className={`p-8 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+                    <div
+                      className={`p-8 rounded-lg shadow-md ${
+                        isDarkMode ? "bg-gray-800" : "bg-white"
+                      }`}
+                    >
                       <div className="mb-4 flex justify-center">
-                        <svg className="w-16 h-16 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        <svg
+                          className="w-16 h-16 text-yellow-500"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
                       </div>
-                      <h2 className={`text-xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
+                      <h2
+                        className={`text-xl font-bold mb-2 ${
+                          isDarkMode ? "text-white" : "text-gray-800"
+                        }`}
+                      >
                         🌟 Nội dung VIP
                       </h2>
-                      <p className={`mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                      <p
+                        className={`mb-6 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
                         {vipAccessResult.reason}
                       </p>
                       <div className="flex flex-col md:flex-row gap-3 justify-center">
@@ -965,70 +1137,90 @@ function DocumentView() {
                   </div>
                 ) : (
                   <>
-                    {!loading && filteredQuestions.length === 0 && !viewState.viewLimitExceeded && (
-                      <div className="mx-auto max-w-4xl px-4 py-8 rounded-lg">
-                        <div
-                          className={`border rounded-lg overflow-hidden shadow-sm p-8 text-center ${
-                            isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-                          }`}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-16 w-16 mx-auto mb-4 text-gray-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                    {!loading &&
+                      filteredQuestions.length === 0 &&
+                      !viewState.viewLimitExceeded && (
+                        <div className="mx-auto max-w-4xl px-4 py-8 rounded-lg">
+                          <div
+                            className={`border rounded-lg overflow-hidden shadow-sm p-8 text-center ${
+                              isDarkMode
+                                ? "bg-gray-800 border-gray-700"
+                                : "bg-white border-gray-200"
+                            }`}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                          </svg>
-                          <h3 className={`text-lg font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
-                            Không có nội dung
-                          </h3>
-                          <p className={`mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                            Tài liệu này hiện chưa có câu hỏi hoặc đáp án nào.
-                          </p>
-                          <div className="mt-6 flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-3 justify-center">
-                            <button
-                              onClick={reloadQuestions}
-                              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
                             >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                            <h3
+                              className={`text-lg font-medium ${
+                                isDarkMode ? "text-gray-200" : "text-gray-700"
+                              }`}
+                            >
+                              Không có nội dung
+                            </h3>
+                            <p
+                              className={`mt-2 ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              Tài liệu này hiện chưa có câu hỏi hoặc đáp án nào.
+                            </p>
+                            <div className="mt-6 flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-3 justify-center">
+                              <button
+                                onClick={reloadQuestions}
+                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
                               >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                />
-                              </svg>
-                              Tải lại
-                            </button>
-                            <Link
-                              to="/"
-                              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                            >
-                              Quay về trang chủ
-                            </Link>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5 mr-1"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                  />
+                                </svg>
+                                Tải lại
+                              </button>
+                              <Link
+                                to="/"
+                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                              >
+                                Quay về trang chủ
+                              </Link>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {viewState.viewLimitExceeded && !isPuser && !isAdmin ? (
                       <div className="mx-auto max-w-4xl px-4 py-12 text-center rounded-lg">
-                        <div className={`p-8 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+                        <div
+                          className={`p-8 rounded-lg shadow-md ${
+                            isDarkMode ? "bg-gray-800" : "bg-white"
+                          }`}
+                        >
                           <div className="mb-4 flex justify-center">
                             <svg
-                              className={`w-16 h-16 ${isDarkMode ? "text-yellow-500" : "text-yellow-400"}`}
+                              className={`w-16 h-16 ${
+                                isDarkMode
+                                  ? "text-yellow-500"
+                                  : "text-yellow-400"
+                              }`}
                               fill="currentColor"
                               viewBox="0 0 20 20"
                               xmlns="http://www.w3.org/2000/svg"
@@ -1040,11 +1232,20 @@ function DocumentView() {
                               />
                             </svg>
                           </div>
-                          <h2 className={`text-xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"}`}>
+                          <h2
+                            className={`text-xl font-bold mb-2 ${
+                              isDarkMode ? "text-white" : "text-gray-800"
+                            }`}
+                          >
                             Giới hạn lượt xem đã hết
                           </h2>
-                          <p className={`mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                            Bạn đã sử dụng hết 5 lượt xem tài liệu này trong ngày hôm nay.
+                          <p
+                            className={`mb-6 ${
+                              isDarkMode ? "text-gray-300" : "text-gray-600"
+                            }`}
+                          >
+                            Bạn đã sử dụng hết 5 lượt xem tài liệu này trong
+                            ngày hôm nay.
                           </p>
                           <div className="flex flex-col md:flex-row gap-3 justify-center">
                             {user ? (
@@ -1081,11 +1282,14 @@ function DocumentView() {
                       </div>
                     ) : (
                       <>
-                        {categorySlug === "admin" && documentSlug === "users" ? (
+                        {categorySlug === "admin" &&
+                        documentSlug === "users" ? (
                           <UserManagementContent />
                         ) : (
                           !viewState.viewLimitExceeded && (
-                            <MemoizedMainContent filteredQuestions={filteredQuestions} />
+                            <MemoizedMainContent
+                              filteredQuestions={filteredQuestions}
+                            />
                           )
                         )}
                       </>
