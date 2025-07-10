@@ -1,14 +1,210 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TailieuHOU</title>
+    <title>Tài Liệu</title>
+    <link rel="canonical" href="https://tailieuehou.id.vn" />
+    <meta name="description" content="Tài liệu học tập, ôn thi" />
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="./src/styles/main.css">
+
+    <!-- Favicon -->
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Thêm meta verification Google AdSense -->
+    <meta name="google-adsense-account" content="ca-pub-4282799215996734">
+
+    <!-- Force cache refresh for production -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="build-version" content="v1749934903755">
+
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- Thêm meta tag để tắt đặt hàng tự động từ AdSense -->
+    <meta name="google" content="notranslate">
+
+    <!-- Meta tags để điều khiển cache -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <!-- Preload critical assets -->
+    <link rel="preload" href="/assets/index.css" as="style">
+    <!-- Remove old JSX preload since Vite will handle this -->
+
+    <!-- Preconnect to APIs -->
+    <link rel="preconnect" href="https://firebaseapp.com">
+    <link rel="preconnect" href="https://firebaseio.com">
+
+    <style>
+        #adsContainer {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: 320px;
+            height: 250px;
+            background-color: transparent;
+            display: block;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (min-width: 770px) {
+            #adsContainer {
+                left: calc(50% + 144px);
+            }
+        }
+
+        @media (min-width: 770px) and (max-width: 1279px) {
+            #adsContainer {
+                left: calc(50% + 32px);
+            }
+        }
+
+        @media (max-width: 769px) {
+            #adsContainer {
+                bottom: 10px;
+            }
+        }
+
+        .ad-wrapper {
+            position: relative;
+            width: 320px;
+            height: 250px;
+            min-width: 320px;
+            min-height: 250px;
+            display: block;
+            overflow: visible;
+        }
+
+        /* Nút đóng quảng cáo */
+        .close-ad-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* Thông báo quảng cáo */
+        .ad-message {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(248, 248, 248, 0.9);
+            border: 1px dashed #ddd;
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            box-sizing: border-box;
+            z-index: 5;
+        }
+
+        /* Đảm bảo ins.adsbygoogle luôn có kích thước visible */
+        ins.adsbygoogle {
+            display: block !important;
+            width: 320px !important;
+            height: 250px !important;
+            min-width: 320px !important;
+            min-height: 250px !important;
+            margin: 0;
+            padding: 0;
+            background-color: transparent;
+        }
+    </style>
+    <!-- Add meta timestamp to force refresh -->
+    <meta name="timestamp" content="" id="meta-timestamp">
+    <script>
+        // Set timestamp in meta tag
+        document.getElementById('meta-timestamp').setAttribute('content', Date.now().toString());
+    </script>
+
+    <!-- Resource refresh script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Add timestamp to asset requests to prevent caching
+            const linkElements = document.getElementsByTagName('link');
+            const scriptElements = document.getElementsByTagName('script');
+
+            const timestamp = '?t=' + Date.now();
+
+            function addTimestampToElements(elements) {
+                for (let i = 0; i < elements.length; i++) {
+                    const element = elements[i];
+                    const src = element.href || element.src;
+                    if (src && !src.includes('?t=')) {
+                        // Add timestamp only if not already present
+                        if (src.includes('?')) {
+                            element.href = element.src = src + '&t=' + Date.now();
+                        } else {
+                            element.href = element.src = src + '?t=' + Date.now();
+                        }
+                    }
+                }
+            }
+
+            // Disable adding timestamp to prevent redirect loop
+            // addTimestampToElements(linkElements);
+            // addTimestampToElements(scriptElements);
+        });
+    </script>
 </head>
+
 <body class="bg-gray-100">
     <div id="root"></div>
-    <script type="module" src="./src/main.jsx"></script>
+
+    <!-- App script - đặt sau khi đã thiết lập các yếu tố quan trọng -->
+    <script>
+        // Force clear browser cache for production
+        if (location.hostname === 'tailieuehou.id.vn' || location.hostname === 'tailieuehou.web.app') {
+            // Clear any cached JSX references
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                    for (let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
+            }
+
+            // Clear localStorage cache
+            try {
+                localStorage.removeItem('vite-cache');
+                sessionStorage.clear();
+            } catch (e) { }
+        }
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+    <noscript>
+        <div style="padding: 20px; text-align: center;">
+            Vui lòng bật JavaScript để sử dụng trang web này.
+        </div>
+    </noscript>
 </body>
+
 </html>

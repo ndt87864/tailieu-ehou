@@ -2,20 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../../firebase/firebase';
-import { useUserRole } from '../../context/UserRoleContext';
 import { useTheme } from '../../context/ThemeContext';
-import { getAllCategories, addCategory, updateCategory, deleteCategory } from '../../firebase/firestoreService';
+import { addCategory, updateCategory, deleteCategory } from '../../firebase/firestoreService';
 import Sidebar from '../../components/Sidebar';
 import { DocumentMobileHeader } from '../../components/MobileHeader';
 import UserHeader from '../../components/UserHeader';
 import ThemeColorPicker from '../../components/ThemeColorPicker';
+import { useSafeAdminCheck, protectAdminRoute, loadCategoriesOptimized } from '../../utils/adminHelper';
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user] = useAuthState(auth);
-  const { isAdmin } = useUserRole();
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
   
@@ -56,6 +55,14 @@ const CategoryManagement = () => {
   const [deleteSuccess, setDeleteSuccess] = useState('');
   const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  
+  const [isMovingToTop, setIsMovingToTop] = useState(false);
+  const [movingSuccess, setMovingSuccess] = useState('');
+  
+  // Thêm state cho modal xác nhận ghim danh mục
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [categoryToPin, setCategoryToPin] = useState(null);
+  const [isPinning, setIsPinning] = useState(false);
   
   const academicLogos = [
     { 
@@ -388,6 +395,86 @@ const CategoryManagement = () => {
     }
   };
 
+  // Sửa lại hàm xử lý khi nhấn nút đưa lên đầu để hiển thị modal xác nhận
+  const handlePinClick = (category) => {
+    if (!category) return;
+    
+    // Kiểm tra xem danh mục này đã ở vị trí đầu tiên chưa
+    // Tìm danh mục có stt = 1 thay vì dựa vào index của mảng hiển thị
+    const topCategory = categories.find(cat => cat.stt === 1);
+    if (topCategory && topCategory.id === category.id) {
+      setErrorMessage("Danh mục này đã ở vị trí đầu tiên");
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    
+    // Hiển thị modal xác nhận thay vì xử lý trực tiếp
+    setCategoryToPin(category);
+    setShowPinModal(true);
+  };
+
+  // Hàm thực hiện việc đưa danh mục lên đầu sau khi xác nhận
+  const confirmPinToTop = async () => {
+    if (!categoryToPin) return;
+    
+    try {
+      setIsPinning(true);
+      
+      // Cập nhật trạng thái loading
+      setLoading(true);
+      
+      // Truy vấn để lấy danh sách đã sắp xếp
+      const sortedCategories = [...categories].sort((a, b) => {
+        const aStt = a.stt || Number.MAX_SAFE_INTEGER;
+        const bStt = b.stt || Number.MAX_SAFE_INTEGER;
+        return aStt - bStt;
+      });
+      
+      // Cập nhật danh mục được chọn thành stt = 1
+      await updateCategory(categoryToPin.id, {
+        ...categoryToPin,
+        stt: 1
+      });
+      
+      // Cập nhật các danh mục khác
+      for (const cat of sortedCategories) {
+        if (cat.id !== categoryToPin.id) {
+          // Tăng stt của tất cả các danh mục khác lên 1
+          const currentStt = cat.stt || 0;
+          await updateCategory(cat.id, {
+            ...cat,
+            stt: currentStt + 1
+          });
+        }
+      }
+      
+      // Hiển thị thông báo thành công
+      setMovingSuccess(`Đã ghim danh mục "${categoryToPin.title}" lên đầu tiên`);
+      
+      // Đóng modal xác nhận
+      setShowPinModal(false);
+      setCategoryToPin(null);
+      
+      // Tải lại danh sách danh mục
+      await loadCategoriesOptimized(setLoading, setError, setCategories);
+      
+      // Tự động đóng thông báo sau 3 giây
+      setTimeout(() => {
+        setMovingSuccess('');
+      }, 3000);
+      
+    } catch (error) {
+      console.error("Lỗi khi ghim danh mục lên đầu:", error);
+      setErrorMessage(`Đã xảy ra lỗi khi ghim danh mục: ${error.message}`);
+      setTimeout(() => {
+        setErrorMessage('');
+      }, 3000);
+    } finally {
+      setIsPinning(false);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
@@ -399,32 +486,44 @@ const CategoryManagement = () => {
     };
   }, []);
 
+  // Sử dụng hook kiểm tra admin an toàn
+  const { isAdmin, loading: roleLoading } = useSafeAdminCheck();
+
+  // Áp dụng bảo vệ route
+  protectAdminRoute(isAdmin, roleLoading, navigate);
+
+  // Sử dụng hàm tối ưu để tải danh mục
   useEffect(() => {
+    if (roleLoading) return;
+    if (!isAdmin) return;
+    
     const loadCategories = async () => {
-      if (!isAdmin) {
-        return;
-      }
-      
       try {
         setLoading(true);
-        const categoriesData = await getAllCategories();
-        setCategories(categoriesData);
-      } catch (err) {
-        console.error("Error loading categories:", err);
-        setError("Không thể tải danh sách danh mục");
+        const fetchedCategories = await loadCategoriesOptimized(setLoading, setError, setCategories);
+        
+        // Đảm bảo tất cả danh mục đều có stt, nếu không có thì gán giá trị mặc định
+        const withStt = fetchedCategories.map((cat, index) => ({
+          ...cat,
+          stt: cat.stt || (index + 1) * 10  // Nếu không có stt, gán giá trị mặc định với khoảng cách 10
+        }));
+        
+        setCategories(withStt);
+      } catch (error) {
+        setError(error.message);
       } finally {
         setLoading(false);
       }
     };
-
+    
     loadCategories();
-  }, [isAdmin]);
+  }, [isAdmin, roleLoading]);
 
   useEffect(() => {
-    if (!loading && !isAdmin) {
+    if (!roleLoading && !loading && !isAdmin) {
       navigate('/');
     }
-  }, [isAdmin, loading, navigate]);
+  }, [isAdmin, loading, navigate, roleLoading]);
 
   const filteredCategories = categories.filter((category, index) => {
     const stt = (index + 1).toString();
@@ -598,6 +697,22 @@ const CategoryManagement = () => {
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
                     <div className="flex justify-end space-x-2">
                       <button
+                        onClick={() => handlePinClick(category)}
+                        disabled={isMovingToTop || category.stt === 1}
+                        className={`p-1.5 rounded-md ${
+                          isMovingToTop 
+                            ? (isDarkMode ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 cursor-not-allowed')
+                            : category.stt === 1
+                              ? (isDarkMode ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 cursor-not-allowed')
+                              : (isDarkMode ? 'text-yellow-400 hover:bg-gray-700 hover:text-yellow-300' : 'text-yellow-600 hover:bg-gray-100 hover:text-yellow-700')
+                        }`}
+                        title={category.stt === 1 ? "Danh mục đã ở vị trí đầu tiên" : "Ghim danh mục lên đầu danh sách"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
                         onClick={() => handleEditClick(category)}
                         className={`p-1.5 rounded-md ${
                           isDarkMode ? 'text-blue-400 hover:bg-gray-700 hover:text-blue-300' : 'text-blue-600 hover:bg-gray-100 hover:text-blue-700'
@@ -684,6 +799,22 @@ const CategoryManagement = () => {
                 </td>
                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
                   <div className="flex items-center justify-end space-x-2">
+                    <button
+                      onClick={() => handlePinClick(category)}
+                      disabled={isMovingToTop || category.stt === 1}
+                      className={`inline-flex items-center p-1.5 rounded-md ${
+                        isMovingToTop 
+                          ? (isDarkMode ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 cursor-not-allowed')
+                          : category.stt === 1
+                            ? (isDarkMode ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 cursor-not-allowed')
+                            : (isDarkMode ? 'text-yellow-400 hover:bg-gray-700 hover:text-yellow-300' : 'text-yellow-600 hover:bg-gray-100 hover:text-yellow-700')
+                      }`}
+                      title={category.stt === 1 ? "Danh mục đã ở vị trí đầu tiên" : "Ghim danh mục lên đầu danh sách"}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                      </svg>
+                    </button>
                     <button
                       onClick={() => handleEditClick(category)}
                       className={`inline-flex items-center p-1.5 rounded-md ${
@@ -1270,6 +1401,110 @@ const CategoryManagement = () => {
         </div>
       )}
       
+      {/* Pin Confirmation Modal */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-black bg-opacity-70"></div>
+            </div>
+            
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div 
+              className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full ${
+                isDarkMode ? 'bg-gray-700 border border-gray-600' : 'bg-gray-50 border border-gray-200'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className={`px-6 py-4 border-b ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Xác nhận ghim danh mục
+                  </h3>
+                  <button
+                    type="button"
+                    className={`rounded-md p-1 focus:outline-none ${
+                      isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setShowPinModal(false)}
+                  >
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Modal Body */}
+              <div className={`px-6 py-5 ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50 text-gray-800'}`}>
+                <div className="mb-5 flex items-center justify-center">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                    isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-100'
+                  } mx-auto`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                    </svg>
+                  </div>
+                </div>
+
+                <p className={`text-center text-sm mb-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Bạn có muốn ghim danh mục <span className="font-semibold">{categoryToPin?.title}</span> lên đầu danh sách?
+                  <br />
+                  <span className={`font-medium ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                    Danh mục này sẽ luôn hiển thị ở vị trí đầu tiên.
+                  </span>
+                </p>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className={`px-6 py-4 sm:flex sm:flex-row-reverse ${isDarkMode ? 'bg-gray-700 border-t border-gray-600' : 'bg-gray-50 border-t border-gray-200'}`}>
+                <button
+                  type="button"
+                  onClick={confirmPinToTop}
+                  disabled={isPinning}
+                  className={`w-full inline-flex justify-center items-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white sm:ml-3 sm:w-auto sm:text-sm ${
+                    isPinning 
+                      ? 'bg-yellow-500 cursor-not-allowed' 
+                      : isDarkMode 
+                        ? 'bg-yellow-600 hover:bg-yellow-500 focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500' 
+                        : 'bg-yellow-500 hover:bg-yellow-600 focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500'
+                  }`}
+                >
+                  {isPinning ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                      </svg>
+                      Xác nhận ghim
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPinModal(false)}
+                  className={`mt-3 w-full inline-flex justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm ${
+                    isDarkMode 
+                      ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 border-gray-600' 
+                      : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
+                  }`}
+                >
+                  Hủy bỏ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* ThemeColorPicker */}
       <ThemeColorPicker 
         isOpen={isThemePickerOpen} 
@@ -1284,7 +1519,7 @@ const CategoryManagement = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1.293-4.707a1 1 0 011.414 0L10 14.586l1.293-1.293a1 1 0 011.414 1.414L11.414 16l1.293 1.293a1 1 0 01-1.414 1.414L10 17.414l-1.293 1.293a1 1 0 01-1.414-1.414L8.586 16l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
@@ -1296,6 +1531,38 @@ const CategoryManagement = () => {
                   onClick={() => setErrorMessage('')}
                   className={`inline-flex rounded-md p-1.5 ${
                     isDarkMode ? 'text-red-300 hover:bg-red-800' : 'text-red-500 hover:bg-red-200'
+                  } focus:outline-none`}
+                >
+                  <span className="sr-only">Đóng</span>
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 011.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {movingSuccess && (
+        <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${
+          isDarkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'
+        } z-50 max-w-md`}>
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium">{movingSuccess}</p>
+            </div>
+            <div className="ml-auto pl-3">
+              <div className="-mx-1.5 -my-1.5">
+                <button 
+                  onClick={() => setMovingSuccess('')}
+                  className={`inline-flex rounded-md p-1.5 ${
+                    isDarkMode ? 'text-green-300 hover:bg-green-800' : 'text-green-500 hover:bg-green-200'
                   } focus:outline-none`}
                 >
                   <span className="sr-only">Đóng</span>

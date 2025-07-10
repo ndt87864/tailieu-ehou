@@ -1,9 +1,14 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useTheme, THEME_COLORS } from '../context/ThemeContext';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth } from '../firebase/firebase';
 
 const ThemeColorPicker = ({ isOpen, onClose }) => {
   const { isDarkMode, themeColor, changeThemeColor, toggleDarkMode, THEME_COLORS } = useTheme();
+  const [user] = useAuthState(auth);
+  const [saveStatus, setSaveStatus] = useState(''); // 'saving', 'saved', 'error'
   const pickerRef = useRef(null);
+  
   useEffect(() => {
     if (!isOpen) return;
     
@@ -18,8 +23,37 @@ const ThemeColorPicker = ({ isOpen, onClose }) => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose]);
-    if (!isOpen) return null;
-    return (
+
+  // Handle theme color change with status indicator
+  const handleThemeColorChange = async (color) => {
+    setSaveStatus('saving');
+    try {
+      await changeThemeColor(color);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (error) {
+      console.error('Error saving theme color:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(''), 3000);
+    }
+  };
+
+  // Handle dark mode toggle with status indicator
+  const handleDarkModeToggle = async () => {
+    setSaveStatus('saving');
+    try {
+      await toggleDarkMode();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (error) {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus(''), 3000);
+    }
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
       <div 
         ref={pickerRef}
@@ -35,11 +69,26 @@ const ThemeColorPicker = ({ isOpen, onClose }) => {
           </button>
         </div>
         
+        {/* Save status indicator */}
+        {saveStatus && (
+          <div className={`mb-4 p-2 text-sm rounded-md ${
+            saveStatus === 'saving' 
+              ? isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'
+              : saveStatus === 'saved'
+                ? isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'
+                : isDarkMode ? 'bg-red-900/30 text-red-300' : 'bg-red-50 text-red-700'
+          }`}>
+            {saveStatus === 'saving' && 'Đang lưu cài đặt...'}
+            {saveStatus === 'saved' && 'Đã lưu cài đặt thành công'}
+            {saveStatus === 'error' && 'Lỗi khi lưu cài đặt'}
+          </div>
+        )}
+        
         {/* Chế độ sáng/tối */}
         <div className="mb-5 border-b pb-4">
           <h4 className="text-sm font-medium mb-3">Chế độ sáng/tối</h4>
           <button 
-            onClick={toggleDarkMode}
+            onClick={handleDarkModeToggle}
             className={`w-full flex items-center justify-between p-3 rounded-md ${
               isDarkMode 
                 ? 'bg-gray-700 hover:bg-gray-600' 
@@ -76,59 +125,59 @@ const ThemeColorPicker = ({ isOpen, onClose }) => {
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-            {/* Màu mặc định */}
+            {/* Màu mặc định - cập nhật lớp CSS để phản ánh màu xanh emerald mới */}
             <div 
-              className={`theme-color-option theme-color-default ${themeColor === THEME_COLORS.DEFAULT ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.DEFAULT)}
-              title="Mặc định"
+              className={`theme-color-option theme-emerald ${themeColor === THEME_COLORS.DEFAULT ? 'active' : ''}`}
+              onClick={() => handleThemeColorChange(THEME_COLORS.DEFAULT)}
+              title="Xanh Emerald"
             ></div>
             
             {/* Màu xanh */}
             <div 
               className={`theme-color-option theme-color-blue ${themeColor === THEME_COLORS.BLUE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BLUE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BLUE)}
               title="Xanh dương"
             ></div>
             
             {/* Màu đỏ */}
             <div 
               className={`theme-color-option theme-color-red ${themeColor === THEME_COLORS.RED ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.RED)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.RED)}
               title="Đỏ"
             ></div>
             
             {/* Màu tím */}
             <div 
               className={`theme-color-option theme-color-purple ${themeColor === THEME_COLORS.PURPLE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.PURPLE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.PURPLE)}
               title="Tím"
             ></div>
             
             {/* Màu vàng */}
             <div 
               className={`theme-color-option theme-color-yellow ${themeColor === THEME_COLORS.YELLOW ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.YELLOW)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.YELLOW)}
               title="Vàng"
             ></div>
             
             {/* Màu nâu */}
             <div 
               className={`theme-color-option theme-color-brown ${themeColor === THEME_COLORS.BROWN ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BROWN)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BROWN)}
               title="Nâu"
             ></div>
             
             {/* Màu đen */}
             <div 
               className={`theme-color-option theme-color-black ${themeColor === THEME_COLORS.BLACK ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BLACK)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BLACK)}
               title="Đen"
             ></div>
             
             {/* Màu trắng */}
             <div 
               className={`theme-color-option theme-color-white ${themeColor === THEME_COLORS.WHITE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.WHITE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.WHITE)}
               title="Trắng"
             ></div>
           </div>
@@ -138,6 +187,11 @@ const ThemeColorPicker = ({ isOpen, onClose }) => {
           <p className="mb-2">
             <strong>Lưu ý:</strong> Thay đổi màu chủ đề sẽ chỉ có hiệu lực khi ở chế độ sáng.
           </p>
+          {user ? (
+            <p className="text-xs">Cài đặt của bạn sẽ được lưu và đồng bộ trên tất cả thiết bị.</p>
+          ) : (
+            <p className="text-xs">Đăng nhập để lưu cài đặt giao diện của bạn.</p>
+          )}
         </div>
       </div>
     </div>

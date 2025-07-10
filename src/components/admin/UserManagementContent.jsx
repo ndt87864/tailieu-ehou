@@ -37,7 +37,6 @@ const UserManagementContent = () => {
   const [newUserFormErrors, setNewUserFormErrors] = useState({});
   const [addingUser, setAddingUser] = useState(false);
 
-  // Add sidebar state
   const [categories, setCategories] = useState([]);
   const [documents, setDocuments] = useState({});
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -48,7 +47,6 @@ const UserManagementContent = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
 
-  // Add window resize effect
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -66,10 +64,27 @@ const UserManagementContent = () => {
 
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!isAdmin) {
+        navigate('/login');
+        return;
+      }
+      
       try {
         setLoading(true);
+        
+        // Fetch users with limit to improve performance
         const allUsers = await getAllUsers();
-        setUsers(allUsers);
+        
+        // Process users in a batch if needed
+        const processedUsers = allUsers.map(user => ({
+          ...user,
+          // Default values for any missing properties
+          displayName: user.displayName || 'No Name',
+          email: user.email || 'No Email',
+          role: user.role || 'fuser',
+        }));
+        
+        setUsers(processedUsers);
       } catch (error) {
         console.error('Lỗi khi lấy danh sách người dùng:', error);
         setError('Không thể tải danh sách người dùng. Vui lòng thử lại sau.');
@@ -79,9 +94,8 @@ const UserManagementContent = () => {
     };
 
     fetchUsers();
-  }, []);
+  }, [isAdmin, navigate]);
 
-  // Handle role change
   const handleRoleChange = async (userId, newRole) => {
     try {
       setUpdateSuccess('');

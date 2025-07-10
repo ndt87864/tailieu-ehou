@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 
 export const AdminMobileHeader = ({ title, setIsSidebarOpen, setIsThemePickerOpen }) => {
   const { isDarkMode } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   return (
     <>
-      <header className={`fixed top-0 left-0 right-0 z-30 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'} border-b px-4 py-3 flex items-center justify-between`}>
+      <header className={`fixed top-0 left-0 right-0 z-30 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-white'} border-b px-4 py-3 flex items-center justify-between ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'}`}>
         <div className="flex items-center">
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -31,9 +32,16 @@ export const AdminMobileHeader = ({ title, setIsSidebarOpen, setIsThemePickerOpe
             </svg>
           </button>
         </div>
+        {isMenuOpen && (
+          <div className={`absolute top-full right-0 mt-2 w-48 rounded-md shadow-lg ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'}`}>
+            {/* ...menu items... */}
+          </div>
+        )}
       </header>
       
       <div className="h-14"></div>
     </>
   );
 };
+
+export default AdminMobileHeader;

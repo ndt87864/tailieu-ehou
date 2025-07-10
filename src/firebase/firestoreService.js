@@ -1,1 +1,238 @@
-import {   collection,   getDocs,   getDoc,   doc,   query,   where,  addDoc,   updateDoc,   deleteDoc,  orderBy,  setDoc} from "firebase/firestore";import { db } from "./firebase";export const COLLECTIONS = {  CATEGORIES: "categories",  DOCUMENTS: "documents",  QUESTIONS: "questions",  USER_PREFERENCES: "userPreferences",  USERS: "users" };export const getAllCategories = async () => {  try {    const categoriesRef = collection(db, 'categories');    const categoriesSnapshot = await getDocs(categoriesRef);    const categories = [];    for (const doc of categoriesSnapshot.docs) {      const categoryData = doc.data();      const documentsRef = collection(db, 'documents');      const documentsQuery = query(documentsRef, where('categoryId', '==', doc.id));      const documentsSnapshot = await getDocs(documentsQuery);      categories.push({        id: doc.id,        ...categoryData,        documentCount: documentsSnapshot.docs.length      });    }    return categories.sort((a, b) => (a.stt || 0) - (b.stt || 0));  } catch (error) {    console.error('Error getting categories:', error);    throw error;  }};export const getAllCategoriesWithDocuments = async () => {  try {    const categoriesRef = collection(db, COLLECTIONS.CATEGORIES);    const categoriesSnapshot = await getDocs(categoriesRef);    let categoriesData = categoriesSnapshot.docs.map(doc => ({      id: doc.id,      ...doc.data()    }));    categoriesData = categoriesData.sort((a, b) => (a.stt || 0) - (b.stt || 0));    const result = [];    for (const category of categoriesData) {      const documentsQuery = query(        collection(db, COLLECTIONS.DOCUMENTS),        where("categoryId", "==", category.id)      );      const documentsSnapshot = await getDocs(documentsQuery);      let documents = documentsSnapshot.docs.map(doc => ({        id: doc.id,        ...doc.data()      }));      documents = documents.sort((a, b) => (a.stt || 0) - (b.stt || 0));      result.push({        ...category,        documents      });    }    return result;  } catch (error) {    console.error("Error getting categories with documents:", error);    throw error;  }};export const addCategory = async (categoryData) => {  try {    const categoriesRef = collection(db, COLLECTIONS.CATEGORIES);    const categoriesSnapshot = await getDocs(categoriesRef);    let maxStt = 0;    categoriesSnapshot.docs.forEach(doc => {      const stt = doc.data().stt || 0;      if (stt > maxStt) maxStt = stt;    });    const newCategory = {      ...categoryData,      stt: maxStt + 1,      createdAt: new Date(),      updatedAt: new Date()    };    const docRef = await addDoc(collection(db, COLLECTIONS.CATEGORIES), newCategory);    return {      id: docRef.id,      ...newCategory    };  } catch (error) {    console.error('Error adding category:', error);    throw error;  }};export const updateCategory = async (categoryId, categoryData) => {  try {    const categoryRef = doc(db, COLLECTIONS.CATEGORIES, categoryId);    const updatedCategory = {      ...categoryData,      updatedAt: new Date()    };    await updateDoc(categoryRef, updatedCategory);    return {      id: categoryId,      ...updatedCategory    };  } catch (error) {    console.error('Error updating category:', error);    throw error;  }};export const deleteCategory = async (categoryId) => {  try {    const documentsQuery = query(      collection(db, COLLECTIONS.DOCUMENTS),      where("categoryId", "==", categoryId)    );    const documentsSnapshot = await getDocs(documentsQuery);    const deletePromises = documentsSnapshot.docs.map(async (docSnapshot) => {      const documentId = docSnapshot.id;      const questionsQuery = query(        collection(db, COLLECTIONS.QUESTIONS),        where("documentId", "==", documentId)      );      const questionsSnapshot = await getDocs(questionsQuery);      const questionDeletePromises = questionsSnapshot.docs.map(questionDoc =>         deleteDoc(doc(db, COLLECTIONS.QUESTIONS, questionDoc.id))      );      await Promise.all(questionDeletePromises);      return deleteDoc(doc(db, COLLECTIONS.DOCUMENTS, documentId));    });    await Promise.all(deletePromises);    await deleteDoc(doc(db, COLLECTIONS.CATEGORIES, categoryId));    return {      success: true,      message: "Đã xóa danh mục và tất cả tài liệu liên quan"    };  } catch (error) {    console.error('Error deleting category:', error);    throw error;  }};export const getCategoryById = async (categoryId) => {  try {    const docRef = doc(db, COLLECTIONS.CATEGORIES, categoryId);    const docSnap = await getDoc(docRef);    if (docSnap.exists()) {      return {        id: docSnap.id,        ...docSnap.data()      };    } else {      return null;    }  } catch (error) {    console.error("Error getting category:", error);    throw error;  }};export const getDocumentsByCategory = async (categoryId) => {  try {    const categoryRef = doc(db, COLLECTIONS.CATEGORIES, categoryId);    const categorySnap = await getDoc(categoryRef);    const categoryData = categorySnap.exists() ? categorySnap.data() : {};    const categoryLogo = categoryData.logo || null;    const q = query(      collection(db, COLLECTIONS.DOCUMENTS),      where("categoryId", "==", categoryId)    );    const querySnapshot = await getDocs(q);    return querySnapshot.docs      .map(doc => ({        id: doc.id,        ...doc.data(),        categoryLogo: categoryLogo       }))      .sort((a, b) => (a.stt || 0) - (b.stt || 0));   } catch (error) {    console.error("Error getting documents:", error);    throw error;  }};export const getQuestionsByDocument = async (documentId) => {  try {    const questionsCollection = collection(db, COLLECTIONS.QUESTIONS);    try {      const q = query(        questionsCollection,         where("documentId", "==", documentId),        orderBy("stt", "asc")      );      const questionsSnapshot = await getDocs(q);      return questionsSnapshot.docs.map(doc => ({        id: doc.id,        ...doc.data(),        question: doc.data().question || '',        answer: doc.data().answer || '',        stt: doc.data().stt || 0      }));    } catch (indexError) {      const basicQuery = query(        questionsCollection,         where("documentId", "==", documentId)      );      const questionsSnapshot = await getDocs(basicQuery);      const questions = questionsSnapshot.docs.map(doc => ({        id: doc.id,        ...doc.data(),        question: doc.data().question || '',        answer: doc.data().answer || '',        stt: doc.data().stt || 0      }));      return questions.sort((a, b) => (a.stt || 0) - (b.stt || 0));    }  } catch (error) {    console.error("Error fetching questions:", error);    throw error;  }};export const getAllQuestionsWithDocumentInfo = async () => {  try {    console.log("Fetching all questions with document info");    const questionsCollection = collection(db, 'questions');    const questionsSnapshot = await getDocs(questionsCollection);    if (questionsSnapshot.empty) {      console.log("No questions found in Firestore");      return [];    }    console.log("Questions fetched, count:", questionsSnapshot.size);    const questionsArray = questionsSnapshot.docs.map(doc => ({      id: doc.id,      ...doc.data()    }));    const questionsWithDocInfo = await Promise.all(      questionsArray.map(async (question) => {        if (!question.documentId) {          console.log("Question has no documentId:", question);          return {            ...question,            documentTitle: 'Không có tài liệu',            categoryId: '',            categoryTitle: 'Không có danh mục',          };        }        try {          const docRef = doc(db, 'documents', question.documentId);          const docSnap = await getDoc(docRef);          if (!docSnap.exists()) {            console.log(`Document with ID ${question.documentId} not found for question:`, question);            return {              ...question,              documentTitle: 'Tài liệu không tồn tại',              categoryId: '',              categoryTitle: 'Không có danh mục',            };          }          const docData = docSnap.data();          let categoryData = { title: 'Không có danh mục', logo: null };          if (docData.categoryId) {            const categoryRef = doc(db, 'categories', docData.categoryId);            const categorySnap = await getDoc(categoryRef);            if (categorySnap.exists()) {              categoryData = categorySnap.data();            }          }          return {            ...question,            documentTitle: docData.title || 'Không có tiêu đề',            categoryId: docData.categoryId || '',            categoryTitle: categoryData.title || 'Không có danh mục',            categoryLogo: categoryData.logo || null          };        } catch (error) {          console.error(`Error getting document info for question ${question.id}:`, error);          return {            ...question,            documentTitle: 'Lỗi tải tài liệu',            categoryId: '',            categoryTitle: 'Lỗi tải danh mục',          };        }      })    );    console.log("Questions with document info:", questionsWithDocInfo);    return questionsWithDocInfo;  } catch (error) {    console.error("Error in getAllQuestionsWithDocumentInfo:", error);    throw error;  }};export const addQuestion = async (questionData) => {  try {    const questionsQuery = query(      collection(db, COLLECTIONS.QUESTIONS),      where("documentId", "==", questionData.documentId)    );    const questionsSnapshot = await getDocs(questionsQuery);    let maxStt = 0;    questionsSnapshot.docs.forEach(doc => {      const stt = doc.data().stt || 0;      if (stt > maxStt) maxStt = stt;    });    const newQuestion = {      ...questionData,      stt: maxStt + 1,      createdAt: new Date(),      updatedAt: new Date()    };    const questionRef = await addDoc(collection(db, COLLECTIONS.QUESTIONS), newQuestion);    return {      id: questionRef.id,      ...newQuestion    };  } catch (error) {    console.error('Error adding question:', error);    throw error;  }};export const updateQuestion = async (questionId, questionData) => {  try {    const questionRef = doc(db, COLLECTIONS.QUESTIONS, questionId);    const updatedQuestion = {      ...questionData,      updatedAt: new Date()    };    await updateDoc(questionRef, updatedQuestion);    return {      id: questionId,      ...updatedQuestion    };  } catch (error) {    console.error('Error updating question:', error);    throw error;  }};export const deleteQuestion = async (questionId) => {  try {    await deleteDoc(doc(db, COLLECTIONS.QUESTIONS, questionId));    return {      success: true,      message: "Đã xóa câu hỏi thành công"    };  } catch (error) {    console.error('Error deleting question:', error);    throw error;  }};export const seedDataToFirestore = async (sidebarData, titlesData) => {  try {    for (let i = 0; i < sidebarData.length; i++) {      const category = sidebarData[i];      const categoryRef = await addDoc(collection(db, COLLECTIONS.CATEGORIES), {        title: category.title,        stt: i + 1       });      if (category.children && Array.isArray(category.children)) {        for (let j = 0; j < category.children.length; j++) {          const subCategory = category.children[j];          const documentRef = await addDoc(collection(db, COLLECTIONS.DOCUMENTS), {            categoryId: categoryRef.id,            title: subCategory,            slug: subCategory.toLowerCase().replace(/\s+/g, '_'),            stt: j + 1           });          const questions = titlesData[subCategory] || [];          for (const question of questions) {            await addDoc(collection(db, COLLECTIONS.QUESTIONS), {              documentId: documentRef.id,              stt: question.stt,              question: question.question,              answer: question.answer            });          }        }      }    }    return true;  } catch (error) {    throw error;  }};export const saveUserThemePreference = async (isDarkMode) => {  try {    const preferenceId = "theme_preference";    const darkModeBoolean = Boolean(isDarkMode);    await setDoc(doc(db, COLLECTIONS.USER_PREFERENCES, preferenceId), {      darkMode: darkModeBoolean,      updatedAt: new Date()    });    const docRef = doc(db, COLLECTIONS.USER_PREFERENCES, preferenceId);    const docSnap = await getDoc(docRef);    if (docSnap.exists()) {      const savedValue = docSnap.data().darkMode;    }    return true;  } catch (error) {    console.error("Error saving theme preference:", error);    return false;  }};export const getUserThemePreference = async () => {  try {    const preferenceId = "theme_preference";    const docRef = doc(db, COLLECTIONS.USER_PREFERENCES, preferenceId);    const docSnap = await getDoc(docRef);    if (docSnap.exists()) {      const darkModeValue = docSnap.data().darkMode;      const booleanValue = Boolean(darkModeValue);      return booleanValue;    }    return null;   } catch (error) {    console.error("Error getting theme preference:", error);    return null;   }};export const saveUserPreferences = async (userId, preferences) => {  try {    if (!userId) {      throw new Error("User ID is required to save preferences");    }    const userPrefsRef = doc(db, COLLECTIONS.USER_PREFERENCES, userId);    await setDoc(userPrefsRef, {      ...preferences,      updatedAt: new Date()    }, { merge: true });    return true;  } catch (error) {    console.error("Error saving user preferences:", error);    throw error;  }};export const getUserPreferences = async (userId) => {  try {    if (!userId) {      throw new Error("User ID is required to get preferences");    }    const userPrefsRef = doc(db, COLLECTIONS.USER_PREFERENCES, userId);    const userPrefsDoc = await getDoc(userPrefsRef);    if (userPrefsDoc.exists()) {      const data = userPrefsDoc.data();      return data;    }    return null;  } catch (error) {    console.error("Error getting user preferences:", error);    throw error;  }};export const updateUserPreference = async (userId, key, value) => {  try {    const docRef = doc(db, COLLECTIONS.USER_PREFERENCES, userId);    const docSnap = await getDoc(docRef);    if (docSnap.exists()) {      const updateData = {};      updateData[key] = value;      updateData.updatedAt = new Date();      await updateDoc(docRef, updateData);    } else {      const newData = { updatedAt: new Date() };      newData[key] = value;      await setDoc(docRef, newData);    }    return true;  } catch (error) {    console.error(`Error updating user preference (${key}):`, error);    throw error;  }};export const saveUserToFirestore = async (userId, userData) => {  try {    const userRef = doc(db, COLLECTIONS.USERS, userId);    const userSnap = await getDoc(userRef);    if (userSnap.exists()) {      const existingData = userSnap.data();      const userDataWithRole = {        ...userData,        role: existingData.role || userData.role || 'fuser',         createdAt: existingData.createdAt || new Date(),        updatedAt: new Date()      };      await updateDoc(userRef, userDataWithRole);    } else {      const userDataWithRole = {        ...userData,        role: userData.role || 'fuser',         createdAt: new Date(),        updatedAt: new Date()      };      await setDoc(userRef, userDataWithRole);    }    return true;  } catch (error) {    console.error("Lỗi khi lưu thông tin người dùng:", error);    throw error;  }};export const getUserRole = async (userId) => {  try {    const userRef = doc(db, COLLECTIONS.USERS, userId);    const userSnap = await getDoc(userRef);    if (userSnap.exists()) {      const userData = userSnap.data();      return userData.role || 'fuser';     }    return 'fuser';   } catch (error) {    console.error("Lỗi khi lấy vai trò người dùng:", error);    return 'fuser';   }};export const getAllUsers = async () => {  try {    const q = query(collection(db, COLLECTIONS.USERS));    const querySnapshot = await getDocs(q);    return querySnapshot.docs.map(doc => ({      id: doc.id,      ...doc.data()    }));  } catch (error) {    console.error("Error getting users:", error);    throw error;  }};export const updateUserRole = async (userId, newRole) => {  try {    const userRef = doc(db, COLLECTIONS.USERS, userId);    await updateDoc(userRef, {      role: newRole,      updatedAt: new Date()    });    return true;  } catch (error) {    console.error("Lỗi khi cập nhật vai trò người dùng:", error);    throw error;  }};export const deleteUserFromFirestore = async (userId) => {  try {    await deleteDoc(doc(db, COLLECTIONS.USERS, userId));    console.log("Đã xóa người dùng khỏi Firestore thành công");    return true;  } catch (error) {    console.error("Lỗi khi xóa người dùng:", error);    throw error;  }};export const deleteUserAuthentication = async (userId) => {  try {    return {      success: false,      message: 'Không thể xóa người dùng khỏi Authentication, chỉ xóa được khỏi Firestore.'    };  } catch (error) {    console.error('Lỗi khi xóa người dùng từ Authentication:', error);    return {      success: false,      error: error.message    };  }};export const getDocumentsWithQuestionCount = async () => {  try {    const documentsRef = collection(db, COLLECTIONS.DOCUMENTS);    const documentsSnapshot = await getDocs(documentsRef);    const documentsWithCount = [];    for (const docSnapshot of documentsSnapshot.docs) {      const documentId = docSnapshot.id;      const documentData = docSnapshot.data();      const categoryRef = doc(db, COLLECTIONS.CATEGORIES, documentData.categoryId || '');      const categorySnap = await getDoc(categoryRef);      const categoryData = categorySnap.exists() ? categorySnap.data() : {};      const questionsQuery = query(        collection(db, COLLECTIONS.QUESTIONS),        where("documentId", "==", documentId)      );      const questionsSnapshot = await getDocs(questionsQuery);      documentsWithCount.push({        id: documentId,        ...documentData,        categoryTitle: categoryData.title || 'Unknown',        categoryLogo: categoryData.logo || null,        questionCount: questionsSnapshot.docs.length      });    }    return documentsWithCount.sort((a, b) => (a.stt || 0) - (b.stt || 0));  } catch (error) {    console.error('Error getting documents with question count:', error);    throw error;  }};export const deleteDocument = async (documentId) => {  try {    const questionsQuery = query(      collection(db, COLLECTIONS.QUESTIONS),      where("documentId", "==", documentId)    );    const questionsSnapshot = await getDocs(questionsQuery);    const questionDeletePromises = questionsSnapshot.docs.map(questionDoc =>       deleteDoc(doc(db, COLLECTIONS.QUESTIONS, questionDoc.id))    );    await Promise.all(questionDeletePromises);    await deleteDoc(doc(db, COLLECTIONS.DOCUMENTS, documentId));    return {      success: true,      message: "Đã xóa tài liệu và tất cả câu hỏi liên quan"    };  } catch (error) {    console.error('Error deleting document:', error);    throw error;  }};export const addDocument = async (documentData) => {  try {    const docsQuery = query(      collection(db, COLLECTIONS.DOCUMENTS),      where("categoryId", "==", documentData.categoryId)    );    const docsSnapshot = await getDocs(docsQuery);    let maxStt = 0;    docsSnapshot.docs.forEach(doc => {      const stt = doc.data().stt || 0;      if (stt > maxStt) maxStt = stt;    });    const newDocument = {      ...documentData,      stt: maxStt + 1,      slug: documentData.title.toLowerCase().replace(/\s+/g, '_').replace(/[^\w\s]/gi, ''),       createdAt: new Date(),      updatedAt: new Date()    };    const docRef = await addDoc(collection(db, COLLECTIONS.DOCUMENTS), newDocument);    return {      id: docRef.id,      ...newDocument    };  } catch (error) {    console.error('Error adding document:', error);    throw error;  }};export const updateDocument = async (documentId, documentData) => {  try {    const documentRef = doc(db, COLLECTIONS.DOCUMENTS, documentId);    const updatedDocument = {      ...documentData,      slug: documentData.title.toLowerCase().replace(/\s+/g, '_').replace(/[^\w\s]/gi, ''),       updatedAt: new Date()    };    await updateDoc(documentRef, updatedDocument);    return {      id: documentId,      ...updatedDocument    };  } catch (error) {    console.error('Error updating document:', error);    throw error;  }};export const getLimitedQuestionsWithDocumentInfo = async (documentId) => {  try {    const questionsSnapshot = await getDocs(      query(        collection(db, 'questions'),        where('documentId', '==', documentId),        orderBy('stt', 'asc')       )    );    if (questionsSnapshot.empty) {      return [];    }    const questions = questionsSnapshot.docs.map(doc => ({      id: doc.id,      ...doc.data()    }));    const documentInfo = await getDocumentInfo(documentId);    const questionsWithInfo = questions.map(question => ({      ...question,      documentTitle: documentInfo?.title || '',      categoryId: documentInfo?.categoryId || '',      categoryTitle: documentInfo?.categoryTitle || '',      categoryLogo: documentInfo?.categoryLogo || null    }));    return questionsWithInfo.slice(0, Math.ceil(questionsWithInfo.length / 2));  } catch (error) {    console.error("Error getting limited questions with document info:", error);    throw error;  }};async function getDocumentInfo(documentId) {  try {    const documentDoc = await getDoc(doc(db, 'documents', documentId));    if (!documentDoc.exists()) {      return null;    }    const documentData = documentDoc.data();    const categoryDoc = await getDoc(doc(db, 'categories', documentData.categoryId));    if (!categoryDoc.exists()) {      return {        ...documentData,        categoryTitle: '',        categoryLogo: null      };    }    const categoryData = categoryDoc.data();    return {      ...documentData,      categoryTitle: categoryData.title || '',      categoryLogo: categoryData.logo || null    };  } catch (error) {    console.error("Error getting document info:", error);    return null;  }}
+import { 
+  COLLECTIONS,
+  getAllCategories,
+  getAllCategoriesWithDocuments,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  getCategoryById
+} from './categoryService';
+
+import {
+  getDocumentsByCategory,
+  getDocumentsWithQuestionCount,
+  deleteDocument,
+  addDocument,
+  updateDocument,
+  incrementDocumentViewCount
+} from './documentService';
+
+import {
+  getQuestionsByDocument,
+  getAllQuestionsWithDocumentInfo,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  getLimitedQuestionsWithDocumentInfo
+} from './questionService';
+
+import {
+  saveUserThemePreference,
+  getUserThemePreference,
+  saveUserPreferences,
+  getUserPreferences,
+  updateUserPreference,
+  saveUserToFirestore,
+  getUserRole,
+  getAllUsers,
+  updateUserSubscriptionType,
+  updateUserRole,
+  deleteUserFromFirestore,
+  deleteUserAuthentication,
+  loginSession,
+  endAllOtherSessions,
+  checkAndUpdateDocumentView,
+  canViewDocument,
+  getViewedDocumentsToday,
+  setUserLoggedOut,
+  loginWithDeviceId,
+  verifyCurrentDevice,
+  checkUserAlreadyLoggedIn,
+  getUserData,
+  checkLoginStatus,
+  createUserProfile,
+  updateUserData,
+  updateUserProfile,
+  updateUserPaidCategories,
+  getUserStatistics,
+  getActiveUsersCount,
+  getUserGrowthData,
+  updateUserOnlineStatus,
+  setUserOffline,
+  setUserOnline,
+  incrementAnonymousVisitor,
+  decrementAnonymousVisitor,
+  getAnonymousVisitorCount,
+  updateUserExcelPermission,
+  updateUserExcelPercentage
+} from './userService';
+
+// Import Firestore functions for footer management
+import { 
+  collection, 
+  getDocs, 
+  addDoc,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp
+} from "firebase/firestore";
+import { db } from "./firebase";
+
+// Re-export all functions
+export {
+  // Category Service
+  COLLECTIONS,
+  getAllCategories,
+  getAllCategoriesWithDocuments,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  getCategoryById,
+
+  // Document Service
+  getDocumentsByCategory,
+  getDocumentsWithQuestionCount,
+  deleteDocument,
+  addDocument,
+  updateDocument,
+  incrementDocumentViewCount,
+
+  // Question Service
+  getQuestionsByDocument,
+  getAllQuestionsWithDocumentInfo,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  getLimitedQuestionsWithDocumentInfo,
+
+  // User Service
+  saveUserThemePreference,
+  getUserThemePreference,
+  saveUserPreferences,
+  getUserPreferences,
+  updateUserPreference,
+  saveUserToFirestore,
+  getUserRole,
+  getAllUsers,
+  updateUserSubscriptionType,
+  updateUserRole,
+  deleteUserFromFirestore,
+  deleteUserAuthentication,
+  loginSession,
+  endAllOtherSessions,
+  checkAndUpdateDocumentView,
+  canViewDocument,
+  getViewedDocumentsToday,
+  setUserLoggedOut,
+  loginWithDeviceId,
+  verifyCurrentDevice,
+  checkUserAlreadyLoggedIn,
+  getUserData,
+  checkLoginStatus,
+  createUserProfile,
+  updateUserData,
+  updateUserProfile,
+  updateUserPaidCategories,
+  getUserStatistics,
+  getActiveUsersCount,
+  getUserGrowthData,
+  updateUserOnlineStatus,
+  setUserOffline,
+  setUserOnline,
+  incrementAnonymousVisitor,
+  decrementAnonymousVisitor,
+  getAnonymousVisitorCount,
+  updateUserExcelPermission,
+  updateUserExcelPercentage
+};
+
+// Seed data function (kept here as it interacts with multiple collections)
+export const seedDataToFirestore = async (sidebarData, titlesData) => {
+  try {
+    for (let i = 0; i < sidebarData.length; i++) {
+      const category = sidebarData[i];
+      const categoryRef = await addDoc(collection(db, COLLECTIONS.CATEGORIES), {
+        title: category.title,
+        stt: i + 1 
+      });
+      if (category.children && Array.isArray(category.children)) {
+        for (let j = 0; j < category.children.length; j++) {
+          const subCategory = category.children[j];
+          const documentRef = await addDoc(collection(db, COLLECTIONS.DOCUMENTS), {
+            categoryId: categoryRef.id,
+            title: subCategory,
+            slug: subCategory.toLowerCase().replace(/\s+/g, '_'),
+            stt: j + 1 
+          });
+          const questions = titlesData[subCategory] || [];
+          for (const question of questions) {
+            await addDoc(collection(db, COLLECTIONS.QUESTIONS), {
+              documentId: documentRef.id,
+              stt: question.stt,
+              question: question.question,
+              answer: question.answer
+            });
+          }
+        }
+      }
+    }
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Footer management functions
+export const getFooterContent = async () => {
+  try {
+    const footerDoc = await getDoc(doc(db, 'settings', 'footer'));
+    if (footerDoc.exists()) {
+      return footerDoc.data();
+    }
+    return { sections: [] };
+  } catch (error) {
+    console.error('Error getting footer content:', error);
+    throw error;
+  }
+};
+
+export const updateFooterContent = async (footerData) => {
+  try {
+    await setDoc(doc(db, 'settings', 'footer'), footerData, { merge: true });
+  } catch (error) {
+    console.error('Error updating footer content:', error);
+    throw error;
+  }
+};
+
+export const addFooterItem = async (footerItem) => {
+  try {
+    const footerDoc = await getDoc(doc(db, 'settings', 'footer'));
+    let sections = [];
+    
+    if (footerDoc.exists()) {
+      sections = footerDoc.data().sections || [];
+    }
+    
+    sections.push(footerItem);
+    await setDoc(doc(db, 'settings', 'footer'), { sections });
+  } catch (error) {
+    console.error('Error adding footer item:', error);
+    throw error;
+  }
+};
+
+export const deleteFooterItem = async (footerId) => {
+  try {
+    const footerDoc = await getDoc(doc(db, 'settings', 'footer'));
+    if (footerDoc.exists()) {
+      const sections = footerDoc.data().sections || [];
+      const updatedSections = sections.filter(section => section.id !== footerId);
+      await setDoc(doc(db, 'settings', 'footer'), { sections: updatedSections });
+    }
+  } catch (error) {
+    console.error('Error deleting footer item:', error);
+    throw error;
+  }
+};

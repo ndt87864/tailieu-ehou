@@ -20,21 +20,43 @@ const Register = () => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
 
+  // Define email regex as a proper RegExp object
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  // Fix the isValidEmail function to ensure it uses RegExp.test() properly
   const isValidEmail = (email) => {
-    const emailRegex = "/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/";
+    if (!email) return false;
     return emailRegex.test(email);
   };
 
+  // Fix the phone regex definition - it might currently be a string instead of a RegExp object
+  const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
+
+  // Fix the isValidPhone function
   const isValidPhone = (phone) => {
-    const phoneRegex =" /^[0-9]{10}$/";
+    if (!phone) return false;
     return phoneRegex.test(phone);
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError('');
     setSuccess(false);
+    
+    // Email validation
+    if (!isValidEmail(email)) {
+      setError('Email không hợp lệ. Vui lòng nhập đúng định dạng email.');
+      setLoading(false);
+      return;
+    }
+    
+    // Validate phone number before proceeding
+    if (!isValidPhone(phone)) {
+      setError('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10 chữ số, bắt đầu bằng 03, 05, 07, 08, hoặc 09)');
+      setLoading(false);
+      return;
+    }
     
     try {
       if (!fullName.trim()) {
@@ -271,7 +293,7 @@ const Register = () => {
                   ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
                   : 'bg-green-700 hover:bg-green-800 focus:ring-green-600'
               } focus:outline-none focus:ring-2 focus:ring-offset-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
+             >
               {loading ? 'Đang xử lý...' : 'Đăng ký'}
             </button>
           </div>

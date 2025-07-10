@@ -1,1 +1,50 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';import { auth } from '../firebase/firebase';import { getUserRole } from '../firebase/firestoreService';import { useAuthState } from 'react-firebase-hooks/auth';const UserRoleContext = createContext({  userRole: 'fuser',   isAdmin: false,  isPaidUser: false,  isFreeUser: true,  loading: true,});export const useUserRole = () => useContext(UserRoleContext);export const UserRoleProvider = ({ children }) => {  const [user, authLoading] = useAuthState(auth);  const [userRole, setUserRole] = useState('fuser');  const [loading, setLoading] = useState(true);  useEffect(() => {    const fetchUserRole = async () => {      if (!authLoading) {        if (user) {          try {            const role = await getUserRole(user.uid);            setUserRole(role);          } catch (error) {            console.error('Lỗi khi lấy vai trò người dùng:', error);            setUserRole('fuser');           }        } else {          setUserRole('fuser');         }        setLoading(false);      }    };    fetchUserRole();  }, [user, authLoading]);  const isAdmin = userRole === 'admin';  const isPaidUser = userRole === 'puser';  const isFreeUser = userRole === 'fuser';  const value = {    userRole,    isAdmin,    isPaidUser,    isFreeUser,    loading: authLoading || loading,  };  return (    <UserRoleContext.Provider value={value}>      {children}    </UserRoleContext.Provider>  );};export default UserRoleContext;
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getUserData } from '../firebase/firestoreService';
+import { useAuth } from './AuthContext';
+
+// Create the context and export it
+export const UserRoleContext = createContext();
+
+export function useUserRole() {
+  return useContext(UserRoleContext);
+}
+
+export function UserRoleProvider({ children }) {
+  const [userRole, setUserRole] = useState('user');
+  const [paidCategories, setPaidCategories] = useState([]);
+  const { currentUser } = useAuth();
+
+  useEffect(() => {
+    async function fetchUserRole() {
+      if (currentUser) {
+        try {
+          const userData = await getUserData(currentUser.uid);
+          if (userData) {
+            setUserRole(userData.role || 'user');
+            setPaidCategories(userData.paidCategories || []);
+          }
+        } catch (error) {
+          console.error('Error fetching user role:', error);
+        }
+      } else {
+        // Reset to default if no user is logged in
+        setUserRole('user');
+        setPaidCategories([]);
+      }
+    }
+
+    fetchUserRole();
+  }, [currentUser]);
+
+  const value = {
+    userRole,
+    paidCategories,
+    isAdmin: userRole === 'admin',
+  };
+
+  return (
+    <UserRoleContext.Provider value={value}>
+      {children}
+    </UserRoleContext.Provider>
+  );
+}

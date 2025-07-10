@@ -6,9 +6,38 @@ import { useSidebar } from '../context/SidebarContext';
 import { auth } from '../firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import ThemeColorPicker from './ThemeColorPicker';
-import { logoutWithStatusUpdate } from '../firebase/authService';
+import { signOut } from 'firebase/auth';
+
+// Helper function to check and handle domain redirection
+const checkDomainAndRedirect = () => {
+  const currentDomain = window.location.hostname;
+  const newDomain = "tailieuehou.id.vn";
+  
+  if (currentDomain !== newDomain && currentDomain !== 'localhost') {
+    window.location.href = `https://${newDomain}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    return true;
+  }
+  return false;
+};
+
+// Fix the missing logoutUser function
+const logoutUser = async () => {
+  try {
+    // Call Firebase signOut
+    await signOut(auth);
+    return true;
+  } catch (error) {
+    console.error("Error signing out:", error);
+    throw error;
+  }
+};
 
 const UserHeader = ({ title }) => {
+  // Run domain check on component mount
+  useEffect(() => {
+    checkDomainAndRedirect();
+  }, []);
+  
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { isAdmin } = useUserRole();
   const navigate = useNavigate();
@@ -19,8 +48,10 @@ const UserHeader = ({ title }) => {
 
   const handleLogout = async () => {
     try {
-      setIsDropdownOpen(false);
-      await logoutWithStatusUpdate();
+      await logoutUser();
+      // Any additional actions after logout
+      
+    navigate('/login');
     } catch (error) {
       console.error("Error during logout:", error);
     }

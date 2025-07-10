@@ -309,7 +309,6 @@ const findUnusedFiles = () => {
     });
   };
   
-  // Duyệt từ các entry point để đánh dấu tất cả file được sử dụng
   entryPoints.forEach(entryPoint => {
     if (fs.existsSync(entryPoint)) {
       checkUsed(entryPoint);
@@ -335,45 +334,39 @@ const findUnusedFiles = () => {
       unusedFilesListPath, 
       unusedFiles.map(file => path.relative(projectRoot, file)).join('\n')
     );
-    console.log(`\nĐã lưu danh sách file không sử dụng vào: ${unusedFilesListPath}`);
     
-    // Tạo script xóa file
-    const deleteScriptPath = path.join(projectRoot, 'delete-unused-files.js');
-    const deleteScriptContent = `
-const fs = require('fs');
-const path = require('path');
-
-const filesToDelete = [
-${unusedFiles.map(file => `  "${file.replace(/\\/g, '\\\\')}"`).join(',\n')}
-];
-
-console.log('Bắt đầu xóa các file không sử dụng...');
-let deletedCount = 0;
-
-for (const file of filesToDelete) {
-  if (fs.existsSync(file)) {
-    try {
-      fs.unlinkSync(file);
-      console.log(\`Đã xóa: \${path.relative(process.cwd(), file)}\`);
-      deletedCount++;
-    } catch (error) {
-      console.error(\`Lỗi khi xóa \${file}: \${error.message}\`);
-    }
-  }
-}
-
-console.log(\`Hoàn tất! Đã xóa \${deletedCount} file.\`);
-`;
-    
-    fs.writeFileSync(deleteScriptPath, deleteScriptContent);
-    console.log(`Đã tạo script xóa file tại: ${deleteScriptPath}`);
-    console.log('Để xóa các file không sử dụng, chạy lệnh: node delete-unused-files.js');
-    
-    return unusedFiles;
+    // Thêm phân tích kích thước file
+    analyzeFileSize(unusedFiles);
   } else {
-    console.log('Tất cả các file đều đang được sử dụng. Không có file nào cần xóa.');
-    return [];
+    console.log('Không có file không sử dụng nào được tìm thấy.');
   }
+};
+
+// Thêm hàm phân tích kích thước file để xác định các file lớn
+const analyzeFileSize = (files) => {
+  console.log('\nPhân tích kích thước file:');
+  
+  const fileSizes = files.map(file => {
+    const stats = fs.statSync(file);
+    return {
+      file: path.relative(projectRoot, file),
+      size: stats.size,
+      sizeKB: Math.round(stats.size / 1024 * 100) / 100
+    };
+  });
+  
+  // Sắp xếp theo kích thước từ lớn đến nhỏ
+  fileSizes.sort((a, b) => b.size - a.size);
+  
+  // Hiển thị 10 file lớn nhất
+  console.log('\nTop 10 file không sử dụng lớn nhất:');
+  fileSizes.slice(0, 10).forEach(({file, sizeKB}, index) => {
+    console.log(`${index + 1}. ${file} - ${sizeKB} KB`);
+  });
+  
+  // Tổng kích thước
+  const totalSize = fileSizes.reduce((sum, {size}) => sum + size, 0);
+  console.log(`\nTổng kích thước file không sử dụng: ${Math.round(totalSize / 1024 / 1024 * 100) / 100} MB`);
 };
 
 // Thêm chức năng xóa file không sử dụng vào quy trình dọn dẹp

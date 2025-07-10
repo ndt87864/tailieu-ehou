@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "tailieu-89ca9"
-  }
+  },
+  "targets": {
+    "tailieu-89ca9": {
+      "hosting": {
+        "tailieu-89ca9": [
+          "tailieu-89ca9"
+        ],
+        "tailieuehou": [
+          "tailieuehou"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

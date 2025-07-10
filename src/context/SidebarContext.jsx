@@ -1,18 +1,31 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useState, useContext } from 'react';
 
-const SidebarContext = createContext({
-  showSidebar: true,
-  setShowSidebar: () => {},
-});
+export const SidebarContext = createContext();
 
-export const useSidebar = () => useContext(SidebarContext);
+export function useSidebar() {
+  return useContext(SidebarContext);
+}
 
-export const SidebarProvider = ({ children }) => {
-  const [showSidebar, setShowSidebar] = useState(true);
+export function SidebarProvider({ children }) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+  };
+
+  const openSidebar = () => {
+    setIsSidebarOpen(true);
+  };
 
   const value = {
-    showSidebar,
-    setShowSidebar,
+    isSidebarOpen,
+    toggleSidebar,
+    closeSidebar,
+    openSidebar
   };
 
   return (
@@ -20,6 +33,6 @@ export const SidebarProvider = ({ children }) => {
       {children}
     </SidebarContext.Provider>
   );
-};
+}
 
 export default SidebarContext;

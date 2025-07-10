@@ -116,14 +116,14 @@ body {
 
 /* Định nghĩa các màu chủ đề */
 :root {
-    /* Màu mặc định */
-    --accent-color: #0c4a2e;  /* Màu nhấn mạnh mặc định (xanh lá) */
-    --accent-color-light: #15803d; /* Màu nhấn mạnh nhạt hơn */
-    --accent-color-dark: #166534; /* Màu nhấn mạnh đậm hơn */
-    --accent-color-hover: #14532d; /* Màu hover */
-    --accent-color-pale: #dcfce7; /* Màu nhạt nhất (bg-green-100) */
-    --accent-color-text: #166534; /* Màu cho text (text-green-800) */
-    --accent-color-rgb: 12, 74, 46; /* Tương ứng với #0c4a2e */
+    /* Màu mặc định - cập nhật lại thành màu xanh lá #118d05 như yêu cầu */
+    --accent-color: #118d05;  /* Màu nhấn mạnh mặc định */
+    --accent-color-light: #15a80a; /* Màu nhấn mạnh nhạt hơn */
+    --accent-color-dark: #0a6b04; /* Màu nhấn mạnh đậm hơn */
+    --accent-color-hover: #095103; /* Màu hover */
+    --accent-color-pale: #e6f7e6; /* Màu nhạt nhất */
+    --accent-color-text: #0a6b04; /* Màu cho text */
+    --accent-color-rgb: 17, 141, 5; /* Tương ứng với #118d05 */
 }
 
 /* Màu nền cho các chủ đề khác nhau - chỉ áp dụng khi ở chế độ sáng */
@@ -225,14 +225,14 @@ body {
     --bg-secondary: #2d2d2d;
     --text-primary: #e0e0e0;
     --text-secondary: #a0a0a0;
-    --accent-color: #22c55e;  /* Vẫn giữ màu xanh lá làm màu nhấn */
-    --accent-color-light: #15803d;
-    --accent-color-dark: #166534;
-    --accent-color-hover: #14532d;
-    --accent-color-pale: #052e16;
-    --accent-color-text: #4ade80;
+    --accent-color: #15a80a;  /* Phiên bản sáng hơn của #118d05 cho dark mode */
+    --accent-color-light: #1bc70e; /* Phiên bản sáng hơn */
+    --accent-color-dark: #0a6b04; /* Phiên bản đậm hơn */
+    --accent-color-hover: #095103; /* Màu hover */
+    --accent-color-pale: #0a3602; /* Màu nhạt nhất cho dark mode */
+    --accent-color-text: #1bc70e; /* Màu cho text trong dark mode */
     --border-color: #3d3d3d;
-    --accent-color-rgb: 34, 197, 94; /* Tương ứng với #22c55e */
+    --accent-color-rgb: 21, 168, 10; /* Tương ứng với #15a80a */
 }
 
 /* Màu nền cho các chủ đề khác nhau trong chế độ tối */
@@ -496,6 +496,16 @@ body {
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
+/* Cập nhật lại màu cho theme-emerald để khớp với màu xanh lá yêu cầu */
+.theme-color-option.theme-emerald {
+    background-color: #118d05; /* Màu xanh lá đã yêu cầu */
+    border: 2px solid #0a6b04;
+}
+
+.theme-color-option.theme-emerald.active {
+    box-shadow: 0 0 0 2px #15a80a, 0 0 0 4px #0a6b04;
+}
+
 /* Định nghĩa màu nền cho header và sidebar */
 .theme-header {
     background-color: var(--accent-color) !important; /* Sử dụng màu của theme */
@@ -531,8 +541,8 @@ body {
 .theme-color-black { background-color: #333333; }
 .theme-color-white { background-color: #ffffff; }
 .theme-color-default { 
-    /* Sử dụng màu xanh lá đậm cho theme mặc định */
-    background-color: #0c4a2e;
+    /* Cập nhật theme mặc định thành đúng màu xanh lá yêu cầu */
+    background-color: #118d05;
 }
 
 /* Nút với màu chủ đề */
@@ -618,4 +628,39 @@ body {
 
 .theme-button-hover:hover {
     background-color: var(--accent-color-hover) !important;
+}
+
+/* Anti-screenshot CSS styles */
+.anti-screenshot-blur {
+  filter: blur(10px);
+  transition: filter 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.screenshot-warning {
+  animation: fadeInOut 3s ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Ngăn chặn in ấn */
+@media print {
+  body * {
+    display: none !important;
+  }
+  body:after {
+    content: "In ấn đã bị vô hiệu hóa. Vui lòng nâng cấp tài khoản Premium để sử dụng tính năng này.";
+    font-size: 24px;
+    font-family: Arial, Helvetica, sans-serif;
+    text-align: center;
+    display: block !important;
+    padding-top: 50vh;
+  }
 }

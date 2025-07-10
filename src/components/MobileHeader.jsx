@@ -8,6 +8,8 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 
 const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
   const { themeColor, changeThemeColor, toggleDarkMode, THEME_COLORS } = useTheme();
+  const [user] = useAuthState(auth);
+  const [saveStatus, setSaveStatus] = useState(''); // 'saving', 'saved', 'error'
   const pickerRef = useRef(null);
   
   useEffect(() => {
@@ -24,9 +26,46 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose]);
+
+  // Handle theme color change with status indicator
+  const handleThemeColorChange = async (color) => {
+    if (user) {
+      setSaveStatus('saving');
+      try {
+        await changeThemeColor(color);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(''), 2000);
+      } catch (error) {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus(''), 3000);
+      }
+    } else {
+      // Just change locally if not logged in
+      changeThemeColor(color);
+    }
+  };
+
+  // Handle dark mode toggle with status indicator
+  const handleDarkModeToggle = async () => {
+    if (user) {
+      setSaveStatus('saving');
+      try {
+        await toggleDarkMode();
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(''), 2000);
+      } catch (error) {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus(''), 3000);
+      }
+    } else {
+      // Just toggle locally if not logged in
+      toggleDarkMode();
+    }
+  };
   
   if (!isOpen) return null;
-    return (
+  
+  return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
       <div 
         ref={pickerRef}
@@ -42,11 +81,26 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
           </button>
         </div>
         
+        {/* Save status indicator */}
+        {saveStatus && (
+          <div className={`mb-4 p-2 text-sm rounded-md ${
+            saveStatus === 'saving' 
+              ? isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'
+              : saveStatus === 'saved'
+                ? isDarkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'
+                : isDarkMode ? 'bg-red-900/30 text-red-300' : 'bg-red-50 text-red-700'
+          }`}>
+            {saveStatus === 'saving' && 'Đang lưu cài đặt...'}
+            {saveStatus === 'saved' && 'Đã lưu cài đặt thành công'}
+            {saveStatus === 'error' && 'Lỗi khi lưu cài đặt'}
+          </div>
+        )}
+        
         {/* Chế độ sáng/tối */}
         <div className="mb-5 border-b pb-4">
           <h4 className="text-sm font-medium mb-3">Chế độ sáng/tối</h4>
           <button 
-            onClick={toggleDarkMode}
+            onClick={handleDarkModeToggle}
             className={`w-full flex items-center justify-between p-3 rounded-md 
               ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' 
                 : 'bg-gray-100 hover:bg-gray-200'
@@ -85,56 +139,56 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
             {/* Màu mặc định */}
             <div 
               className={`theme-color-option theme-color-default ${themeColor === THEME_COLORS.DEFAULT ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.DEFAULT)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.DEFAULT)}
               title="Mặc định"
             ></div>
             
             {/* Màu xanh */}
             <div 
               className={`theme-color-option theme-color-blue ${themeColor === THEME_COLORS.BLUE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BLUE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BLUE)}
               title="Xanh dương"
             ></div>
             
             {/* Màu đỏ */}
             <div 
               className={`theme-color-option theme-color-red ${themeColor === THEME_COLORS.RED ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.RED)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.RED)}
               title="Đỏ"
             ></div>
             
             {/* Màu tím */}
             <div 
               className={`theme-color-option theme-color-purple ${themeColor === THEME_COLORS.PURPLE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.PURPLE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.PURPLE)}
               title="Tím"
             ></div>
             
             {/* Màu vàng */}
             <div 
               className={`theme-color-option theme-color-yellow ${themeColor === THEME_COLORS.YELLOW ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.YELLOW)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.YELLOW)}
               title="Vàng"
             ></div>
             
             {/* Màu nâu */}
             <div 
               className={`theme-color-option theme-color-brown ${themeColor === THEME_COLORS.BROWN ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BROWN)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BROWN)}
               title="Nâu"
             ></div>
             
             {/* Màu đen */}
             <div 
               className={`theme-color-option theme-color-black ${themeColor === THEME_COLORS.BLACK ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.BLACK)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.BLACK)}
               title="Đen"
             ></div>
             
             {/* Màu trắng */}
             <div 
               className={`theme-color-option theme-color-white ${themeColor === THEME_COLORS.WHITE ? 'active' : ''}`}
-              onClick={() => changeThemeColor(THEME_COLORS.WHITE)}
+              onClick={() => handleThemeColorChange(THEME_COLORS.WHITE)}
               title="Trắng"
             ></div>
           </div>
@@ -144,10 +198,88 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
           <p className="mb-2">
             <strong>Lưu ý:</strong> Thay đổi màu chủ đề sẽ chỉ có hiệu lực khi ở chế độ sáng.
           </p>
+          {user ? (
+            <p className="text-xs">Cài đặt của bạn sẽ được lưu và đồng bộ trên tất cả thiết bị.</p>
+          ) : (
+            <p className="text-xs">Đăng nhập để lưu cài đặt giao diện của bạn.</p>
+          )}
         </div>
       </div>
     </div>
   );
+};
+
+// Utility function to get consistent header/sidebar background color
+const getConsistentThemeColor = (isDarkMode, themeColor) => {
+  if (isDarkMode) {
+    return 'bg-gray-800'; // Unified dark mode color
+  } else {
+    switch (themeColor) {
+      case THEME_COLORS.DEFAULT:
+        return 'bg-green-600';
+      case THEME_COLORS.BLUE:
+        return 'bg-blue-600';
+      case THEME_COLORS.RED:
+        return 'bg-red-600';
+      case THEME_COLORS.PURPLE:
+        return 'bg-purple-600';
+      case THEME_COLORS.YELLOW:
+        return 'bg-yellow-600'; // Fixed yellow color
+      case THEME_COLORS.BROWN:
+        return 'bg-amber-700'; // Fixed brown color
+      case THEME_COLORS.BLACK:
+        return 'bg-gray-800';
+      case THEME_COLORS.WHITE:
+        return 'bg-gray-100'; // Lightened to match sidebar
+      default:
+        return 'bg-green-600';
+    }
+  }
+};
+
+// FIXED: Create a new common function to get consistent header colors
+// This function must return the EXACT same colors used in the sidebar
+const getMobileHeaderThemeColor = (isDarkMode, themeColor) => {
+  if (isDarkMode) {
+    return 'bg-gray-800'; // Always dark gray in dark mode
+  }
+  
+  switch (themeColor) {
+    case THEME_COLORS.DEFAULT:
+      return 'theme-color-default'; // Using exact hex color #118d05 for default theme
+    case THEME_COLORS.BLUE:
+      return 'bg-blue-600';
+    case THEME_COLORS.RED:
+      return 'bg-red-600';
+    case THEME_COLORS.PURPLE:
+      return 'bg-purple-600';
+    case THEME_COLORS.YELLOW:
+      return 'bg-yellow-600'; // Fixed yellow color
+    case THEME_COLORS.BROWN:
+      return 'bg-amber-600'; // Fixed brown color
+    case THEME_COLORS.BLACK:
+      return 'bg-gray-900';
+    case THEME_COLORS.WHITE:
+      return 'bg-gray-100';
+    default:
+      return 'theme-color-default'; // Default also uses the exact hex color
+  }
+};
+
+// NEW: Utility function to determine text color based on theme
+const getHeaderTextColor = (isDarkMode, themeColor) => {
+  if (isDarkMode) {
+    return 'text-white';
+  } else {
+    // Use black text for white and brown themes, white text for all others
+    switch (themeColor) {
+      case THEME_COLORS.WHITE:
+      case THEME_COLORS.BROWN:
+        return 'text-black';
+      default:
+        return 'text-white';
+    }
+  }
 };
 
 export const HomeMobileHeader = () => {
@@ -174,6 +306,7 @@ export const HomeMobileHeader = () => {
     setIsDropdownOpen(false);
     setIsThemePickerOpen(true);
   };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -186,40 +319,16 @@ export const HomeMobileHeader = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);  
-  const getHeaderBgColor = () => {
-    if (isDarkMode) {
-      return 'bg-gray-900';
-    } else {
-      switch (themeColor) {
-        case THEME_COLORS.DEFAULT:
-          return 'bg-green-900';
-        case THEME_COLORS.BLUE:
-          return 'bg-blue-900';
-        case THEME_COLORS.RED:
-          return 'bg-red-900';
-        case THEME_COLORS.PURPLE:
-          return 'bg-purple-900';
-        case THEME_COLORS.YELLOW:
-          return 'bg-yellow-800';
-        case THEME_COLORS.BROWN:
-          return 'bg-amber-900';
-        case THEME_COLORS.BLACK:
-          return 'bg-gray-900';
-        case THEME_COLORS.WHITE:
-          return 'bg-slate-800';
-        default:
-          return 'bg-green-900';
-      }
-    }
-  };
 
-  const headerBgColor = getHeaderBgColor();
+  // Use the consistent theme color function
+  const headerBgColor = getMobileHeaderThemeColor(isDarkMode, themeColor);
+  const headerTextColor = getHeaderTextColor(isDarkMode, themeColor);
 
   return (
-    <header className={`${headerBgColor} text-white px-4 py-3 flex items-center justify-between shadow-md`}>
+    <header className={`${headerBgColor} ${headerTextColor} px-4 py-3 flex items-center justify-between shadow-md`}>
       <div className="flex items-center gap-2">
         <div className="p-1">
-          <svg className="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <svg className={`w-5 h-5 ${headerTextColor}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M4 11.5l8 4 8-4M4 15l8 4 8-4" />
           </svg>
@@ -231,7 +340,7 @@ export const HomeMobileHeader = () => {
         {/* Nút tùy chỉnh giao diện luôn hiển thị */}
         <button
           onClick={() => setIsThemePickerOpen(true)}
-          className="text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+          className={`${headerTextColor} p-1 rounded-full hover:bg-black/10 transition-colors`}
           aria-label="Tùy chỉnh giao diện"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,7 +352,7 @@ export const HomeMobileHeader = () => {
           <div className="relative" ref={dropdownRef}>
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-white px-2 py-1 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1"
+              className={`${headerTextColor} px-2 py-1 rounded-full hover:bg-black/10 transition-colors flex items-center gap-1`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -286,7 +395,7 @@ export const HomeMobileHeader = () => {
         ) : (
           <button 
             onClick={() => navigate('/login')}
-            className="text-white px-2 py-1 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1"
+            className={`${headerTextColor} px-2 py-1 rounded-full hover:bg-black/10 transition-colors flex items-center gap-1`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
@@ -319,6 +428,7 @@ export const DocumentMobileHeader = ({
 
   const handleLogout = () => {
     auth.signOut();
+    navigate('/login');
     setIsDropdownOpen(false);
   };
 
@@ -344,41 +454,17 @@ export const DocumentMobileHeader = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []); 
-  const getHeaderBgColor = () => {
-    if (isDarkMode) {
-      return 'bg-gray-900'; 
-    } else {
-      switch (themeColor) {
-        case THEME_COLORS.DEFAULT:
-          return 'bg-green-900'; 
-        case THEME_COLORS.BLUE:
-          return 'bg-blue-900';
-        case THEME_COLORS.RED:
-          return 'bg-red-900';
-        case THEME_COLORS.PURPLE:
-          return 'bg-purple-900';
-        case THEME_COLORS.YELLOW:
-          return 'bg-yellow-800';
-        case THEME_COLORS.BROWN:
-          return 'bg-amber-900';
-        case THEME_COLORS.BLACK:
-          return 'bg-gray-900';
-        case THEME_COLORS.WHITE:
-          return 'bg-slate-800';
-        default:
-          return 'bg-green-900';
-      }
-    }
-  };
 
-  const headerBgColor = getHeaderBgColor();
+  // Use the consistent theme color function
+  const headerBgColor = getMobileHeaderThemeColor(isDarkMode, themeColor);
+  const headerTextColor = getHeaderTextColor(isDarkMode, themeColor);
 
   return (
-    <header className={`${headerBgColor} text-white px-4 py-3 flex flex-col shadow-md sticky top-0 z-10`}>
+    <header className={`${headerBgColor} ${headerTextColor} px-4 py-3 flex flex-col shadow-md sticky top-0 z-10`}>
       <div className="flex items-center justify-between w-full">
         <Link to="/" className="flex items-center gap-2 overflow-hidden">
           <div className="p-1 flex-shrink-0">
-            <svg className="w-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <svg className={`w-5 h-5 ${headerTextColor}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M4 11.5l8 4 8-4M4 15l8 4 8-4" />
             </svg>
@@ -392,10 +478,10 @@ export const DocumentMobileHeader = ({
           {/* Theme customization button */}
           <button
             onClick={() => setIsThemePickerOpen(true)}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
+            className={`p-2 rounded-full hover:bg-black/10 transition-colors`}
             aria-label="Tùy chỉnh giao diện"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="text-white h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className={`${headerTextColor} h-5 w-5`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
             </svg>
           </button>
@@ -405,7 +491,7 @@ export const DocumentMobileHeader = ({
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="text-white px-2 py-1 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1 mr-2"
+                className={`${headerTextColor} px-2 py-1 rounded-full hover:bg-black/10 transition-colors flex items-center gap-1 mr-2`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
@@ -420,7 +506,7 @@ export const DocumentMobileHeader = ({
               {isDropdownOpen && (
                 <div 
                   className={`absolute right-0 mt-2 w-48 py-1 rounded-md shadow-lg z-20 border ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'
+                    isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'
                   }`}
                   style={{ backdropFilter: 'blur(8px)' }}
                 >
@@ -451,7 +537,7 @@ export const DocumentMobileHeader = ({
           ) : (
             <button 
               onClick={() => navigate('/login')}
-              className="text-white px-2 py-1 rounded-full hover:bg-white/20 transition-colors flex items-center gap-1 mr-2"
+              className={`${headerTextColor} px-2 py-1 rounded-full hover:bg-black/10 transition-colors flex items-center gap-1 mr-2`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
@@ -463,7 +549,7 @@ export const DocumentMobileHeader = ({
           {/* Menu toggle button */}
           <button 
             onClick={() => setIsSidebarOpen(true)} 
-            className="text-white flex-shrink-0 p-2 rounded-full hover:bg-white/10 transition-colors"
+            className={`${headerTextColor} flex-shrink-0 p-2 rounded-full hover:bg-black/10 transition-colors`}
             aria-label="Mở menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -475,7 +561,7 @@ export const DocumentMobileHeader = ({
       
       {/* Document title with improved truncation */}
       {selectedDocument && (
-        <div className="ml-7 mt-1 text-sm text-white/90 truncate max-w-full pr-8">
+        <div className={`ml-7 mt-1 text-sm ${headerTextColor} opacity-90 truncate max-w-full pr-8`}>
           {selectedDocument?.title}
         </div>
       )}

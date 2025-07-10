@@ -68,7 +68,6 @@ function findUnusedFiles() {
   const allFiles = getAllFiles(srcDir);
   const importedFiles = findImports(allFiles);
   
-  console.log("Files not imported anywhere:");
   
   allFiles.forEach(file => {
     // Skip index files and main entry files
@@ -77,9 +76,6 @@ function findUnusedFiles() {
       return;
     }
     
-    if (!importedFiles.has(file)) {
-      console.log(file);
-    }
   });
 }
 
