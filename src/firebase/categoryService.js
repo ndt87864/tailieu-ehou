@@ -7,7 +7,8 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc,
-  limit
+  limit,
+  startAfter
 } from "firebase/firestore";
 import { db } from "./firebase";
 export const COLLECTIONS = {
@@ -220,5 +221,48 @@ export const getCategoryById = async (categoryId) => {
   } catch (error) {
     console.error("Error getting category:", error);
     throw error;
+  }
+};
+
+export const getCategoriesByPage = async (page = 1, limit = 10, lastDoc = null) => {
+  try {
+    const categoriesRef = collection(db, COLLECTIONS.CATEGORIES);
+    let q;
+    if (lastDoc) {
+      q = query(categoriesRef, limit(limit), startAfter(lastDoc));
+    } else {
+      q = query(categoriesRef, limit(limit));
+    }
+    const categoriesSnapshot = await getDocs(q);
+
+    const categoriesData = categoriesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      documentCount: 0
+    }));
+
+    // Đếm số tài liệu cho từng danh mục (tối ưu hóa nếu cần)
+    const countPromises = categoriesData.map(async (category) => {
+      const documentsRef = collection(db, COLLECTIONS.DOCUMENTS);
+      const documentsQuery = query(
+        documentsRef,
+        where('categoryId', '==', category.id)
+      );
+      const documentsSnapshot = await getDocs(documentsQuery);
+      return {
+        ...category,
+        documentCount: documentsSnapshot.size
+      };
+    });
+
+    const categoriesWithCount = await Promise.all(countPromises);
+
+    return {
+      categories: categoriesWithCount,
+      lastDoc: categoriesSnapshot.docs[categoriesSnapshot.docs.length - 1] || null
+    };
+  } catch (error) {
+    console.error('Lỗi khi lấy danh mục theo trang:', error);
+    throw new Error(`Không thể lấy danh mục: ${error.message}`);
   }
 };

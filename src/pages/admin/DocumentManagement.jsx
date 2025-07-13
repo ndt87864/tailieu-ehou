@@ -288,7 +288,12 @@ const DocumentManagement = () => {
       setIsDeleting(false);
     }
   };
-  const filteredDocuments = documents.filter((doc, index) => {
+  // Thêm state cho phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const limit = 10;
+
+  // Lọc tài liệu theo search và category
+  const filteredAllDocuments = documents.filter((doc, index) => {
     const stt = (index + 1).toString();
     const title = doc.title.toLowerCase();
     const category = doc.categoryTitle?.toLowerCase() || "";
@@ -303,6 +308,39 @@ const DocumentManagement = () => {
 
     return matchesSearch && matchesCategory;
   });
+
+  // Lấy tài liệu cho trang hiện tại
+  const filteredDocuments = filteredAllDocuments.slice(
+    (currentPage - 1) * limit,
+    currentPage * limit
+  );
+
+  // Tính tổng số trang
+  const totalPages = Math.ceil(filteredAllDocuments.length / limit);
+
+  // Hàm chuyển trang
+  function handlePrevPage() {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  }
+  function handleNextPage() {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  }
+
+  // State cho input nhập số trang
+  const [gotoPageInput, setGotoPageInput] = useState(currentPage);
+
+  // Đồng bộ input với currentPage
+  useEffect(() => {
+    setGotoPageInput(currentPage);
+  }, [currentPage]);
+
+  // Hàm xác nhận chuyển trang
+  function handleGotoPage() {
+    let page = parseInt(gotoPageInput);
+    if (isNaN(page) || page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    setCurrentPage(page);
+  }
 
   const handleEditClick = (doc) => {
     setEditDocument({
@@ -605,7 +643,7 @@ const DocumentManagement = () => {
                                         : "text-gray-500"
                                     }`}
                                   >
-                                    {index + 1}
+                                    {(currentPage - 1) * limit + index + 1}
                                   </span>
                                   <div
                                     className={`w-8 h-8 flex items-center justify-center rounded-md ${
@@ -726,6 +764,42 @@ const DocumentManagement = () => {
                             </div>
                           </div>
                         ))}
+                        <div className="flex flex-col md:flex-row justify-center items-center gap-2 mt-4 pb-4">
+                          <div className="flex flex-row items-center gap-2 w-full justify-center">
+                            <button
+                              className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+                              onClick={handlePrevPage}
+                              disabled={currentPage === 1}
+                            >
+                              Trang trước
+                            </button>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={1}
+                                max={totalPages}
+                                value={gotoPageInput}
+                                onChange={(e) =>
+                                  setGotoPageInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleGotoPage();
+                                  }
+                                }}
+                                className="w-16 px-2 py-1 border rounded text-center"
+                              />
+                              <span className="text-sm">/ {totalPages}</span>
+                            </div>
+                            <button
+                              className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+                              onClick={handleNextPage}
+                              disabled={currentPage === totalPages}
+                            >
+                              Trang sau
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
                       {/* Desktop view */}
@@ -828,7 +902,7 @@ const DocumentManagement = () => {
                                         : "text-gray-500"
                                     }`}
                                   >
-                                    {index + 1}
+                                    {(currentPage - 1) * limit + index + 1}
                                   </div>
                                 </td>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
@@ -963,6 +1037,38 @@ const DocumentManagement = () => {
                             ))}
                           </tbody>
                         </table>
+                        <div className="flex flex-col md:flex-row justify-center items-center gap-2 mt-4 pb-4">
+                          <button
+                            className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+                            onClick={handlePrevPage}
+                            disabled={currentPage === 1}
+                          >
+                            Trang trước
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={totalPages}
+                              value={gotoPageInput}
+                              onChange={(e) => setGotoPageInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleGotoPage();
+                                }
+                              }}
+                              className="w-16 px-2 py-1 border rounded text-center"
+                            />
+                            <span className="text-sm">/ {totalPages}</span>
+                          </div>
+                          <button
+                            className="px-3 py-1 rounded border bg-gray-100 disabled:opacity-50"
+                            onClick={handleNextPage}
+                            disabled={currentPage === totalPages}
+                          >
+                            Trang sau
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
