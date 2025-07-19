@@ -1991,45 +1991,80 @@ const QuestionManagement = () => {
       {showFilterModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+            <div
+              className="fixed inset-0 transition-opacity"
+              aria-hidden="true"
+            >
               <div className="absolute inset-0 bg-black bg-opacity-70"></div>
             </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <span
+              className="hidden sm:inline-block sm:align-middle sm:h-screen"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
             <div
               className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full ${
-                isDarkMode ? "bg-gray-700 border border-gray-600" : "bg-gray-50 border border-gray-200"
+                isDarkMode
+                  ? "bg-gray-700 border border-gray-600"
+                  : "bg-gray-50 border border-gray-200"
               }`}
             >
-              <div className={`px-6 pt-6 pb-6 ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-                <h3 className="text-xl font-medium leading-6 mb-5">Bộ lọc môn</h3>
+              <div
+                className={`px-6 pt-6 pb-6 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                }`}
+              >
+                <h3 className="text-xl font-medium leading-6 mb-5">
+                  Bộ lọc môn
+                </h3>
                 <div className="mb-5">
-                  <label className="block text-sm font-medium mb-2">Chọn danh mục (môn học)</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Chọn danh mục (môn học)
+                  </label>
                   <select
-                    className={`w-full rounded-md border px-3 py-2 ${isDarkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-900 border-gray-300"}`}
+                    className={`w-full rounded-md border px-3 py-2 ${
+                      isDarkMode
+                        ? "bg-gray-700 text-white border-gray-600"
+                        : "bg-white text-gray-900 border-gray-300"
+                    }`}
                     value={filterCategory || ""}
-                    onChange={e => {
+                    onChange={(e) => {
                       setFilterCategory(e.target.value);
                       setFilterDocument("");
                     }}
                   >
                     <option value="">-- Chọn danh mục --</option>
-                    {allCategories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.title}</option>
+                    {allCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.title}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div className="mb-5">
-                  <label className="block text-sm font-medium mb-2">Chọn bộ câu hỏi (tài liệu)</label>
+                  <label className="block text-sm font-medium mb-2">
+                    Chọn bộ câu hỏi (tài liệu)
+                  </label>
                   <select
-                    className={`w-full rounded-md border px-3 py-2 ${isDarkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-gray-900 border-gray-300"}`}
+                    className={`w-full rounded-md border px-3 py-2 ${
+                      isDarkMode
+                        ? "bg-gray-700 text-white border-gray-600"
+                        : "bg-white text-gray-900 border-gray-300"
+                    }`}
                     value={filterDocument || ""}
-                    onChange={e => setFilterDocument(e.target.value)}
-                    disabled={!filterCategory || !categoryDocuments[filterCategory]}
+                    onChange={(e) => setFilterDocument(e.target.value)}
+                    disabled={
+                      !filterCategory || !categoryDocuments[filterCategory]
+                    }
                   >
                     <option value="">-- Chọn bộ câu hỏi --</option>
-                    {filterCategory && categoryDocuments[filterCategory] &&
-                      categoryDocuments[filterCategory].map(doc => (
-                        <option key={doc.id} value={doc.id}>{doc.title}</option>
+                    {filterCategory &&
+                      categoryDocuments[filterCategory] &&
+                      categoryDocuments[filterCategory].map((doc) => (
+                        <option key={doc.id} value={doc.id}>
+                          {doc.title}
+                        </option>
                       ))}
                   </select>
                 </div>
@@ -2047,7 +2082,11 @@ const QuestionManagement = () => {
                   </button>
                   <button
                     type="button"
-                    className={`px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors ${(!filterCategory || !filterDocument) ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors ${
+                      !filterCategory || !filterDocument
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
                     onClick={handleApplyFilter}
                     disabled={!filterCategory || !filterDocument}
                   >
