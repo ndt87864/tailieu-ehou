@@ -1115,7 +1115,9 @@ function Sidebar({
                   />
                 </svg>
                 {showFullContent && (
-                  <span className="text-white font-medium">Quản lý tài khoản cao cấp </span>
+                  <span className="text-white font-medium">
+                    Quản lý tài khoản cao cấp{" "}
+                  </span>
                 )}
               </Link>
 
@@ -1144,10 +1146,39 @@ function Sidebar({
                   <span className="text-white font-medium">Quản lý footer</span>
                 )}
               </Link>
+              <Link
+                to="/admin/image-uploader"
+                onClick={(e) => handleAdminRefresh(e, "/admin/image-uploader")}
+                className={`flex items-center px-4 py-3 transition-colors ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 mr-3 text-white flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  />
+                </svg>
+                {showFullContent && (
+                  <span className="text-white font-medium">
+                    Quản lý upload file{" "}
+                  </span>
+                )}
+              </Link>
 
               <Link
                 to="/admin/pricing-content-management"
-                onClick={(e) => handleAdminRefresh(e, "/admin/pricing-content-management")}
+                onClick={(e) =>
+                  handleAdminRefresh(e, "/admin/pricing-content-management")
+                }
                 className={`flex items-center px-4 py-3 transition-colors ${
                   isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
                 }`}
@@ -1167,7 +1198,9 @@ function Sidebar({
                   />
                 </svg>
                 {showFullContent && (
-                  <span className="text-white font-medium">Quản lý nội dung liên hệ</span>
+                  <span className="text-white font-medium">
+                    Quản lý nội dung liên hệ
+                  </span>
                 )}
               </Link>
             </div>

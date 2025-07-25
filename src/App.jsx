@@ -172,6 +172,14 @@ const FooterManagementPage = () => (
   </ProtectedAdminRoute>
 );
 
+// Trang upload ảnh admin
+import AdminImageUploader from "./pages/admin/AdminImageUploader";
+const AdminImageUploaderPage = () => (
+  <ProtectedAdminRoute>
+    <AdminImageUploader />
+  </ProtectedAdminRoute>
+);
+
 const PricingContentManagementPage = () => (
   <ProtectedAdminRoute>
     <PricingContentManagement />
@@ -519,6 +527,11 @@ function App() {
                 <Route
                   path="/admin/dashboard"
                   element={<AdminDashboardPage />}
+                />
+                {/* Trang upload ảnh admin */}
+                <Route
+                  path="/admin/image-uploader"
+                  element={<AdminImageUploaderPage />}
                 />
                 <Route
                   path="/admin"
