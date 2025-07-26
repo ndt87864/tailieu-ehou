@@ -173,7 +173,9 @@
             // addTimestampToElements(scriptElements);
         });
     </script>
-  <script type="module" crossorigin src="/assets/index-RoLrdNR5.js"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4282799215996734"
+        crossorigin="anonymous"></script>
+  <script type="module" crossorigin src="/assets/index-e0QPa0ZA.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-AQ085LKi.css">
 </head>
 
@@ -204,7 +206,44 @@
         <div style="padding: 20px; text-align: center;">
             Vui lòng bật JavaScript để sử dụng trang web này.
         </div>
-    </noscript>
-</body>
-
-</html>
+    <script>
+        // Đảm bảo chỉ nhúng script quảng cáo sau 4s kể từ khi trang load
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(function () {
+                // Kiểm tra nếu script chưa được thêm vào
+                if (!document.querySelector('script[data-adsbygoogle]')) {
+                    var script = document.createElement('script');
+                    script.setAttribute('async', '');
+                    script.setAttribute('data-adsbygoogle', 'true');
+                    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4282799215996734';
+                    script.crossOrigin = 'anonymous';
+                    document.head.appendChild(script);
+                }
+                // Sau khi script đã load, chèn khối quảng cáo vào DOM (nếu chưa có)
+                if (!document.getElementById('adsbygoogle-top')) {
+                    var adDiv = document.createElement('ins');
+                    adDiv.className = 'adsbygoogle';
+                    adDiv.style.display = 'block';
+                    adDiv.style.textAlign = 'center';
+                    adDiv.setAttribute('data-ad-client', 'ca-pub-4282799215996734');
+                    adDiv.setAttribute('data-ad-slot', '3086001754');
+                    adDiv.setAttribute('data-ad-format', 'auto');
+                    adDiv.setAttribute('id', 'adsbygoogle-top');
+                    // Chèn vào trước #root
+                    var root = document.getElementById('root');
+                    if (root && root.parentNode) {
+                        root.parentNode.insertBefore(adDiv, root);
+                    }
+                    // Đợi script sẵn sàng rồi gọi (adsbygoogle = window.adsbygoogle || []).push({})
+                    function tryPushAds() {
+                        if (window.adsbygoogle && Array.isArray(window.adsbygoogle)) {
+                            window.adsbygoogle.push({});
+                        } else {
+                            setTimeout(tryPushAds, 500);
+                        }
+                    }
+                    tryPushAds();
+                }
+            }, 4000); // 4 giây
+        });
+    </script>
