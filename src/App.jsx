@@ -21,7 +21,7 @@ import { SidebarProvider } from "./context/SidebarContext";
 import AdminUserManagement from "./pages/admin/user/AdminUserManagement";
 import CategoryManagement from "./pages/admin/CategoryManagement";
 import DocumentManagement from "./pages/admin/DocumentManagement";
-import QuestionManagement from "./pages/admin/QuestionManagement";
+import QuestionManagement from "./pages/admin/question/QuestionManagement";
 import HomePage from "./pages/HomePage";
 import Pricing from "./pages/Pricing";
 import { useAuthState } from "react-firebase-hooks/auth";
