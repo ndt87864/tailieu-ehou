@@ -11,7 +11,7 @@ import { getApp } from "firebase/app";
 import Sidebar from "../../components/Sidebar";
 import UserHeader from "../../components/UserHeader";
 
-const IMGBB_API_KEY = "9f41312b9e63774e3dbdcafd6f9f5c36";
+const IMGBB_API_KEY = "f051ba26b2f74b1480f701e485184185";
 
 const AdminImageUploader = () => {
   const db = getFirestore(getApp());

@@ -1146,7 +1146,7 @@ function Sidebar({
                   <span className="text-white font-medium">Quản lý footer</span>
                 )}
               </Link>
-              <Link
+              {/* <Link
                 to="/admin/image-uploader"
                 onClick={(e) => handleAdminRefresh(e, "/admin/image-uploader")}
                 className={`flex items-center px-4 py-3 transition-colors ${
@@ -1172,7 +1172,7 @@ function Sidebar({
                     Quản lý upload file{" "}
                   </span>
                 )}
-              </Link>
+              </Link> */}
 
               <Link
                 to="/admin/pricing-content-management"

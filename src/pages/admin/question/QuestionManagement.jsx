@@ -19,7 +19,7 @@ import UserHeader from "../../../components/UserHeader";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import * as XLSX from "xlsx";
 import QuestionTable from "./QuestionTable";
-const IMGBB_API_KEY = "9f41312b9e63774e3dbdcafd6f9f5c36"; // API Key cho ImgBB
+const IMGBB_API_KEY = "f051ba26b2f74b1480f701e485184185"; // API Key cho ImgBB
 import AddQuestionModal from "./AddQuestionModal";
 import EditQuestionModal from "./EditQuestionModal";
 import DeleteQuestionModal from "./DeleteQuestionModal";
