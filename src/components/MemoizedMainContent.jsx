@@ -13,21 +13,27 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
   const renderImageModal = () =>
     imageModal.open && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-        <div className="bg-white rounded-lg p-4 max-w-2xl w-full relative">
+        <div
+          className="rounded-lg p-4 max-w-2xl w-full relative bg-cover bg-center"
+          style={{
+            backgroundColor: "#fff", // fallback nếu ảnh lỗi
+          }}
+        >
+          <div className="absolute inset-0 bg-white bg-opacity-80 rounded-lg pointer-events-none" />
           <button
-            className="absolute -top-4 -right-4 bg-white shadow-lg rounded-full text-gray-600 hover:text-black text-2xl w-10 h-10 flex items-center justify-center border border-gray-300 hover:border-blue-500 transition-colors"
+            className="absolute top-1.5 right-1.5 bg-red-600 rounded-full text-white text-lg w-7 h-7 flex items-center justify-center border border-gray-300 hover:border-blue-500 transition-colors z-50 backdrop-blur"
             onClick={() => setImageModal({ open: false, url: "" })}
             title="Đóng"
-            style={{ zIndex: 60 }}
+            style={{ boxShadow: "0 2px 8px rgba(245, 14, 14, 0.95)" }}
           >
             &times;
           </button>
           <img
             src={imageModal.url}
             alt="Preview"
-            className="w-full h-auto max-h-[70vh] object-contain rounded"
+            className="w-full h-auto max-h-[70vh] object-contain rounded relative z-10"
           />
-          <div className="mt-3 text-center">
+          <div className="mt-3 text-center relative z-10">
             <a
               href={imageModal.url}
               target="_blank"
