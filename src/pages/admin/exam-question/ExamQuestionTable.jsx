@@ -188,14 +188,18 @@ const ExamQuestionTable = ({ isDarkMode }) => {
                         setQuestionToEdit(q);
                         setShowEditModal(true);
                       }}
-                    >Sửa</button>
+                    >
+                      Sửa
+                    </button>
                     <button
                       className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
                       onClick={() => {
                         setQuestionToDelete(q);
                         setShowDeleteModal(true);
                       }}
-                    >Xóa</button>
+                    >
+                      Xóa
+                    </button>
                   </td>
                 </tr>
               ))}

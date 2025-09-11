@@ -18,13 +18,15 @@ import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import UserHeader from "../../../components/UserHeader";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import * as XLSX from "xlsx";
-import QuestionTable from "./QuestionTable";
+import { Document, Packer, Paragraph, TextRun, ImageRun } from "docx";
+import { saveAs } from "file-saver";
 const IMGBB_API_KEY = "f051ba26b2f74b1480f701e485184185"; // API Key cho ImgBB
 import AddQuestionModal from "./AddQuestionModal";
 import EditQuestionModal from "./EditQuestionModal";
 import DeleteQuestionModal from "./DeleteQuestionModal";
 import FilterQuestionModal from "./FilterQuestionModal";
 import BulkDeleteModal from "./BulkDeleteModal";
+import QuestionTable from "./QuestionTable";
 const QuestionManagement = () => {
   const [questions, setQuestions] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -946,6 +948,121 @@ const QuestionManagement = () => {
     setLoading(false);
   };
 
+  // Lấy documentTitle hiện tại
+  const currentDocumentTitle =
+    documents.find((doc) => doc.id === selectedDocumentFilter)?.title ||
+    "DanhSachCauHoi";
+
+  // Hàm xuất Excel chỉ gồm 3 cột, tên file theo documentTitle
+  const handleExportExcel = () => {
+    const data = filteredQuestions.map((q, idx) => ({
+      STT: idx + 1,
+      "Câu hỏi": q.question,
+      "Đáp án": q.answer,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+    XLSX.writeFile(wb, `${currentDocumentTitle}.xlsx`);
+  };
+
+  // Hàm xuất Word (docx) dạng "Câu X: ...", tiêu đề và tên file theo documentTitle
+  const handleExportWord = async () => {
+    async function fetchImageBuffer(url) {
+      try {
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
+        return buffer;
+      } catch {
+        return null;
+      }
+    }
+
+    const paragraphs = [];
+    for (let idx = 0; idx < filteredQuestions.length; idx++) {
+      const q = filteredQuestions[idx];
+      paragraphs.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `Câu ${idx + 1}: ${q.question}`, bold: true }),
+          ],
+        })
+      );
+
+      // Ảnh minh họa cho câu hỏi
+      if (q.url_question) {
+        const imgBuffer = await fetchImageBuffer(q.url_question);
+        if (imgBuffer) {
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: imgBuffer,
+                  transformation: { width: 320, height: 180 },
+                }),
+              ],
+              spacing: { after: 100 },
+            })
+          );
+        }
+      }
+
+      // Đáp án
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun({ text: q.answer })],
+        })
+      );
+
+      // Ảnh đáp án
+      if (q.url_answer) {
+        const imgBuffer = await fetchImageBuffer(q.url_answer);
+        if (imgBuffer) {
+          paragraphs.push(
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: imgBuffer,
+                  transformation: { width: 320, height: 180 },
+                }),
+              ],
+              spacing: { after: 200 },
+            })
+          );
+        }
+      } else {
+        paragraphs.push(
+          new Paragraph({
+            children: [],
+            spacing: { after: 200 },
+          })
+        );
+      }
+    }
+
+    const docx = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: currentDocumentTitle,
+                  bold: true,
+                  size: 32,
+                }),
+              ],
+              spacing: { after: 400 },
+            }),
+            ...paragraphs,
+          ],
+        },
+      ],
+    });
+    const blob = await Packer.toBlob(docx);
+    saveAs(blob, `${currentDocumentTitle}.docx`);
+  };
+
   return (
     <div
       className={`flex flex-col min-h-screen ${
@@ -1047,6 +1164,22 @@ const QuestionManagement = () => {
                       </svg>
                       Thêm Câu Hỏi Mới
                     </span>
+                  </button>
+                  {/* Nút xuất Excel */}
+                  <button
+                    className={`px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors`}
+                    onClick={handleExportExcel}
+                    title="Tải xuống Excel"
+                  >
+                    Excel
+                  </button>
+                  {/* Nút xuất Word */}
+                  <button
+                    className={`px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors`}
+                    onClick={handleExportWord}
+                    title="Tải xuống Word"
+                  >
+                    Word
                   </button>
                 </div>
               </div>
