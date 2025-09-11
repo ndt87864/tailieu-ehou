@@ -14,6 +14,7 @@ const ExamQuestionTable = ({ isDarkMode }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [questionToEdit, setQuestionToEdit] = useState(null);
   const [questionToDelete, setQuestionToDelete] = useState(null);
+  const [isDeleteConfirmed, setIsDeleteConfirmed] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState(null);
 
@@ -196,6 +197,7 @@ const ExamQuestionTable = ({ isDarkMode }) => {
                       onClick={() => {
                         setQuestionToDelete(q);
                         setShowDeleteModal(true);
+                        setIsDeleteConfirmed(false);
                       }}
                     >
                       Xóa
@@ -215,6 +217,53 @@ const ExamQuestionTable = ({ isDarkMode }) => {
         handleAddQuestion={handleAddQuestion}
         isAdding={isAdding}
         addError={addError}
+      />
+      {/* Modal sửa câu hỏi */}
+      <EditQuestionModal
+        showEditModal={showEditModal}
+        isDarkMode={isDarkMode}
+        questionToEdit={questionToEdit}
+        setShowEditModal={setShowEditModal}
+        handleEditQuestion={async (updated) => {
+          // Gọi API cập nhật, truyền đúng id và data
+          try {
+            const { updateExamQuestion } = await import("../../../firebase");
+            await updateExamQuestion(updated.id, {
+              question: updated.question,
+              answer: updated.answer,
+              documentTitle: updated.documentTitle,
+            });
+            setShowEditModal(false);
+            fetchQuestions();
+          } catch (err) {
+            // Xử lý lỗi nếu cần
+          }
+        }}
+        isEditing={false}
+        editError={null}
+      />
+      {/* Modal xóa câu hỏi */}
+      <DeleteQuestionModal
+        showDeleteModal={showDeleteModal}
+        isDarkMode={isDarkMode}
+        questionToDelete={questionToDelete}
+        setShowDeleteModal={setShowDeleteModal}
+        handleDeleteQuestion={async () => {
+          // Gọi API xóa, sau đó fetch lại danh sách
+          try {
+            const { deleteExamQuestion } = await import("../../../firebase");
+            await deleteExamQuestion(questionToDelete?.id);
+            setShowDeleteModal(false);
+            setIsDeleteConfirmed(false);
+            fetchQuestions();
+          } catch (err) {
+            // Xử lý lỗi nếu cần
+          }
+        }}
+        isDeleting={false}
+        deleteError={null}
+        isDeleteConfirmed={isDeleteConfirmed}
+        setIsDeleteConfirmed={setIsDeleteConfirmed}
       />
     </div>
   );

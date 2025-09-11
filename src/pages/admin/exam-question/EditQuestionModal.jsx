@@ -14,11 +14,16 @@ const EditQuestionModal = ({
   isEditing,
   editError,
 }) => {
-  const [question, setQuestion] = useState(questionToEdit?.question || "");
-  const [answer, setAnswer] = useState(questionToEdit?.answer || "");
-  const [documentTitle, setDocumentTitle] = useState(
-    questionToEdit?.documentTitle || ""
-  );
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [documentTitle, setDocumentTitle] = useState("");
+
+  // Cập nhật lại dữ liệu khi questionToEdit thay đổi
+  React.useEffect(() => {
+    setQuestion(questionToEdit?.question || "");
+    setAnswer(questionToEdit?.answer || "");
+    setDocumentTitle(questionToEdit?.documentTitle || "");
+  }, [questionToEdit, showEditModal]);
 
   if (!showEditModal) return null;
   return (
