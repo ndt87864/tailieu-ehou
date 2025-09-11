@@ -3,7 +3,6 @@ const hideScrollbarStyle = `
   .custom-hide-scrollbar::-webkit-scrollbar { display: none; }
   .custom-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 `;
-import React from "react";
 
 const AddQuestionModal = ({
   showAddModal,

@@ -50,6 +50,7 @@ import {
 } from "./utils/cacheControl";
 import { checkAndHandleUpdate, forceRefresh } from "./utils/cacheManager";
 import PricingContentManagement from "./pages/admin/PricingContentManagement";
+import ExamQuestionManagement from "./pages/admin/exam-question/ExamQuestionManagement";
 
 // Component bảo vệ route admin đơn giản
 const ProtectedAdminRoute = ({ children }) => {
@@ -183,6 +184,12 @@ const FooterManagementPage = () => (
 const PricingContentManagementPage = () => (
   <ProtectedAdminRoute>
     <PricingContentManagement />
+  </ProtectedAdminRoute>
+);
+
+const ExamQuestionManagementPage = () => (
+  <ProtectedAdminRoute>
+    <ExamQuestionManagement />
   </ProtectedAdminRoute>
 );
 
@@ -533,15 +540,16 @@ function App() {
                   path="/admin/image-uploader"
                   element={<AdminImageUploaderPage />}
                 /> */}
-                <Route
-                  path="/admin"
-                  element={<Navigate to="/admin/dashboard" replace />}
-                />
+                <Route path="/admin" element={<AdminDashboardPage />} />
 
                 <Route path="/pricing" element={<Pricing />} />
                 <Route
                   path="/admin/pricing-content-management"
                   element={<PricingContentManagementPage />}
+                />
+                <Route
+                  path="/admin/exam-questions"
+                  element={<ExamQuestionManagementPage />}
                 />
                 <Route
                   path="/:categorySlug/:documentSlug"

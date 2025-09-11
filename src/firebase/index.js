@@ -8,3 +8,4 @@ export * from './firebase';
 export * from './authService';
 export * from './firestoreService';
 export * from './optimizedFirestoreService';
+export * from './examQuestionService';
