@@ -150,32 +150,36 @@ const HomePage = () => {
         const cachedData = sessionStorage.getItem('homepageData');
         const cachedTimestamp = sessionStorage.getItem('homepageDataTimestamp');
         const now = new Date();
-        
+
         // Use cached data if available and less than 30 minutes old
         if (cachedData && cachedTimestamp) {
           const timestamp = new Date(parseInt(cachedTimestamp));
           const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-          
+
           if (timestamp > thirtyMinutesAgo) {
-            const parsedData = JSON.parse(cachedData);
+            let parsedData = JSON.parse(cachedData);
+            // Filter out adminOnly categories for non-admin users
+            if (!user?.role || user.role !== 'admin') {
+              parsedData = parsedData.filter((cat) => !cat.adminOnly);
+            }
             setCategoriesWithDocs(parsedData);
             setLoading(false);
             return;
           }
         }
-        
+
         setLoading(true);
-        
+
         // 1. Fetch all categories and sort by stt
         const categoriesRef = collection(db, 'categories');
         const categoriesSnapshot = await getDocs(query(categoriesRef, limit(100)));
-        
+
         if (categoriesSnapshot.empty) {
           setError("Không tìm thấy danh mục nào.");
           setLoading(false);
           return;
         }
-        
+
         // Extract category data and sort by stt
         let categoriesData = categoriesSnapshot.docs.map(doc => ({
           id: doc.id,
@@ -184,10 +188,15 @@ const HomePage = () => {
           allDocuments: [], // Store all documents
           hasMoreDocuments: false
         }));
-        
+
+        // Filter out adminOnly categories for non-admin users
+        if (!user?.role || user.role !== 'admin') {
+          categoriesData = categoriesData.filter((cat) => !cat.adminOnly);
+        }
+
         // Sort categories by stt (order)
         categoriesData = categoriesData.sort((a, b) => (a.stt || 0) - (b.stt || 0));
-        
+
         // 2. Fetch documents for each category in parallel
         const fetchDocumentsPromises = categoriesData.map(async category => {
           try {
@@ -197,19 +206,19 @@ const HomePage = () => {
               where('categoryId', '==', category.id),
               limit(100)
             );
-            
+
             const documentsSnapshot = await getDocs(documentsQuery);
-            
+
             if (!documentsSnapshot.empty) {
               // Get all documents and sort by stt
               const allDocs = documentsSnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
               })).sort((a, b) => (a.stt || 0) - (b.stt || 0));
-              
+
               // Take first 5 documents for initial display
               const initialDocs = allDocs.slice(0, 5);
-              
+
               return {
                 categoryId: category.id,
                 documents: initialDocs,
@@ -217,7 +226,7 @@ const HomePage = () => {
                 hasMoreDocuments: allDocs.length > 5
               };
             }
-            
+
             return {
               categoryId: category.id,
               documents: [],
@@ -226,7 +235,7 @@ const HomePage = () => {
             };
           } catch (error) {
             console.error(`Lỗi khi tải tài liệu cho danh mục ${category.title}:`, error);
-            
+
             // Thêm hướng dẫn tạo index nếu là lỗi index Firebase
             if (error.message && error.message.includes('index')) {
               console.error(
@@ -238,10 +247,10 @@ const HomePage = () => {
             }
           }
         });
-        
+
         // Wait for all document fetching to complete
         const documentsResults = await Promise.all(fetchDocumentsPromises);
-        
+
         // 3. Merge documents with their categories
         const categoriesWithDocuments = categoriesData.map(category => {
           const docResult = documentsResults.find(result => result.categoryId === category.id);
@@ -255,10 +264,10 @@ const HomePage = () => {
           }
           return category;
         });
-        
+
         // 4. Set state with the processed data
         setCategoriesWithDocs(categoriesWithDocuments);
-        
+
         // 5. Cache the data for future use
         sessionStorage.setItem('homepageData', JSON.stringify(categoriesWithDocuments));
         sessionStorage.setItem('homepageDataTimestamp', now.toString());
@@ -266,7 +275,7 @@ const HomePage = () => {
 
         // Fetch popular documents
         setLoadingPopular(true);
-        
+
       } catch (err) {
         console.error("Error loading homepage data:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
@@ -276,7 +285,7 @@ const HomePage = () => {
     };
 
     fetchData();
-  }, []);
+  }, [user]);
 
   // Function to load more documents for a specific category
   const handleLoadMore = (categoryId) => {

@@ -291,7 +291,7 @@ function DocumentView() {
   }, [userDataCache?.uid, categories]);// Main Data Loading - Simplified dependencies to prevent excessive re-renders
   useEffect(() => {
     let isCancelled = false;
-    
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -300,7 +300,7 @@ function DocumentView() {
         const documentViewOptimizer = await import("../utils/documentViewOptimizer");
         const startTime = performance.now();
 
-        const [categoriesData] = await Promise.all([
+        const [categoriesDataRaw] = await Promise.all([
           documentViewOptimizer.getCachedCategories(),
           idleCallback(() => {
             import("../components/ThemeColorPicker");
@@ -308,8 +308,13 @@ function DocumentView() {
           }),
         ]);
 
+        // Filter out adminOnly categories for non-admin users
+        const categoriesData = isAdmin
+          ? categoriesDataRaw
+          : (categoriesDataRaw || []).filter((cat) => !cat.adminOnly);
+
         if (isCancelled) return;
-        
+
         if (!categoriesData?.length) throw new Error("Không thể tải danh mục");
         setCategories(categoriesData);
 
@@ -325,13 +330,13 @@ function DocumentView() {
 
         if (!category) throw new Error("Không tìm thấy danh mục này");
         if (isCancelled) return;
-        
+
         setSelectedCategory(category);
         setOpenMain(categoriesData.indexOf(category));
 
         const docsData = await documentViewOptimizer.getCachedDocumentsByCategory(category.id);
         if (!docsData?.length) throw new Error("Danh mục này không có tài liệu");
-        
+
         if (isCancelled) return;
         setDocuments({ [category.id]: docsData });
 
@@ -395,11 +400,11 @@ function DocumentView() {
     if (categorySlug && documentSlug) {
       fetchData();
     }
-    
+
     return () => {
       isCancelled = true;
     };
-  }, [categorySlug, documentSlug, userDataCache?.uid]); // Simplified dependencies
+  }, [categorySlug, documentSlug, userDataCache?.uid, isAdmin]);
 
   // Other Effects
   useEffect(() => {
