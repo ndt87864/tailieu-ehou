@@ -4,11 +4,17 @@ console.log('Tailieu Questions Extension content script loaded');
 // Store questions from extension for comparison
 let extensionQuestions = [];
 
+// Cache key for questions
+const QUESTIONS_CACHE_KEY = 'tailieu_questions';
+
 // Debug flags and throttling
 let isComparing = false;
 let lastCompareTime = 0;
 const COMPARE_DEBOUNCE_MS = 2000; // 2 seconds
 let debugMode = false; // Set to true for verbose logging
+
+// Load cached questions when page loads
+loadCachedQuestions();
 
 // Conditional logging function
 function debugLog(...args) {
@@ -21,35 +27,115 @@ function debugLog(...args) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Content script received message:', request);
     
-    if (request.action === 'getPageInfo') {
-        sendResponse({
-            url: window.location.href,
-            title: document.title,
-            domain: window.location.hostname
-        });
+    try {
+        if (request.action === 'getPageInfo') {
+            sendResponse({
+                url: window.location.href,
+                title: document.title,
+                domain: window.location.hostname
+            });
+            return true; // Keep message channel open
+        }
+    } catch (error) {
+        console.error('Error handling getPageInfo:', error);
+        sendResponse({ error: error.message });
+        return true;
     }
     
     if (request.action === 'compareQuestions') {
-        extensionQuestions = request.questions || [];
-        const result = compareAndHighlightQuestions();
-        sendResponse({ 
-            success: true, 
-            matchedQuestions: result.matched,
-            totalPageQuestions: result.pageQuestions.length 
-        });
+        try {
+            extensionQuestions = request.questions || [];
+            
+            // Save to cache
+            saveCachedQuestions();
+            
+            const result = compareAndHighlightQuestions();
+            sendResponse({ 
+                success: true, 
+                matchedQuestions: result.matched,
+                totalPageQuestions: result.pageQuestions.length 
+            });
+        } catch (error) {
+            console.error('Error handling compareQuestions:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
+    }
+    
+    if (request.action === 'setExtensionQuestions') {
+        try {
+            extensionQuestions = request.questions || [];
+            
+            // Save to cache
+            saveCachedQuestions();
+            
+            console.log('Extension questions updated from popup:', extensionQuestions.length);
+            showCachedQuestionsIndicator();
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('Error handling setExtensionQuestions:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
     }
     
     if (request.action === 'clearHighlights') {
-        clearAllHighlights();
-        sendResponse({ success: true });
+        try {
+            clearAllHighlights();
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('Error handling clearHighlights:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
     }
     
     if (request.action === 'toggleDebug') {
-        debugMode = !debugMode;
-        console.log('Debug mode:', debugMode ? 'ON' : 'OFF');
-        sendResponse({ success: true, debugMode: debugMode });
+        try {
+            debugMode = !debugMode;
+            console.log('Debug mode:', debugMode ? 'ON' : 'OFF');
+            sendResponse({ success: true, debugMode: debugMode });
+        } catch (error) {
+            console.error('Error handling toggleDebug:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
     }
 });
+
+// Load cached questions from storage
+async function loadCachedQuestions() {
+    try {
+        const result = await chrome.storage.local.get(QUESTIONS_CACHE_KEY);
+        if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
+            extensionQuestions = result[QUESTIONS_CACHE_KEY];
+            console.log('Questions loaded from cache:', extensionQuestions.length);
+            
+            // Show cached questions indicator
+            showCachedQuestionsIndicator();
+            
+            // Auto-compare with page content after delay
+            setTimeout(() => {
+                if (extensionQuestions.length > 0) {
+                    console.log('Auto-comparing cached questions with page...');
+                    compareAndHighlightQuestions();
+                }
+            }, 2000); // Wait 2 seconds for page to load
+        }
+    } catch (error) {
+        console.error('Error loading cached questions:', error);
+    }
+}
+
+// Save questions to cache
+async function saveCachedQuestions() {
+    try {
+        await chrome.storage.local.set({ [QUESTIONS_CACHE_KEY]: extensionQuestions });
+        debugLog('Questions saved to cache:', extensionQuestions.length);
+    } catch (error) {
+        console.error('Error saving questions to cache:', error);
+    }
+}
 
 // Function to extract questions from current page
 function extractQuestionsFromPage() {
@@ -570,6 +656,84 @@ function clearAllHighlights() {
     });
     
     console.log('All highlights cleared');
+}
+
+// Show cached questions indicator
+function showCachedQuestionsIndicator() {
+    // Remove existing indicator
+    const existingIndicator = document.getElementById('tailieu-cached-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    if (extensionQuestions.length === 0) return;
+    
+    const indicator = document.createElement('div');
+    indicator.id = 'tailieu-cached-indicator';
+    indicator.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+            📚 <span>${extensionQuestions.length} câu hỏi sẵn sàng</span>
+            <button id="tailieu-compare-now" style="background: #4caf50; color: white; border: none; border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer;">
+                So sánh ngay
+            </button>
+            <button id="tailieu-hide-indicator" style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer;">
+                ✕
+            </button>
+        </div>
+    `;
+    
+    indicator.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(33, 150, 243, 0.95);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-size: 13px;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    // Add CSS animation
+    if (!document.getElementById('tailieu-indicator-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'tailieu-indicator-styles';
+        styles.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    document.body.appendChild(indicator);
+    
+    // Add event listeners
+    const compareNowBtn = document.getElementById('tailieu-compare-now');
+    if (compareNowBtn) {
+        compareNowBtn.addEventListener('click', () => {
+            compareAndHighlightQuestions();
+            indicator.remove();
+        });
+    }
+    
+    const hideBtn = document.getElementById('tailieu-hide-indicator');
+    if (hideBtn) {
+        hideBtn.addEventListener('click', () => {
+            indicator.remove();
+        });
+    }
+    
+    // Auto-hide after 8 seconds
+    setTimeout(() => {
+        if (indicator && indicator.parentNode) {
+            indicator.remove();
+        }
+    }, 8000);
 }
 
 // Add a floating button to show extension (optional)
