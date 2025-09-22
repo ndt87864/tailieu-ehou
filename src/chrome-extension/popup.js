@@ -3,7 +3,7 @@
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // DOM Elements
-let categorySelect, documentSelect, loadQuestionsBtn, compareQuestionsBtn, questionsSection, questionsList, loading, error;
+let categorySelect, documentSelect, questionsSection, questionsList, loading, error;
 
 // Data storage
 let categories = [];
@@ -50,8 +50,6 @@ function initializeElements() {
             
             categorySelect = document.getElementById('categorySelect');
             documentSelect = document.getElementById('documentSelect');
-            loadQuestionsBtn = document.getElementById('loadQuestionsBtn');
-            compareQuestionsBtn = document.getElementById('compareQuestionsBtn');
             questionsSection = document.getElementById('questionsSection');
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
@@ -59,7 +57,7 @@ function initializeElements() {
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
-                categorySelect, documentSelect, loadQuestionsBtn, compareQuestionsBtn,
+                categorySelect, documentSelect,
                 questionsSection, questionsList, loading, error
             };
             
@@ -82,14 +80,6 @@ function initializeElements() {
 function setupEventListeners() {
     categorySelect.addEventListener('change', onCategoryChange);
     documentSelect.addEventListener('change', onDocumentChange);
-    loadQuestionsBtn.addEventListener('click', onLoadQuestions);
-    compareQuestionsBtn.addEventListener('click', compareQuestionsWithPage);
-    
-    // Debug toggle button
-    const toggleDebugBtn = document.getElementById('toggleDebugBtn');
-    if (toggleDebugBtn) {
-        toggleDebugBtn.addEventListener('click', toggleDebugMode);
-    }
 }
 
 // Cache Management Functions
@@ -165,13 +155,12 @@ async function autoRestoreSelections() {
                 if (selectedDocumentId) {
                     // Restore document selection
                     documentSelect.value = selectedDocumentId;
-                    loadQuestionsBtn.disabled = false;
                     
-                    // If we have questions, display them and enable compare
+                    // If we have questions, show status and auto-compare
                     if (questions.length > 0) {
-                        displayQuestions(questions);
-                        compareQuestionsBtn.disabled = false;
-                        showCacheIndicator();
+                        showQuestionsStatus(questions.length);
+                        // Auto-compare when restoring
+                        await compareQuestionsWithPage();
                     }
                 }
             } else {
@@ -179,7 +168,6 @@ async function autoRestoreSelections() {
                 await loadDocuments(selectedCategoryId);
                 if (selectedDocumentId) {
                     documentSelect.value = selectedDocumentId;
-                    loadQuestionsBtn.disabled = false;
                 }
             }
         }
@@ -219,9 +207,7 @@ async function clearCache() {
         categorySelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
         documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
         questionsList.innerHTML = '';
-        
-        loadQuestionsBtn.disabled = true;
-        compareQuestionsBtn.disabled = true;
+        questionsSection.style.display = 'none';
         
         hideCacheIndicator();
         
@@ -346,11 +332,6 @@ async function loadQuestions(documentId) {
         // Send to content script
         sendQuestionsToContentScript(questions);
         
-        displayQuestions(questions);
-        
-        // Enable compare button
-        compareQuestionsBtn.disabled = false;
-        
     } catch (err) {
         console.error('Failed to load questions:', err);
         showError('Không thể tải danh sách câu hỏi.');
@@ -404,24 +385,37 @@ function populateDocumentSelect() {
     }
 }
 
-function displayQuestions(questionsToShow) {
-    if (!questionsToShow || questionsToShow.length === 0) {
-        questionsList.innerHTML = '<div class="no-questions">Không có câu hỏi nào cho tài liệu này.</div>';
-    } else {
-        questionsList.innerHTML = questionsToShow.map(question => `
-            <div class="question-item">
-                <div class="question-text">❓ ${question.question || 'Câu hỏi không có nội dung'}</div>
-                <div class="answer-text">💡 ${question.answer || 'Chưa có đáp án'}</div>
-            </div>
-        `).join('');
+function showQuestionsStatus(count) {
+    try {
+        if (count === 0) {
+            questionsList.innerHTML = '<div class="no-questions">Không có câu hỏi nào cho tài liệu này.</div>';
+        } else {
+            questionsList.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🚀</div>
+                    <div style="font-weight: 600; margin-bottom: 8px;">Đã tải ${count} câu hỏi</div>
+                    <div style="font-size: 13px;">Extension sẽ tự động tìm và highlight câu hỏi trên trang web</div>
+                </div>
+            `;
+        }
+        
+        // Update questions count
+        document.getElementById('questionsCount').textContent = 
+            `✅ Đã tải ${count} câu hỏi - Đang so sánh...`;
+        
+        // Show questions section
+        questionsSection.style.display = 'block';
+        
+        // Save questions to cache
+        saveToCache(CACHE_KEYS.QUESTIONS, questions);
+        
+        // Show cache indicator
+        showCacheIndicator();
+        
+    } catch (err) {
+        console.error('Error showing questions status:', err);
+        showError('Lỗi hiển thị trạng thái câu hỏi.');
     }
-    
-    // Update questions count
-    document.getElementById('questionsCount').textContent = 
-        `Danh sách câu hỏi (${questionsToShow.length})`;
-    
-    // Show questions section
-    questionsSection.style.display = 'block';
 }
 
 // Event Handlers
@@ -434,10 +428,6 @@ async function onCategoryChange() {
     // Reset document select and hide questions
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     documentSelect.disabled = true;
-    loadQuestionsBtn.disabled = true;
-    if (compareQuestionsBtn) {
-        compareQuestionsBtn.disabled = true;
-    }
     questionsSection.style.display = 'none';
     
     // Clear document selection from cache when category changes
@@ -457,15 +447,13 @@ async function onDocumentChange() {
     await saveToCache(CACHE_KEYS.SELECTED_DOCUMENT, selectedDocumentId);
     
     if (selectedDocumentId) {
-        loadQuestionsBtn.disabled = false;
         // Hide previous questions
         questionsSection.style.display = 'none';
         hideCacheIndicator();
+        
+        // Tự động tải câu hỏi
+        await onLoadQuestions();
     } else {
-        loadQuestionsBtn.disabled = true;
-        if (compareQuestionsBtn) {
-            compareQuestionsBtn.disabled = true;
-        }
         questionsSection.style.display = 'none';
     }
 }
@@ -482,12 +470,8 @@ async function loadQuestions(documentId) {
         questions = data.questions || [];
         console.log('Questions loaded:', questions.length);
         
-        displayQuestions(questions);
-        
-        // Enable compare button when questions are loaded
-        if (compareQuestionsBtn) {
-            compareQuestionsBtn.disabled = false;
-        }
+        // Show simple status message instead of full questions list
+        showQuestionsStatus(questions.length);
         
     } catch (err) {
         console.error('Failed to load questions:', err);
@@ -611,10 +595,11 @@ async function compareQuestionsWithPage() {
         if (response && response.success) {
             console.log('Question comparison completed:', response);
             
-            // Show comparison results
-            showComparisonResults(response.matchedQuestions, response.totalPageQuestions);
+            // Update questions status with results
+            updateQuestionsStatusWithResults(response.matchedQuestions, response.totalPageQuestions);
         } else {
             console.log('No response from content script - may not be ready');
+            updateQuestionsStatusWithResults(0, 0);
         }
         
     } catch (error) {
@@ -623,99 +608,49 @@ async function compareQuestionsWithPage() {
     }
 }
 
-function showComparisonResults(matchedQuestions, totalPageQuestions) {
-    // Add comparison results section if not exists
-    let resultsSection = document.getElementById('comparisonResults');
-    
-    if (!resultsSection) {
-        resultsSection = document.createElement('div');
-        resultsSection.id = 'comparisonResults';
-        resultsSection.className = 'comparison-results';
-        resultsSection.style.cssText = `
-            margin-top: 15px;
-            padding: 10px;
-            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
-            border-radius: 8px;
-            border-left: 4px solid #4CAF50;
-        `;
+function updateQuestionsStatusWithResults(matchedQuestions, totalPageQuestions) {
+    try {
+        const matchCount = matchedQuestions || 0;
+        const totalQuestions = questions.length;
         
-        // Insert after questions section
-        questionsSection.appendChild(resultsSection);
-    }
-    
-    const matchCount = matchedQuestions ? matchedQuestions.length : 0;
-    
-    resultsSection.innerHTML = `
-        <div class="comparison-header" style="
-            font-weight: bold;
-            color: #2e7d32;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-        ">
-            🔍 Kết quả so sánh trang web
-        </div>
-        <div class="comparison-stats" style="
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 10px;
-        ">
-            📊 Tìm thấy <strong>${totalPageQuestions || 0}</strong> câu hỏi trên trang<br>
-            ✅ Khớp với <strong>${matchCount}</strong> câu hỏi trong database
-        </div>
-        ${matchCount > 0 ? `
-            <div class="matched-questions" style="
-                max-height: 150px;
-                overflow-y: auto;
-                font-size: 13px;
-            ">
-                <div style="font-weight: bold; margin-bottom: 5px; color: #2e7d32;">
-                    🎯 Câu hỏi được highlight:
+        // Update questions count header
+        const questionsCount = document.getElementById('questionsCount');
+        if (questionsCount) {
+            if (matchCount > 0) {
+                questionsCount.textContent = `🎯 Tìm thấy ${matchCount}/${totalQuestions} câu hỏi trên trang`;
+                questionsCount.style.color = '#4CAF50';
+            } else {
+                questionsCount.textContent = `📋 ${totalQuestions} câu hỏi - Chưa tìm thấy trên trang`;
+                questionsCount.style.color = '#ff9800';
+            }
+        }
+        
+        // Update content with results
+        if (questionsList) {
+            const emoji = matchCount > 0 ? '🎯' : '🔍';
+            const title = matchCount > 0 ? 'Thành công!' : 'Đang tìm kiếm...';
+            const message = matchCount > 0 
+                ? `Đã tìm thấy và highlight ${matchCount} câu hỏi trên trang web`
+                : 'Chưa tìm thấy câu hỏi nào. Hãy thử tải lại trang hoặc điều hướng đến trang có câu hỏi.';
+            
+            questionsList.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">${emoji}</div>
+                    <div style="font-weight: 600; margin-bottom: 8px; color: ${matchCount > 0 ? '#4CAF50' : '#ff9800'};">${title}</div>
+                    <div style="font-size: 13px; line-height: 1.4;">${message}</div>
+                    ${matchCount > 0 ? '<div style="font-size: 11px; color: #999; margin-top: 8px;">Câu hỏi đã được highlight màu vàng trên trang</div>' : ''}
                 </div>
-                ${matchedQuestions.map((match, index) => `
-                    <div class="matched-item" style="
-                        background: white;
-                        padding: 6px;
-                        margin: 4px 0;
-                        border-radius: 4px;
-                        border-left: 3px solid #4CAF50;
-                        font-size: 12px;
-                    ">
-                        <strong>${index + 1}.</strong> ${match.pageQuestion.substring(0, 50)}...
-                        <div style="color: #666; font-style: italic; margin-top: 2px;">
-                            💡 ${match.answer.substring(0, 40)}...
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            <button id="clearHighlightsBtn" style="
-                background: #ff6b35;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 12px;
-                cursor: pointer;
-                margin-top: 8px;
-            ">
-                🧹 Xóa highlights
-            </button>
-        ` : `
-            <div style="
-                color: #666;
-                font-style: italic;
-                font-size: 13px;
-            ">
-                ℹ️ Không tìm thấy câu hỏi nào khớp
-            </div>
-        `}
-    `;
-    
-    // Add event listener for clear highlights button
-    const clearBtn = document.getElementById('clearHighlightsBtn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', clearPageHighlights);
+            `;
+        }
+        
+    } catch (err) {
+        console.error('Error updating questions status:', err);
     }
+}
+
+function showComparisonResults(matchedQuestions, totalPageQuestions) {
+    // Legacy function - now using updateQuestionsStatusWithResults  
+    return updateQuestionsStatusWithResults(matchedQuestions, totalPageQuestions);
 }
 
 async function clearPageHighlights() {
@@ -746,25 +681,7 @@ async function clearPageHighlights() {
     }
 }
 
-// Toggle debug mode in content script
-async function toggleDebugMode() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab) return;
-        
-        const response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'toggleDebug'
-        }).catch(() => null);
-        
-        const toggleBtn = document.getElementById('toggleDebugBtn');
-        if (response && response.debugMode !== undefined) {
-            toggleBtn.textContent = response.debugMode ? '🐛 Debug OFF' : '🐛 Debug ON';
-            toggleBtn.style.background = response.debugMode ? '#f44336' : '#4caf50';
-        }
-    } catch (error) {
-        console.error('Error toggling debug mode:', error);
-    }
-}
+
 
 // Add auto-compare when popup opens (optional)
 async function autoCompareOnOpen() {

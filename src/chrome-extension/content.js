@@ -225,18 +225,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         return true;
     }
-    
-    if (request.action === 'toggleDebug') {
-        try {
-            debugMode = !debugMode;
-            console.log('Debug mode:', debugMode ? 'ON' : 'OFF');
-            sendResponse({ success: true, debugMode: debugMode });
-        } catch (error) {
-            console.error('Error handling toggleDebug:', error);
-            sendResponse({ error: error.message });
-        }
-        return true;
-    }
 });
 
 // Load cached questions from storage
