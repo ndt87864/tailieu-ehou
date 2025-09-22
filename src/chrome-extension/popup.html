@@ -83,6 +83,21 @@
             background: #5a6fd8;
         }
 
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
         .btn:disabled {
             background: #ccc;
             cursor: not-allowed;
@@ -174,6 +189,10 @@
 
         <button id="loadQuestionsBtn" class="btn btn-primary" disabled>
             Tải câu hỏi
+        </button>
+        
+        <button id="compareQuestionsBtn" class="btn btn-secondary" disabled style="margin-left: 8px;">
+            🔍 So sánh với trang
         </button>
     </div>
 

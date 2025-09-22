@@ -3,7 +3,7 @@
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // DOM Elements
-let categorySelect, documentSelect, loadQuestionsBtn, questionsSection, questionsList, loading, error;
+let categorySelect, documentSelect, loadQuestionsBtn, compareQuestionsBtn, questionsSection, questionsList, loading, error;
 
 // Data storage
 let categories = [];
@@ -32,6 +32,7 @@ function initializeElements() {
             categorySelect = document.getElementById('categorySelect');
             documentSelect = document.getElementById('documentSelect');
             loadQuestionsBtn = document.getElementById('loadQuestionsBtn');
+            compareQuestionsBtn = document.getElementById('compareQuestionsBtn');
             questionsSection = document.getElementById('questionsSection');
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
@@ -39,7 +40,7 @@ function initializeElements() {
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
-                categorySelect, documentSelect, loadQuestionsBtn,
+                categorySelect, documentSelect, loadQuestionsBtn, compareQuestionsBtn,
                 questionsSection, questionsList, loading, error
             };
             
@@ -63,6 +64,7 @@ function setupEventListeners() {
     categorySelect.addEventListener('change', onCategoryChange);
     documentSelect.addEventListener('change', onDocumentChange);
     loadQuestionsBtn.addEventListener('click', onLoadQuestions);
+    compareQuestionsBtn.addEventListener('click', compareQuestionsWithPage);
 }
 
 // API Functions
@@ -220,6 +222,9 @@ async function onCategoryChange() {
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     documentSelect.disabled = true;
     loadQuestionsBtn.disabled = true;
+    if (compareQuestionsBtn) {
+        compareQuestionsBtn.disabled = true;
+    }
     questionsSection.style.display = 'none';
     
     if (selectedCategoryId) {
@@ -237,6 +242,9 @@ function onDocumentChange() {
         questionsSection.style.display = 'none';
     } else {
         loadQuestionsBtn.disabled = true;
+        if (compareQuestionsBtn) {
+            compareQuestionsBtn.disabled = true;
+        }
         questionsSection.style.display = 'none';
     }
 }
@@ -255,6 +263,11 @@ async function loadQuestions(documentId) {
         
         displayQuestions(questions);
         
+        // Enable compare button when questions are loaded
+        if (compareQuestionsBtn) {
+            compareQuestionsBtn.disabled = false;
+        }
+        
     } catch (err) {
         console.error('Failed to load questions:', err);
         showError('Không thể tải danh sách câu hỏi.');
@@ -267,6 +280,9 @@ async function onLoadQuestions() {
     const selectedDocumentId = documentSelect.value;
     if (selectedDocumentId) {
         await loadQuestions(selectedDocumentId);
+        
+        // After loading questions, compare with current page
+        await compareQuestionsWithPage();
     } else {
         showError('Vui lòng chọn tài liệu trước.');
     }
@@ -306,5 +322,170 @@ function hideError() {
         }
     } catch (err) {
         console.error('Error hiding error:', err);
+    }
+}
+
+// Question comparison functionality
+async function compareQuestionsWithPage() {
+    try {
+        console.log('Comparing questions with current page...');
+        
+        // Get active tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!tab) {
+            console.error('No active tab found');
+            return;
+        }
+        
+        // Send questions to content script for comparison
+        const response = await chrome.tabs.sendMessage(tab.id, {
+            action: 'compareQuestions',
+            questions: questions
+        });
+        
+        if (response && response.success) {
+            console.log('Question comparison completed:', response);
+            
+            // Show comparison results
+            showComparisonResults(response.matchedQuestions, response.totalPageQuestions);
+        } else {
+            console.log('No response from content script - may not be ready');
+        }
+        
+    } catch (error) {
+        console.error('Error comparing questions:', error);
+        // Don't show error to user as this is a background feature
+    }
+}
+
+function showComparisonResults(matchedQuestions, totalPageQuestions) {
+    // Add comparison results section if not exists
+    let resultsSection = document.getElementById('comparisonResults');
+    
+    if (!resultsSection) {
+        resultsSection = document.createElement('div');
+        resultsSection.id = 'comparisonResults';
+        resultsSection.className = 'comparison-results';
+        resultsSection.style.cssText = `
+            margin-top: 15px;
+            padding: 10px;
+            background: linear-gradient(135deg, #e8f5e8, #f0f8f0);
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        `;
+        
+        // Insert after questions section
+        questionsSection.appendChild(resultsSection);
+    }
+    
+    const matchCount = matchedQuestions ? matchedQuestions.length : 0;
+    
+    resultsSection.innerHTML = `
+        <div class="comparison-header" style="
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        ">
+            🔍 Kết quả so sánh trang web
+        </div>
+        <div class="comparison-stats" style="
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 10px;
+        ">
+            📊 Tìm thấy <strong>${totalPageQuestions || 0}</strong> câu hỏi trên trang<br>
+            ✅ Khớp với <strong>${matchCount}</strong> câu hỏi trong database
+        </div>
+        ${matchCount > 0 ? `
+            <div class="matched-questions" style="
+                max-height: 150px;
+                overflow-y: auto;
+                font-size: 13px;
+            ">
+                <div style="font-weight: bold; margin-bottom: 5px; color: #2e7d32;">
+                    🎯 Câu hỏi được highlight:
+                </div>
+                ${matchedQuestions.map((match, index) => `
+                    <div class="matched-item" style="
+                        background: white;
+                        padding: 6px;
+                        margin: 4px 0;
+                        border-radius: 4px;
+                        border-left: 3px solid #4CAF50;
+                        font-size: 12px;
+                    ">
+                        <strong>${index + 1}.</strong> ${match.pageQuestion.substring(0, 50)}...
+                        <div style="color: #666; font-style: italic; margin-top: 2px;">
+                            💡 ${match.answer.substring(0, 40)}...
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="clearHighlightsBtn" style="
+                background: #ff6b35;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+                cursor: pointer;
+                margin-top: 8px;
+            ">
+                🧹 Xóa highlights
+            </button>
+        ` : `
+            <div style="
+                color: #666;
+                font-style: italic;
+                font-size: 13px;
+            ">
+                ℹ️ Không tìm thấy câu hỏi nào khớp
+            </div>
+        `}
+    `;
+    
+    // Add event listener for clear highlights button
+    const clearBtn = document.getElementById('clearHighlightsBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearPageHighlights);
+    }
+}
+
+async function clearPageHighlights() {
+    try {
+        // Get active tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!tab) {
+            console.error('No active tab found');
+            return;
+        }
+        
+        // Send clear message to content script
+        await chrome.tabs.sendMessage(tab.id, {
+            action: 'clearHighlights'
+        });
+        
+        // Remove comparison results
+        const resultsSection = document.getElementById('comparisonResults');
+        if (resultsSection) {
+            resultsSection.remove();
+        }
+        
+        console.log('Page highlights cleared');
+        
+    } catch (error) {
+        console.error('Error clearing highlights:', error);
+    }
+}
+
+// Add auto-compare when popup opens (optional)
+async function autoCompareOnOpen() {
+    // Only auto-compare if we have loaded questions
+    if (questions && questions.length > 0) {
+        await compareQuestionsWithPage();
     }
 }
