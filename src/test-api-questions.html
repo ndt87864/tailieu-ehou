@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API Questions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+
+        .button:hover {
+            background-color: #45a049;
+        }
+
+        #loading {
+            display: none;
+            color: #666;
+        }
+
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .question-item {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .question-text {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .question-info {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Test REST API - Questions từ Firestore</h1>
+
+        <div>
+            <button class="button" onclick="testDirectFunction()">Test Direct Function</button>
+            <button class="button" onclick="testAPI()">Test API Endpoint</button>
+            <button class="button" onclick="clearResults()">Clear Results</button>
+        </div>
+
+        <div id="loading">Đang tải dữ liệu...</div>
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        // Import Firebase services
+        import { getAllQuestionsWithDocumentInfo } from './firebase/questionService.js';
+
+        // Make functions available globally
+        window.testDirectFunction = async function () {
+            const loadingEl = document.getElementById('loading');
+            const resultsEl = document.getElementById('results');
+
+            loadingEl.style.display = 'block';
+            resultsEl.innerHTML = '';
+
+            try {
+                console.log('Gọi trực tiếp function getAllQuestionsWithDocumentInfo...');
+                const questions = await getAllQuestionsWithDocumentInfo();
+
+                loadingEl.style.display = 'none';
+
+                if (questions && questions.length > 0) {
+                    resultsEl.innerHTML = `
+                        <h3>✅ Thành công! Tìm thấy ${questions.length} câu hỏi:</h3>
+                        ${questions.map(q => `
+                            <div class="question-item">
+                                <div class="question-text">${q.questionText || 'Không có nội dung'}</div>
+                                <div class="question-info">
+                                    Document: ${q.documentTitle || 'N/A'} | 
+                                    Category: ${q.categoryTitle || 'N/A'} |
+                                    Type: ${q.questionType || 'N/A'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    resultsEl.innerHTML = '<h3>⚠️ Không tìm thấy câu hỏi nào</h3>';
+                }
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                resultsEl.innerHTML = `<h3>❌ Lỗi: ${error.message}</h3><pre>${error.stack}</pre>`;
+                console.error('Lỗi khi test direct function:', error);
+            }
+        };
+
+        window.testAPI = async function () {
+            const loadingEl = document.getElementById('loading');
+            const resultsEl = document.getElementById('results');
+
+            loadingEl.style.display = 'block';
+            resultsEl.innerHTML = '';
+
+            try {
+                console.log('Gọi API endpoint...');
+                // Thử gọi API handler trực tiếp
+                const { default: handler } = await import('./apiQuestions.js');
+
+                // Mock request/response objects
+                const mockReq = { method: 'GET' };
+                const mockRes = {
+                    status: function (code) {
+                        this.statusCode = code;
+                        return this;
+                    },
+                    json: function (data) {
+                        this.responseData = data;
+                        return this;
+                    }
+                };
+
+                await handler(mockReq, mockRes);
+
+                loadingEl.style.display = 'none';
+
+                if (mockRes.statusCode === 200 && mockRes.responseData.questions) {
+                    const questions = mockRes.responseData.questions;
+                    resultsEl.innerHTML = `
+                        <h3>✅ API thành công! Trả về ${questions.length} câu hỏi:</h3>
+                        ${questions.map(q => `
+                            <div class="question-item">
+                                <div class="question-text">${q.questionText || 'Không có nội dung'}</div>
+                                <div class="question-info">
+                                    Document: ${q.documentTitle || 'N/A'} | 
+                                    Category: ${q.categoryTitle || 'N/A'} |
+                                    Type: ${q.questionType || 'N/A'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    `;
+                } else {
+                    resultsEl.innerHTML = `<h3>❌ API lỗi: Status ${mockRes.statusCode}</h3><pre>${JSON.stringify(mockRes.responseData, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                loadingEl.style.display = 'none';
+                resultsEl.innerHTML = `<h3>❌ Lỗi API: ${error.message}</h3><pre>${error.stack}</pre>`;
+                console.error('Lỗi khi test API:', error);
+            }
+        };
+
+        window.clearResults = function () {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('loading').style.display = 'none';
+        };
+    </script>
+</body>
+
+</html>

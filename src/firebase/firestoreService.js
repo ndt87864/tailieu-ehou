@@ -77,7 +77,7 @@ import {
   setDoc,
   serverTimestamp
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "./firebase.js";
 
 // Re-export all functions
 export {

@@ -11,7 +11,7 @@ import {
   limit,
   increment
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "./firebase.js";
 export const COLLECTIONS = {
   CATEGORIES: "categories",
   DOCUMENTS: "documents",

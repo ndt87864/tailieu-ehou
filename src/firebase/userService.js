@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "./firebase";
+import { db } from "./firebase.js";
 export const COLLECTIONS = {
   CATEGORIES: "categories",
   DOCUMENTS: "documents",
