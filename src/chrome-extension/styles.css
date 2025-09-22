@@ -7,50 +7,11 @@
     position: relative !important;
 }
 
-.tailieu-highlighted-answer {
-    position: relative !important;
-    animation: highlightPulse 1s ease-in-out !important;
-}
-
 .tailieu-answer-tooltip {
     z-index: 10001 !important;
 }
 
-.tailieu-checkmark {
-    font-weight: bold !important;
-}
-
-.tailieu-success-indicator {
-    animation: successPop 0.8s ease-out !important;
-}
-
-/* Animations */
-@keyframes highlightPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-@keyframes bounce {
-    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-8px); }
-    60% { transform: translateY(-4px); }
-}
-
-@keyframes successPop {
-    0% { 
-        opacity: 0; 
-        transform: scale(0.3) rotate(-180deg); 
-    }
-    50% { 
-        opacity: 1; 
-        transform: scale(1.2) rotate(-90deg); 
-    }
-    100% { 
-        opacity: 1; 
-        transform: scale(1) rotate(0deg); 
-    }
-}
+/* Animations - keeping only necessary ones */
 
 /* Additional highlight styles */
 .tailieu-highlight {
