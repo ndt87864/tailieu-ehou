@@ -474,6 +474,75 @@ function calculateSimilarity(str1, str2) {
     return (longer.length - editDistance) / longer.length;
 }
 
+// Escape special regex characters
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlight text content within an element without affecting HTML structure
+function highlightTextInElement(element, searchText) {
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    const textNodes = [];
+    let node;
+    
+    // Collect all text nodes
+    while (node = walker.nextNode()) {
+        textNodes.push(node);
+    }
+    
+    // Search for the text in text nodes
+    const searchLower = searchText.toLowerCase();
+    
+    textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const textLower = text.toLowerCase();
+        
+        // Check if this text node contains the search text
+        const index = textLower.indexOf(searchLower);
+        if (index !== -1) {
+            const parent = textNode.parentNode;
+            
+            // Create highlighted version
+            const beforeText = text.substring(0, index);
+            const matchedText = text.substring(index, index + searchText.length);
+            const afterText = text.substring(index + searchText.length);
+            
+            // Create new nodes
+            const fragment = document.createDocumentFragment();
+            
+            if (beforeText) {
+                fragment.appendChild(document.createTextNode(beforeText));
+            }
+            
+            // Create highlighted span
+            const highlightSpan = document.createElement('span');
+            highlightSpan.style.cssText = `
+                background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
+                border-radius: 3px !important;
+                padding: 2px 4px !important;
+                font-weight: bold !important;
+                box-shadow: 0 1px 3px rgba(255,107,53,0.3) !important;
+            `;
+            highlightSpan.className = 'tailieu-text-highlight';
+            highlightSpan.textContent = matchedText;
+            fragment.appendChild(highlightSpan);
+            
+            if (afterText) {
+                fragment.appendChild(document.createTextNode(afterText));
+            }
+            
+            // Replace the original text node
+            parent.replaceChild(fragment, textNode);
+        }
+    });
+}
+
 // Levenshtein distance algorithm
 function levenshteinDistance(str1, str2) {
     const matrix = [];
@@ -507,16 +576,25 @@ function levenshteinDistance(str1, str2) {
 function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     const element = pageQuestion.element;
     
-    // Highlight the question
+    // Highlight only the text content, not the entire element
     if (!element.classList.contains('tailieu-highlighted-question')) {
+        // Create a wrapper span for highlighting text only
+        const questionText = pageQuestion.text.trim();
+        
+        // Store original HTML for restoration
+        if (!element.dataset.originalHTML) {
+            element.dataset.originalHTML = element.innerHTML;
+        }
+        
+        // Use a more sophisticated approach to highlight text content
+        highlightTextInElement(element, questionText);
+        
+        // Add a subtle border to the container for better visibility
         element.style.cssText += `
-            background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
-            border: 2px solid #ff6b35 !important;
-            border-radius: 5px !important;
-            padding: 8px !important;
+            border-left: 4px solid #ff6b35 !important;
+            padding-left: 8px !important;
             margin: 5px 0 !important;
             position: relative !important;
-            box-shadow: 0 2px 8px rgba(255,107,53,0.3) !important;
         `;
         element.classList.add('tailieu-highlighted-question');
         
@@ -746,22 +824,31 @@ function highlightAnswerOptions(questionElement, correctAnswer) {
 
 // Clear all highlights
 function clearAllHighlights() {
-    // Remove question highlights
+    // Remove question highlights - restore original HTML
     document.querySelectorAll('.tailieu-highlighted-question').forEach(element => {
-        element.style.background = '';
-        element.style.border = '';
-        element.style.borderRadius = '';
-        element.style.padding = '';
+        // Remove inline styles added to the container
+        element.style.borderLeft = '';
+        element.style.paddingLeft = '';
         element.style.margin = '';
         element.style.position = '';
-        element.style.boxShadow = '';
+        
+        // Restore original HTML if available
+        if (element.dataset.originalHTML) {
+            element.innerHTML = element.dataset.originalHTML;
+            delete element.dataset.originalHTML;
+        } else {
+            // Fallback: remove highlighting spans
+            const highlightedSpans = element.querySelectorAll('.tailieu-text-highlight');
+            highlightedSpans.forEach(span => {
+                span.outerHTML = span.textContent;
+            });
+        }
+        
         element.classList.remove('tailieu-highlighted-question');
         
-        // Remove tooltips
-        const tooltip = element.querySelector('.tailieu-answer-tooltip');
-        if (tooltip) {
-            tooltip.remove();
-        }
+        // Remove tooltips (they should be restored with original HTML, but just in case)
+        const tooltips = element.querySelectorAll('.tailieu-answer-tooltip');
+        tooltips.forEach(tooltip => tooltip.remove());
     });
     
     // Remove answer highlights
