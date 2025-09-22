@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test API Questions</title>
+    <title>Test REST APIs - Firestore Data</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -35,6 +35,18 @@
             background-color: #45a049;
         }
 
+        .button.categories {
+            background-color: #2196F3;
+        }
+
+        .button.documents {
+            background-color: #FF9800;
+        }
+
+        .button.clear {
+            background-color: #f44336;
+        }
+
         #loading {
             display: none;
             color: #666;
@@ -49,7 +61,7 @@
             overflow-y: auto;
         }
 
-        .question-item {
+        .data-item {
             border: 1px solid #ddd;
             margin: 10px 0;
             padding: 10px;
@@ -57,39 +69,102 @@
             background: white;
         }
 
-        .question-text {
+        .data-title {
             font-weight: bold;
             color: #333;
         }
 
-        .question-info {
+        .data-info {
             font-size: 0.9em;
             color: #666;
             margin-top: 5px;
+        }
+
+        .api-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>Test REST API - Questions từ Firestore</h1>
+        <h1>Test REST APIs - Firestore Data</h1>
 
-        <div>
-            <button class="button" onclick="testDirectFunction()">Test Direct Function</button>
-            <button class="button" onclick="testAPI()">Test API Endpoint</button>
-            <button class="button" onclick="clearResults()">Clear Results</button>
+        <div class="api-section">
+            <h3>📋 Questions API</h3>
+            <button class="button" onclick="testQuestionsAPI()">Test Questions API</button>
+            <p>Endpoint: <code>/api/questions</code></p>
+        </div>
+
+        <div class="api-section">
+            <h3>📁 Categories API</h3>
+            <button class="button categories" onclick="testCategoriesAPI()">Test Categories API</button>
+            <p>Endpoint: <code>/api/categories</code></p>
+        </div>
+
+        <div class="api-section">
+            <h3>📄 Documents API</h3>
+            <button class="button documents" onclick="testDocumentsAPI()">Test Documents API</button>
+            <p>Endpoint: <code>/api/documents</code></p>
+        </div>
+
+        <div class="api-section">
+            <button class="button clear" onclick="clearResults()">Clear Results</button>
         </div>
 
         <div id="loading">Đang tải dữ liệu...</div>
         <div id="results"></div>
     </div>
 
-    <script type="module">
-        // Import Firebase services
-        import { getAllQuestionsWithDocumentInfo } from './firebase/questionService.js';
+    <script>
+        // Test Questions API - chỉ hiển thị question, answer, documentId
+        window.testQuestionsAPI = async function () {
+            await testAPI('/api/questions', 'questions', (data) => {
+                return data.map(q => `
+                    <div class="data-item">
+                        <div class="data-title">❓ ${q.question || 'Không có câu hỏi'}</div>
+                        <div class="data-info">
+                            Document ID: ${q.documentId || 'N/A'} | 
+                            Answer: ${q.answer || 'N/A'}
+                        </div>
+                    </div>
+                `).join('');
+            });
+        };
 
-        // Make functions available globally
-        window.testDirectFunction = async function () {
+        // Test Categories API - chỉ hiển thị id và title
+        window.testCategoriesAPI = async function () {
+            await testAPI('/api/categories', 'categories', (data) => {
+                return data.map(c => `
+                    <div class="data-item">
+                        <div class="data-title">📁 ${c.title || 'Không có tiêu đề'}</div>
+                        <div class="data-info">
+                            ID: ${c.id || 'N/A'}
+                        </div>
+                    </div>
+                `).join('');
+            });
+        };
+
+        // Test Documents API - chỉ hiển thị id và title
+        window.testDocumentsAPI = async function () {
+            await testAPI('/api/documents', 'documents', (data) => {
+                return data.map(d => `
+                    <div class="data-item">
+                        <div class="data-title">📄 ${d.title || 'Không có tiêu đề'}</div>
+                        <div class="data-info">
+                            ID: ${d.id || 'N/A'}
+                        </div>
+                    </div>
+                `).join('');
+            });
+        };
+
+        // Generic test API function
+        async function testAPI(endpoint, dataKey, renderFunction) {
             const loadingEl = document.getElementById('loading');
             const resultsEl = document.getElementById('results');
 
@@ -97,88 +172,31 @@
             resultsEl.innerHTML = '';
 
             try {
-                console.log('Gọi trực tiếp function getAllQuestionsWithDocumentInfo...');
-                const questions = await getAllQuestionsWithDocumentInfo();
+                console.log(`Gọi ${endpoint}...`);
+                const response = await fetch(`http://localhost:3001${endpoint}`);
 
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
                 loadingEl.style.display = 'none';
 
-                if (questions && questions.length > 0) {
+                if (result.success && result[dataKey] && result[dataKey].length > 0) {
+                    const data = result[dataKey];
                     resultsEl.innerHTML = `
-                        <h3>✅ Thành công! Tìm thấy ${questions.length} câu hỏi:</h3>
-                        ${questions.map(q => `
-                            <div class="question-item">
-                                <div class="question-text">${q.questionText || 'Không có nội dung'}</div>
-                                <div class="question-info">
-                                    Document: ${q.documentTitle || 'N/A'} | 
-                                    Category: ${q.categoryTitle || 'N/A'} |
-                                    Type: ${q.questionType || 'N/A'}
-                                </div>
-                            </div>
-                        `).join('')}
+                        <h3>✅ ${endpoint} thành công! Trả về ${data.length} bản ghi:</h3>
+                        ${renderFunction(data)}
                     `;
                 } else {
-                    resultsEl.innerHTML = '<h3>⚠️ Không tìm thấy câu hỏi nào</h3>';
+                    resultsEl.innerHTML = `<h3>⚠️ ${endpoint} không trả về dữ liệu nào</h3><pre>${JSON.stringify(result, null, 2)}</pre>`;
                 }
             } catch (error) {
                 loadingEl.style.display = 'none';
-                resultsEl.innerHTML = `<h3>❌ Lỗi: ${error.message}</h3><pre>${error.stack}</pre>`;
-                console.error('Lỗi khi test direct function:', error);
+                resultsEl.innerHTML = `<h3>❌ Lỗi ${endpoint}: ${error.message}</h3><pre>${error.stack || 'Không có stack trace'}</pre>`;
+                console.error(`Lỗi khi test ${endpoint}:`, error);
             }
-        };
-
-        window.testAPI = async function () {
-            const loadingEl = document.getElementById('loading');
-            const resultsEl = document.getElementById('results');
-
-            loadingEl.style.display = 'block';
-            resultsEl.innerHTML = '';
-
-            try {
-                console.log('Gọi API endpoint...');
-                // Thử gọi API handler trực tiếp
-                const { default: handler } = await import('./apiQuestions.js');
-
-                // Mock request/response objects
-                const mockReq = { method: 'GET' };
-                const mockRes = {
-                    status: function (code) {
-                        this.statusCode = code;
-                        return this;
-                    },
-                    json: function (data) {
-                        this.responseData = data;
-                        return this;
-                    }
-                };
-
-                await handler(mockReq, mockRes);
-
-                loadingEl.style.display = 'none';
-
-                if (mockRes.statusCode === 200 && mockRes.responseData.questions) {
-                    const questions = mockRes.responseData.questions;
-                    resultsEl.innerHTML = `
-                        <h3>✅ API thành công! Trả về ${questions.length} câu hỏi:</h3>
-                        ${questions.map(q => `
-                            <div class="question-item">
-                                <div class="question-text">${q.questionText || 'Không có nội dung'}</div>
-                                <div class="question-info">
-                                    Document: ${q.documentTitle || 'N/A'} | 
-                                    Category: ${q.categoryTitle || 'N/A'} |
-                                    Type: ${q.questionType || 'N/A'}
-                                </div>
-                            </div>
-                        `).join('')}
-                    `;
-                } else {
-                    resultsEl.innerHTML = `<h3>❌ API lỗi: Status ${mockRes.statusCode}</h3><pre>${JSON.stringify(mockRes.responseData, null, 2)}</pre>`;
-                }
-            } catch (error) {
-                loadingEl.style.display = 'none';
-                resultsEl.innerHTML = `<h3>❌ Lỗi API: ${error.message}</h3><pre>${error.stack}</pre>`;
-                console.error('Lỗi khi test API:', error);
-            }
-        };
+        }
 
         window.clearResults = function () {
             document.getElementById('results').innerHTML = '';

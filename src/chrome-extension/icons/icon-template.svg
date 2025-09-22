@@ -1,0 +1,30 @@
+<!-- SVG Template for Extension Icon -->
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#gradient)" stroke="#ffffff" stroke-width="4"/>
+  
+  <!-- Book icon -->
+  <rect x="35" y="40" width="58" height="48" fill="#ffffff" rx="4"/>
+  <rect x="35" y="40" width="58" height="6" fill="#f0f0f0"/>
+  <line x1="64" y1="46" x2="64" y2="88" stroke="#667eea" stroke-width="2"/>
+  
+  <!-- Question mark -->
+  <text x="64" y="108" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">?</text>
+</svg>
+
+<!-- 
+Hướng dẫn tạo icon:
+1. Copy SVG code này vào file .svg
+2. Sử dụng online converter để chuyển SVG thành PNG với các kích thước:
+   - 16x16 pixels → icon16.png
+   - 48x48 pixels → icon48.png  
+   - 128x128 pixels → icon128.png
+3. Hoặc sử dụng CSS để tạo icon bằng HTML/CSS
+-->

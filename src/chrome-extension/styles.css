@@ -1,0 +1,39 @@
+/* Styles for content script injected elements */
+
+/* Floating button styles are defined inline in content.js for better control */
+
+/* Additional styles that might be needed for content script */
+.tailieu-highlight {
+    background-color: #ffeb3b !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+    transition: background-color 0.2s !important;
+}
+
+.tailieu-highlight:hover {
+    background-color: #ffc107 !important;
+}
+
+/* Styles for any injected UI elements */
+.tailieu-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 9999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.tailieu-modal {
+    background: white !important;
+    padding: 20px !important;
+    border-radius: 8px !important;
+    max-width: 500px !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
+}

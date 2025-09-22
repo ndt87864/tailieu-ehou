@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 380px;
+            min-height: 500px;
+            margin: 0;
+            padding: 15px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .selection-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .questions-section {
+            display: none;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .questions-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e1e5e9;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .question-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .question-item:last-child {
+            border-bottom: none;
+        }
+
+        .question-text {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .answer-text {
+            color: #666;
+            font-size: 13px;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border-left: 3px solid #667eea;
+        }
+
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+        .no-questions {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>📚 Tailieu Questions</h1>
+    </div>
+
+    <div class="selection-section">
+        <div class="form-group">
+            <label for="categorySelect">Chọn danh mục:</label>
+            <select id="categorySelect">
+                <option value="">-- Chọn danh mục --</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="documentSelect">Chọn tài liệu:</label>
+            <select id="documentSelect" disabled>
+                <option value="">-- Chọn tài liệu --</option>
+            </select>
+        </div>
+
+        <button id="loadQuestionsBtn" class="btn btn-primary" disabled>
+            Tải câu hỏi
+        </button>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">
+        <div>🔄 Đang tải...</div>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div id="questionsSection" class="questions-section">
+        <div class="questions-header">
+            <span id="questionsCount">Danh sách câu hỏi</span>
+        </div>
+        <div id="questionsList"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>
