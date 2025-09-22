@@ -65,6 +65,12 @@ function setupEventListeners() {
     documentSelect.addEventListener('change', onDocumentChange);
     loadQuestionsBtn.addEventListener('click', onLoadQuestions);
     compareQuestionsBtn.addEventListener('click', compareQuestionsWithPage);
+    
+    // Debug toggle button
+    const toggleDebugBtn = document.getElementById('toggleDebugBtn');
+    if (toggleDebugBtn) {
+        toggleDebugBtn.addEventListener('click', toggleDebugMode);
+    }
 }
 
 // API Functions
@@ -156,7 +162,7 @@ function populateCategorySelect() {
     
     try {
         categories.forEach(category => {
-            const option = document.createElement('option');
+            const option = window.document.createElement('option');
             option.value = category.id;
             option.textContent = category.title;
             categorySelect.appendChild(option);
@@ -176,18 +182,18 @@ function populateDocumentSelect() {
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     
     try {
-        documents.forEach(document => {
-            const option = document.createElement('option');
-            option.value = document.id;
-            option.textContent = document.title;
+        documents.forEach(doc => {
+            const option = window.document.createElement('option');
+            option.value = doc.id;
+            option.textContent = doc.title;
             documentSelect.appendChild(option);
         });
         documentSelect.disabled = false;
     } catch (error) {
         console.error('Error populating document select:', error);
         // Fallback: sử dụng innerHTML
-        const optionsHTML = documents.map(document => 
-            `<option value="${document.id}">${document.title}</option>`
+        const optionsHTML = documents.map(doc => 
+            `<option value="${doc.id}">${doc.title}</option>`
         ).join('');
         documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>' + optionsHTML;
         documentSelect.disabled = false;
@@ -479,6 +485,26 @@ async function clearPageHighlights() {
         
     } catch (error) {
         console.error('Error clearing highlights:', error);
+    }
+}
+
+// Toggle debug mode in content script
+async function toggleDebugMode() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab) return;
+        
+        const response = await chrome.tabs.sendMessage(tab.id, {
+            action: 'toggleDebug'
+        }).catch(() => null);
+        
+        const toggleBtn = document.getElementById('toggleDebugBtn');
+        if (response && response.debugMode !== undefined) {
+            toggleBtn.textContent = response.debugMode ? '🐛 Debug OFF' : '🐛 Debug ON';
+            toggleBtn.style.background = response.debugMode ? '#f44336' : '#4caf50';
+        }
+    } catch (error) {
+        console.error('Error toggling debug mode:', error);
     }
 }
 

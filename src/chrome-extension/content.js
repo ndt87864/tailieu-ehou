@@ -4,6 +4,19 @@ console.log('Tailieu Questions Extension content script loaded');
 // Store questions from extension for comparison
 let extensionQuestions = [];
 
+// Debug flags and throttling
+let isComparing = false;
+let lastCompareTime = 0;
+const COMPARE_DEBOUNCE_MS = 2000; // 2 seconds
+let debugMode = false; // Set to true for verbose logging
+
+// Conditional logging function
+function debugLog(...args) {
+    if (debugMode) {
+        console.log(...args);
+    }
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log('Content script received message:', request);
@@ -29,6 +42,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'clearHighlights') {
         clearAllHighlights();
         sendResponse({ success: true });
+    }
+    
+    if (request.action === 'toggleDebug') {
+        debugMode = !debugMode;
+        console.log('Debug mode:', debugMode ? 'ON' : 'OFF');
+        sendResponse({ success: true, debugMode: debugMode });
     }
 });
 
@@ -56,7 +75,7 @@ function extractQuestionsFromPage() {
     
     const questionElements = document.querySelectorAll(questionSelectors.join(', '));
     
-    console.log('Scanning', questionElements.length, 'elements for questions');
+    debugLog('Scanning', questionElements.length, 'elements for questions');
     
     questionElements.forEach((element, index) => {
         const text = element.textContent.trim();
@@ -118,7 +137,7 @@ function extractQuestionsFromPage() {
                 reason: questionReason
             });
             
-            console.log(`Q${questions.length}: ${text.substring(0, 60)}... (${questionReason})`);
+            debugLog(`Q${questions.length}: ${text.substring(0, 60)}... (${questionReason})`);
         }
     });
     
@@ -160,27 +179,33 @@ function cleanQuestionText(text) {
 
 // Compare questions and highlight matches
 function compareAndHighlightQuestions() {
+    // Prevent excessive calls and logging
+    const now = Date.now();
+    if (isComparing || (now - lastCompareTime) < COMPARE_DEBOUNCE_MS) {
+        console.log('Skipping comparison - too soon or already in progress');
+        return { matched: [], pageQuestions: [] };
+    }
+    
+    isComparing = true;
+    lastCompareTime = now;
+    
     const pageQuestions = extractQuestionsFromPage();
     const matched = [];
     
-    console.log('=== QUESTION COMPARISON DEBUG ===');
-    console.log('Extension questions:', extensionQuestions);
+    console.log('=== QUESTION COMPARISON START ===');
+    console.log('Extension questions:', extensionQuestions.length);
     console.log('Page questions found:', pageQuestions.length);
     
     pageQuestions.forEach((pageQ, pageIndex) => {
         const cleanPageQuestion = cleanQuestionText(pageQ.text);
-        console.log(`Page Q${pageIndex + 1}:`, cleanPageQuestion);
         
         extensionQuestions.forEach((extQ, extIndex) => {
             const cleanExtQuestion = cleanQuestionText(extQ.question);
             
             // Check for similarity (exact match or high similarity)
             if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
-                console.log(`✅ MATCH FOUND!`);
-                console.log(`Page Q${pageIndex + 1}: "${cleanPageQuestion}"`);
-                console.log(`Extension Q${extIndex + 1}: "${cleanExtQuestion}"`);
-                console.log(`Correct Answer: "${extQ.answer}"`);
-                console.log('---');
+                console.log(`✅ MATCH FOUND! Page Q${pageIndex + 1} = Extension Q${extIndex + 1}`);
+                console.log(`Answer: "${extQ.answer}"`);
                 
                 // Highlight the question and try to find/highlight the answer
                 highlightMatchedQuestion(pageQ, extQ);
@@ -195,7 +220,10 @@ function compareAndHighlightQuestions() {
     });
     
     console.log(`Total matches: ${matched.length}`);
-    console.log('=== END DEBUG ===');
+    console.log('=== COMPARISON COMPLETE ===');
+    
+    // Reset comparison flag
+    isComparing = false;
     
     return { matched, pageQuestions };
 }
