@@ -16,6 +16,142 @@ let debugMode = false; // Set to true for verbose logging
 // Load cached questions when page loads
 loadCachedQuestions();
 
+// Auto-compare questions when page is fully loaded
+function initAutoCompareOnLoad() {
+    // Wait for DOM to be ready and page to be stable
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(performAutoCompare, 1000);
+        });
+    } else {
+        // DOM is already loaded
+        setTimeout(performAutoCompare, 1000);
+    }
+    
+    // Also listen for dynamic content changes
+    let contentChangeTimer = null;
+    const observer = new MutationObserver(() => {
+        clearTimeout(contentChangeTimer);
+        contentChangeTimer = setTimeout(performAutoCompare, 2000);
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: false
+    });
+}
+
+// Perform auto-compare if we have cached questions
+async function performAutoCompare() {
+    // Throttle auto-compare to avoid too frequent calls
+    const now = Date.now();
+    if (now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
+        debugLog('Auto-compare throttled, too soon since last compare');
+        return;
+    }
+    
+    if (extensionQuestions.length === 0) {
+        // Try to load from cache first
+        await loadCachedQuestions();
+    }
+    
+    if (extensionQuestions.length > 0) {
+        debugLog('Auto-comparing questions on page load:', extensionQuestions.length);
+        lastCompareTime = now;
+        
+        const result = compareAndHighlightQuestions();
+        
+        if (result.matched > 0) {
+            console.log(`🎯 Tự động so sánh: Tìm thấy ${result.matched}/${extensionQuestions.length} câu hỏi trên trang`);
+            showAutoCompareNotification(result.matched, extensionQuestions.length);
+        } else {
+            debugLog('Auto-compare completed, no matches found');
+        }
+    }
+}
+
+// Show notification for auto-compare results
+function showAutoCompareNotification(matched, total) {
+    const notification = document.createElement('div');
+    notification.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+            🎯 <span>Tự động tìm thấy ${matched}/${total} câu hỏi</span>
+        </div>
+    `;
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(76, 175, 80, 0.95);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-size: 13px;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+        if (notification && notification.parentNode) {
+            notification.remove();
+        }
+    }, 4000);
+}
+
+// Initialize auto-compare
+initAutoCompareOnLoad();
+
+// Monitor URL changes for Single Page Applications
+let currentUrl = window.location.href;
+function monitorUrlChanges() {
+    const observer = new MutationObserver(() => {
+        if (window.location.href !== currentUrl) {
+            currentUrl = window.location.href;
+            debugLog('URL changed, performing auto-compare:', currentUrl);
+            
+            // Wait a bit for new content to load
+            setTimeout(performAutoCompare, 1500);
+        }
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+// Start monitoring URL changes
+monitorUrlChanges();
+
+// Also listen to popstate events (back/forward buttons)
+window.addEventListener('popstate', () => {
+    debugLog('Popstate event detected, performing auto-compare');
+    setTimeout(performAutoCompare, 1000);
+});
+
+// Listen to pushstate/replacestate events (common in SPAs)
+const originalPushState = history.pushState;
+const originalReplaceState = history.replaceState;
+
+history.pushState = function(...args) {
+    originalPushState.apply(this, args);
+    debugLog('PushState detected, performing auto-compare');
+    setTimeout(performAutoCompare, 1000);
+};
+
+history.replaceState = function(...args) {
+    originalReplaceState.apply(this, args);
+    debugLog('ReplaceState detected, performing auto-compare');
+    setTimeout(performAutoCompare, 1000);
+};
+
 // Conditional logging function
 function debugLog(...args) {
     if (debugMode) {
@@ -113,14 +249,6 @@ async function loadCachedQuestions() {
             
             // Show cached questions indicator
             showCachedQuestionsIndicator();
-            
-            // Auto-compare with page content after delay
-            setTimeout(() => {
-                if (extensionQuestions.length > 0) {
-                    console.log('Auto-comparing cached questions with page...');
-                    compareAndHighlightQuestions();
-                }
-            }, 2000); // Wait 2 seconds for page to load
         }
     } catch (error) {
         console.error('Error loading cached questions:', error);
