@@ -73,32 +73,38 @@ export const getQuestionsByDocument = async (documentId) => {
             message: 'Data too large for cache',
             timestamp: new Date().getTime()
           };
-          sessionStorage.setItem(`${cacheKey}_meta`, JSON.stringify(metadata));
-        } else {
-          try {
-            for (let i = 0; i < sessionStorage.length; i++) {
-              const key = sessionStorage.key(i);
-              if (key && key.startsWith('questions_') && key !== cacheKey) {
-                sessionStorage.removeItem(key);
-              }
-            }
-          } catch (e) {
-            console.warn("Error cleaning old cache:", e);
+          if (isBrowser) {
+            sessionStorage.setItem(`${cacheKey}_meta`, JSON.stringify(metadata));
           }
-          
-          sessionStorage.setItem(cacheKey, dataString);
+        } else {
+          if (isBrowser) {
+            try {
+              for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('questions_') && key !== cacheKey) {
+                  sessionStorage.removeItem(key);
+                }
+              }
+            } catch (e) {
+              console.warn("Error cleaning old cache:", e);
+            }
+            
+            sessionStorage.setItem(cacheKey, dataString);
+          }
         }
       } catch (e) {
         console.error("Error caching questions data:", e);
-        try {
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (key && key.startsWith('questions_')) {
-              sessionStorage.removeItem(key);
+        if (isBrowser) {
+          try {
+            for (let i = 0; i < sessionStorage.length; i++) {
+              const key = sessionStorage.key(i);
+              if (key && key.startsWith('questions_')) {
+                sessionStorage.removeItem(key);
+              }
             }
+          } catch (clearError) {
+            console.warn("Could not clear cache storage:", clearError);
           }
-        } catch (clearError) {
-          console.warn("Could not clear cache storage:", clearError);
         }
       }
       

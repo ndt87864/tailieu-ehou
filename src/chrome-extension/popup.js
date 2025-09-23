@@ -159,8 +159,8 @@ async function autoRestoreSelections() {
                     // If we have questions, show status and auto-compare
                     if (questions.length > 0) {
                         showQuestionsStatus(questions.length);
-                        // Auto-compare when restoring
-                        await compareQuestionsWithPage();
+                        // Auto-compare when restoring, with small delay to ensure content script is ready
+                        setTimeout(() => compareQuestionsWithPage(), 1000);
                     }
                 }
             } else {
@@ -389,19 +389,83 @@ function showQuestionsStatus(count) {
     try {
         if (count === 0) {
             questionsList.innerHTML = '<div class="no-questions">Không có câu hỏi nào cho tài liệu này.</div>';
+            document.getElementById('questionsCount').textContent = 'Không có câu hỏi';
         } else {
+            // Show notification banner like in the image
             questionsList.innerHTML = `
-                <div style="padding: 20px; text-align: center; color: #666;">
-                    <div style="font-size: 48px; margin-bottom: 10px;">🚀</div>
-                    <div style="font-weight: 600; margin-bottom: 8px;">Đã tải ${count} câu hỏi</div>
-                    <div style="font-size: 13px;">Extension sẽ tự động tìm và highlight câu hỏi trên trang web</div>
+                <div id="notificationBanner" style="
+                    background: linear-gradient(135deg, #42A5F5, #1E88E5);
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 15px;
+                    box-shadow: 0 2px 10px rgba(66, 165, 245, 0.3);
+                ">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 16px;">📋</span>
+                        <span style="font-weight: 600; font-size: 14px;">${count} câu hỏi sẵn sàng</span>
+                    </div>
+                    <button id="compareNowBtn" style="
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 5px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    ">
+                        So sánh ngay
+                    </button>
+                    <button id="closeBannerBtn" style="
+                        background: none;
+                        color: white;
+                        border: none;
+                        font-size: 16px;
+                        cursor: pointer;
+                        padding: 5px;
+                        margin-left: 5px;
+                    ">
+                        ✕
+                    </button>
+                </div>
+                <div style="padding: 15px; text-align: center; color: #666; font-size: 13px;">
+                    Extension sẽ tự động tìm và highlight câu hỏi trên trang web
                 </div>
             `;
+            
+            // Add event listeners without inline handlers
+            const compareBtn = document.getElementById('compareNowBtn');
+            const closeBannerBtn = document.getElementById('closeBannerBtn');
+            const notificationBanner = document.getElementById('notificationBanner');
+            
+            if (compareBtn) {
+                compareBtn.addEventListener('click', () => {
+                    compareQuestionsWithPage();
+                });
+                
+                // Add hover effects
+                compareBtn.addEventListener('mouseenter', () => {
+                    compareBtn.style.background = '#45A049';
+                });
+                compareBtn.addEventListener('mouseleave', () => {
+                    compareBtn.style.background = '#4CAF50';
+                });
+            }
+            
+            if (closeBannerBtn && notificationBanner) {
+                closeBannerBtn.addEventListener('click', () => {
+                    notificationBanner.style.display = 'none';
+                });
+            }
+            
+            // Update header with simple text
+            document.getElementById('questionsCount').textContent = `${count} câu hỏi sẵn sàng`;
         }
-        
-        // Update questions count
-        document.getElementById('questionsCount').textContent = 
-            `✅ Đã tải ${count} câu hỏi - Đang so sánh...`;
         
         // Show questions section
         questionsSection.style.display = 'block';
@@ -538,7 +602,7 @@ function showCacheIndicator() {
         indicator.id = 'cacheIndicator';
         indicator.innerHTML = `
             <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: space-between;">
-                <span>📋 Sử dụng dữ liệu đã lưu</span>
+                <span>Sử dụng dữ liệu đã lưu</span>
                 <button id="clearCacheBtn" style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 8px;">
                     Xóa cache
                 </button>
@@ -586,25 +650,64 @@ async function compareQuestionsWithPage() {
             return;
         }
         
-        // Send questions to content script for comparison
-        const response = await chrome.tabs.sendMessage(tab.id, {
-            action: 'compareQuestions',
-            questions: questions
-        });
+        // Check if tab is ready (not loading and has valid URL)
+        if (tab.status === 'loading' || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+            console.log('Tab not ready for extension interaction:', tab.url);
+            return;
+        }
         
-        if (response && response.success) {
-            console.log('Question comparison completed:', response);
+        try {
+            // Send questions to content script for comparison with timeout
+            const response = await Promise.race([
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'compareQuestions',
+                    questions: questions
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Message timeout')), 5000)
+                )
+            ]);
             
-            // Update questions status with results
-            updateQuestionsStatusWithResults(response.matchedQuestions, response.totalPageQuestions);
-        } else {
-            console.log('No response from content script - may not be ready');
-            updateQuestionsStatusWithResults(0, 0);
+            if (response && response.success) {
+                console.log('Question comparison completed:', response);
+                
+                // Update questions status with results
+                updateQuestionsStatusWithResults(response.matchedQuestions, response.totalPageQuestions);
+            } else {
+                console.log('No valid response from content script');
+                updateQuestionsStatusWithResults(0, 0);
+            }
+            
+        } catch (messageError) {
+            console.log('Content script not available:', messageError.message);
+            // Try to inject content script if it's not loaded
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    files: ['content.js']
+                });
+                
+                // Wait a bit and try again
+                setTimeout(() => {
+                    chrome.tabs.sendMessage(tab.id, {
+                        action: 'compareQuestions',
+                        questions: questions
+                    }).catch(() => {
+                        console.log('Content script still not ready after injection');
+                        updateQuestionsStatusWithResults(0, 0);
+                    });
+                }, 1000);
+                
+            } catch (injectionError) {
+                console.log('Could not inject content script:', injectionError.message);
+                updateQuestionsStatusWithResults(0, 0);
+            }
         }
         
     } catch (error) {
         console.error('Error comparing questions:', error);
         // Don't show error to user as this is a background feature
+        updateQuestionsStatusWithResults(0, 0);
     }
 }
 
@@ -617,17 +720,16 @@ function updateQuestionsStatusWithResults(matchedQuestions, totalPageQuestions) 
         const questionsCount = document.getElementById('questionsCount');
         if (questionsCount) {
             if (matchCount > 0) {
-                questionsCount.textContent = `🎯 Tìm thấy ${matchCount}/${totalQuestions} câu hỏi trên trang`;
+                questionsCount.textContent = `Tìm thấy ${matchCount}/${totalQuestions} câu hỏi trên trang`;
                 questionsCount.style.color = '#4CAF50';
             } else {
-                questionsCount.textContent = `📋 ${totalQuestions} câu hỏi - Chưa tìm thấy trên trang`;
+                questionsCount.textContent = `${totalQuestions} câu hỏi - Chưa tìm thấy trên trang`;
                 questionsCount.style.color = '#ff9800';
             }
         }
         
         // Update content with results
         if (questionsList) {
-            const emoji = matchCount > 0 ? '🎯' : '🔍';
             const title = matchCount > 0 ? 'Thành công!' : 'Đang tìm kiếm...';
             const message = matchCount > 0 
                 ? `Đã tìm thấy và highlight ${matchCount} câu hỏi trên trang web`
@@ -635,7 +737,6 @@ function updateQuestionsStatusWithResults(matchedQuestions, totalPageQuestions) 
             
             questionsList.innerHTML = `
                 <div style="padding: 20px; text-align: center; color: #666;">
-                    <div style="font-size: 48px; margin-bottom: 10px;">${emoji}</div>
                     <div style="font-weight: 600; margin-bottom: 8px; color: ${matchCount > 0 ? '#4CAF50' : '#ff9800'};">${title}</div>
                     <div style="font-size: 13px; line-height: 1.4;">${message}</div>
                     ${matchCount > 0 ? '<div style="font-size: 11px; color: #999; margin-top: 8px;">Câu hỏi đã được highlight màu vàng trên trang</div>' : ''}
@@ -663,18 +764,33 @@ async function clearPageHighlights() {
             return;
         }
         
-        // Send clear message to content script
-        await chrome.tabs.sendMessage(tab.id, {
-            action: 'clearHighlights'
-        });
+        // Check if tab is ready
+        if (tab.status === 'loading' || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) {
+            console.log('Tab not ready for clearing highlights');
+            return;
+        }
         
-        // Remove comparison results
+        try {
+            // Send clear message to content script with timeout
+            await Promise.race([
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'clearHighlights'
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Clear timeout')), 3000)
+                )
+            ]);
+            
+            console.log('Page highlights cleared');
+        } catch (messageError) {
+            console.log('Could not clear highlights, content script not available:', messageError.message);
+        }
+        
+        // Remove comparison results from popup
         const resultsSection = document.getElementById('comparisonResults');
         if (resultsSection) {
             resultsSection.remove();
         }
-        
-        console.log('Page highlights cleared');
         
     } catch (error) {
         console.error('Error clearing highlights:', error);
@@ -682,6 +798,18 @@ async function clearPageHighlights() {
 }
 
 
+
+// Listen for messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'comparisonComplete') {
+        console.log('Received comparison results from content script:', message);
+        
+        // Update UI with results from auto-comparison
+        updateQuestionsStatusWithResults(message.matched, message.total);
+        
+        sendResponse({ success: true });
+    }
+});
 
 // Add auto-compare when popup opens (optional)
 async function autoCompareOnOpen() {

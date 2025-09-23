@@ -1,5 +1,10 @@
 // Content script for Tailieu Questions Extension
-console.log('Tailieu Questions Extension content script loaded');
+// Prevent multiple script injections
+if (window.tailieuExtensionLoaded) {
+    console.log('Tailieu Questions Extension already loaded, skipping');
+} else {
+    window.tailieuExtensionLoaded = true;
+    console.log('Tailieu Questions Extension content script loaded');
 
 // Store questions from extension for comparison
 let extensionQuestions = [];
@@ -28,26 +33,36 @@ function initAutoCompareOnLoad() {
         setTimeout(performAutoCompare, 1000);
     }
     
-    // Also listen for dynamic content changes
-    let contentChangeTimer = null;
-    const observer = new MutationObserver(() => {
-        clearTimeout(contentChangeTimer);
-        contentChangeTimer = setTimeout(performAutoCompare, 2000);
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: false
-    });
+    // Also listen for dynamic content changes (only if not already observing)
+    if (!window.tailieuMutationObserver) {
+        let contentChangeTimer = null;
+        const observer = new MutationObserver(() => {
+            clearTimeout(contentChangeTimer);
+            contentChangeTimer = setTimeout(performAutoCompare, 2000);
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: false
+        });
+        
+        window.tailieuMutationObserver = observer;
+    }
 }
 
 // Perform auto-compare if we have cached questions
-async function performAutoCompare() {
-    // Throttle auto-compare to avoid too frequent calls
+async function performAutoCompare(force = false) {
+    // Throttle auto-compare to avoid too frequent calls (unless forced)
     const now = Date.now();
-    if (now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
+    if (!force && now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
         debugLog('Auto-compare throttled, too soon since last compare');
+        return;
+    }
+    
+    // Skip if currently comparing
+    if (isComparing) {
+        debugLog('Auto-compare skipped, already comparing');
         return;
     }
     
@@ -57,17 +72,49 @@ async function performAutoCompare() {
     }
     
     if (extensionQuestions.length > 0) {
-        debugLog('Auto-comparing questions on page load:', extensionQuestions.length);
+        debugLog('Auto-comparing questions on page:', extensionQuestions.length);
         lastCompareTime = now;
+        isComparing = true;
         
-        const result = compareAndHighlightQuestions();
-        
-        if (result.matched > 0) {
-            console.log(`🎯 Tự động so sánh: Tìm thấy ${result.matched}/${extensionQuestions.length} câu hỏi trên trang`);
-            showAutoCompareNotification(result.matched, extensionQuestions.length);
-        } else {
-            debugLog('Auto-compare completed, no matches found');
+        try {
+            // Wait for page to be ready
+            if (document.readyState !== 'complete') {
+                await new Promise(resolve => {
+                    if (document.readyState === 'complete') {
+                        resolve();
+                    } else {
+                        window.addEventListener('load', resolve, { once: true });
+                    }
+                });
+                
+                // Additional small delay for dynamic content
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            const result = await compareAndHighlightQuestions();
+            
+            if (result.matched > 0) {
+                console.log(` Tự động so sánh: Tìm thấy ${result.matched}/${extensionQuestions.length} câu hỏi trên trang`);
+                showAutoCompareNotification(result.matched, extensionQuestions.length);
+                
+                // Notify popup about successful comparison
+                try {
+                    chrome.runtime.sendMessage({
+                        action: 'comparisonComplete',
+                        matched: result.matched,
+                        total: extensionQuestions.length
+                    });
+                } catch (err) {
+                    debugLog('Could not notify popup:', err.message);
+                }
+            } else {
+                debugLog('Auto-compare completed, no matches found');
+            }
+        } finally {
+            isComparing = false;
         }
+    } else {
+        debugLog('Auto-compare skipped, no questions available');
     }
 }
 
@@ -76,7 +123,7 @@ function showAutoCompareNotification(matched, total) {
     const notification = document.createElement('div');
     notification.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-            🎯 <span>Tự động tìm thấy ${matched}/${total} câu hỏi</span>
+             <span>Tự động tìm thấy ${matched}/${total} câu hỏi</span>
         </div>
     `;
     
@@ -111,46 +158,86 @@ initAutoCompareOnLoad();
 // Monitor URL changes for Single Page Applications
 let currentUrl = window.location.href;
 function monitorUrlChanges() {
-    const observer = new MutationObserver(() => {
-        if (window.location.href !== currentUrl) {
-            currentUrl = window.location.href;
-            debugLog('URL changed, performing auto-compare:', currentUrl);
-            
-            // Wait a bit for new content to load
-            setTimeout(performAutoCompare, 1500);
-        }
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    if (!window.tailieuUrlObserver) {
+        const observer = new MutationObserver(() => {
+            if (window.location.href !== currentUrl) {
+                currentUrl = window.location.href;
+                setTimeout(performAutoCompare, 1500);
+            }
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        window.tailieuUrlObserver = observer;
+    }
 }
 
 // Start monitoring URL changes
 monitorUrlChanges();
 
 // Also listen to popstate events (back/forward buttons)
-window.addEventListener('popstate', () => {
-    debugLog('Popstate event detected, performing auto-compare');
-    setTimeout(performAutoCompare, 1000);
-});
+if (!window.tailieuPopstateListener) {
+    window.addEventListener('popstate', () => {
+        debugLog('Popstate event detected, performing auto-compare');
+        setTimeout(performAutoCompare, 1000);
+    });
+    window.tailieuPopstateListener = true;
+}
 
 // Listen to pushstate/replacestate events (common in SPAs)
-const originalPushState = history.pushState;
-const originalReplaceState = history.replaceState;
+// Only override if not already overridden
+if (!window.tailieuHistoryOverridden) {
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
 
-history.pushState = function(...args) {
-    originalPushState.apply(this, args);
-    debugLog('PushState detected, performing auto-compare');
-    setTimeout(performAutoCompare, 1000);
-};
+    history.pushState = function(...args) {
+        originalPushState.apply(this, args);
+        debugLog('PushState detected, performing auto-compare');
+        setTimeout(performAutoCompare, 1000);
+    };
 
-history.replaceState = function(...args) {
-    originalReplaceState.apply(this, args);
-    debugLog('ReplaceState detected, performing auto-compare');
-    setTimeout(performAutoCompare, 1000);
-};
+    history.replaceState = function(...args) {
+        originalReplaceState.apply(this, args);
+        debugLog('ReplaceState detected, performing auto-compare');
+        setTimeout(performAutoCompare, 1000);
+    };
+    
+    window.tailieuHistoryOverridden = true;
+}
+
+// Listen for storage changes to auto-trigger comparison
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes[QUESTIONS_CACHE_KEY]) {
+        console.log('Questions cache updated, triggering auto-compare');
+        
+        // Update local questions cache
+        if (changes[QUESTIONS_CACHE_KEY].newValue) {
+            extensionQuestions = changes[QUESTIONS_CACHE_KEY].newValue;
+            setTimeout(() => performAutoCompare(true), 500);
+        }
+    }
+});
+
+// Also listen for more specific cache changes
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local') {
+        // Check for any tailieu cache updates
+        const tailieusKeys = ['tailieu_selected_category', 'tailieu_selected_document'];
+        const hasRelevantChanges = tailieusKeys.some(key => changes[key]);
+        
+        if (hasRelevantChanges) {
+            setTimeout(async () => {
+                await loadCachedQuestions();
+                if (extensionQuestions.length > 0) {
+                    performAutoCompare(true); // Force comparison
+                }
+            }, 1000);
+        }
+    }
+});
 
 // Conditional logging function
 function debugLog(...args) {
@@ -179,22 +266,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     
     if (request.action === 'compareQuestions') {
-        try {
-            extensionQuestions = request.questions || [];
-            
-            // Save to cache
-            saveCachedQuestions();
-            
-            const result = compareAndHighlightQuestions();
-            sendResponse({ 
-                success: true, 
-                matchedQuestions: result.matched,
-                totalPageQuestions: result.pageQuestions.length 
-            });
-        } catch (error) {
-            console.error('Error handling compareQuestions:', error);
-            sendResponse({ error: error.message });
-        }
+        (async () => {
+            try {
+                extensionQuestions = request.questions || [];
+                
+                // Save to cache
+                saveCachedQuestions();
+                
+                const result = await compareAndHighlightQuestions();
+                sendResponse({ 
+                    success: true, 
+                    matchedQuestions: result.matched.length,
+                    totalPageQuestions: result.pageQuestions.length 
+                });
+            } catch (error) {
+                console.error('Error handling compareQuestions:', error);
+                sendResponse({ error: error.message });
+            }
+        })();
         return true;
     }
     
@@ -204,8 +293,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             
             // Save to cache
             saveCachedQuestions();
-            
-            console.log('Extension questions updated from popup:', extensionQuestions.length);
             showCachedQuestionsIndicator();
             sendResponse({ success: true });
         } catch (error) {
@@ -247,7 +334,6 @@ async function loadCachedQuestions() {
 async function saveCachedQuestions() {
     try {
         await chrome.storage.local.set({ [QUESTIONS_CACHE_KEY]: extensionQuestions });
-        debugLog('Questions saved to cache:', extensionQuestions.length);
     } catch (error) {
         console.error('Error saving questions to cache:', error);
     }
@@ -259,7 +345,6 @@ function extractQuestionsFromPage() {
     
     // Enhanced patterns for Vietnamese questions
     const questionPatterns = [
-        /Câu\s*\d+[:\.\)\s]/gi,
         /Bài\s*\d+[:\.\)\s]/gi,
         /Question\s*\d+[:\.\)\s]/gi,
         /\d+[\.\)]\s*/g,
@@ -339,7 +424,6 @@ function extractQuestionsFromPage() {
                 reason: questionReason
             });
             
-            debugLog(`Q${questions.length}: ${text.substring(0, 60)}... (${questionReason})`);
         }
     });
     
@@ -359,7 +443,6 @@ function extractQuestionsFromPage() {
                     index: `test-${index}`,
                     reason: 'test page structure'
                 });
-                console.log(`Test Q${index + 1}: ${text}`);
             }
         });
     }
@@ -380,7 +463,7 @@ function cleanQuestionText(text) {
 }
 
 // Compare questions and highlight matches
-function compareAndHighlightQuestions() {
+async function compareAndHighlightQuestions() {
     // Prevent excessive calls and logging
     const now = Date.now();
     if (isComparing || (now - lastCompareTime) < COMPARE_DEBOUNCE_MS) {
@@ -391,6 +474,9 @@ function compareAndHighlightQuestions() {
     isComparing = true;
     lastCompareTime = now;
     
+    // Update compare button to show comparing state
+    updateCompareButtonProgress();
+    
     const pageQuestions = extractQuestionsFromPage();
     const matched = [];
     
@@ -398,7 +484,10 @@ function compareAndHighlightQuestions() {
     console.log('Extension questions:', extensionQuestions.length);
     console.log('Page questions found:', pageQuestions.length);
     
-    pageQuestions.forEach((pageQ, pageIndex) => {
+    const totalComparisons = pageQuestions.length;
+    
+    for (let pageIndex = 0; pageIndex < pageQuestions.length; pageIndex++) {
+        const pageQ = pageQuestions[pageIndex];
         const cleanPageQuestion = cleanQuestionText(pageQ.text);
         
         extensionQuestions.forEach((extQ, extIndex) => {
@@ -406,8 +495,6 @@ function compareAndHighlightQuestions() {
             
             // Check for similarity (exact match or high similarity)
             if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
-                console.log(`✅ MATCH FOUND! Page Q${pageIndex + 1} = Extension Q${extIndex + 1}`);
-                console.log(`Answer: "${extQ.answer}"`);
                 
                 // Highlight the question and try to find/highlight the answer
                 highlightMatchedQuestion(pageQ, extQ);
@@ -419,15 +506,91 @@ function compareAndHighlightQuestions() {
                 });
             }
         });
-    });
+        
+        // Small delay every 5 items to allow UI updates
+        if ((pageIndex + 1) % 5 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+    }
     
-    console.log(`Total matches: ${matched.length}`);
-    console.log('=== COMPARISON COMPLETE ===');
-    
-    // Reset comparison flag
+    // Reset comparison flag and button after completion with small delay for visual feedback
     isComparing = false;
+    setTimeout(() => {
+        resetCompareButton(matched.length);
+    }, 100); // Very short delay to show completion
     
     return { matched, pageQuestions };
+}
+
+// Update compare button to comparing state
+function updateCompareButtonProgress() {
+    const compareBtn = document.getElementById('tailieu-compare-now');
+    if (compareBtn) {
+        compareBtn.textContent = 'Đang so sánh...';
+        compareBtn.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
+        compareBtn.style.animation = 'pulse 1.5s ease-in-out infinite';
+        compareBtn.disabled = true;
+        
+        // Add CSS animation if not exists
+        if (!document.getElementById('tailieu-progress-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'tailieu-progress-styles';
+            styles.textContent = `
+                @keyframes pulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+    }
+}
+
+// Reset compare button after completion
+function resetCompareButton(matchedCount) {
+    const compareBtn = document.getElementById('tailieu-compare-now');
+    if (compareBtn) {
+        // Remove animation
+        compareBtn.style.animation = '';
+        
+        if (matchedCount > 0) {
+            compareBtn.textContent = ` Hoàn thành (${matchedCount})`;
+            compareBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45A049)';
+            compareBtn.style.transform = 'scale(1.05)';
+            compareBtn.disabled = true;
+            
+            // Small celebration effect
+            setTimeout(() => {
+                if (compareBtn) {
+                    compareBtn.style.transform = 'scale(1)';
+                }
+            }, 200);
+            
+            // Auto-hide indicator after showing result
+            setTimeout(() => {
+                const indicator = document.getElementById('tailieu-cached-indicator');
+                if (indicator) {
+                    indicator.style.transform = 'translateX(100%)';
+                    indicator.style.opacity = '0';
+                    setTimeout(() => indicator.remove(), 300);
+                }
+            }, 3000);
+        } else {
+            compareBtn.textContent = 'Không tìm thấy';
+            compareBtn.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
+            compareBtn.disabled = true;
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                if (compareBtn) {
+                    compareBtn.textContent = ' So sánh ngay';
+                    compareBtn.style.background = 'linear-gradient(135deg, #4caf50, #45A049)';
+                    compareBtn.disabled = false;
+                }
+            }, 2000);
+        }
+    }
 }
 
 // Check if two questions are similar
@@ -601,7 +764,7 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
                 z-index: 10001;
                 line-height: 1.4;
             ">
-                <strong>📝 Đáp án:</strong><br>
+                <strong>Đáp án:</strong><br>
                 ${extensionQuestion.answer}
             </div>
         `;
@@ -674,8 +837,8 @@ function showCachedQuestionsIndicator() {
     indicator.id = 'tailieu-cached-indicator';
     indicator.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-            📚 <span>${extensionQuestions.length} câu hỏi sẵn sàng</span>
-            <button id="tailieu-compare-now" style="background: #4caf50; color: white; border: none; border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer;">
+             <span>${extensionQuestions.length} câu hỏi sẵn sàng</span>
+            <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s ease;">
                 So sánh ngay
             </button>
             <button id="tailieu-hide-indicator" style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer;">
@@ -717,9 +880,11 @@ function showCachedQuestionsIndicator() {
     // Add event listeners
     const compareNowBtn = document.getElementById('tailieu-compare-now');
     if (compareNowBtn) {
-        compareNowBtn.addEventListener('click', () => {
-            compareAndHighlightQuestions();
-            indicator.remove();
+        compareNowBtn.addEventListener('click', async () => {
+            if (!compareNowBtn.disabled) {
+                await compareAndHighlightQuestions();
+                // Don't remove indicator immediately, let resetCompareButton handle it
+            }
         });
     }
     
@@ -785,3 +950,5 @@ function createFloatingButton() {
 
 // Uncomment the line below if you want a floating button on every page
 // createFloatingButton();
+
+} // End of extension load guard

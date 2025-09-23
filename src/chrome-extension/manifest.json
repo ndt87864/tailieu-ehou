@@ -5,7 +5,8 @@
   "description": "Extension để hiển thị câu hỏi và đáp án từ Tailieu API",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost:3001/*",
