@@ -20,6 +20,9 @@ export const COLLECTIONS = {
   USERS: "users" 
 };
 
+// Helper function to check if we're in a browser environment
+const isBrowser = () => typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
+
 export const getQuestionsByDocument = async (documentId) => {
   try {
     if (!documentId) {
@@ -28,13 +31,16 @@ export const getQuestionsByDocument = async (documentId) => {
     
     const cacheKey = `questions_${documentId}`;
     
-    try {
-      const cachedData = sessionStorage.getItem(cacheKey);
-      if (cachedData) {
-        return JSON.parse(cachedData);
+    // Only use sessionStorage if we're in a browser environment
+    if (isBrowser()) {
+      try {
+        const cachedData = sessionStorage.getItem(cacheKey);
+        if (cachedData) {
+          return JSON.parse(cachedData);
+        }
+      } catch (e) {
+        console.error("Error reading cached data:", e);
       }
-    } catch (e) {
-      console.error("Error reading cached data:", e);
     }
     
     const questionsQuery = query(
@@ -61,23 +67,22 @@ export const getQuestionsByDocument = async (documentId) => {
         stt: doc.data().stt || 0
       }));
       
-      try {
-        const dataString = JSON.stringify(questions);
-        const dataSize = new Blob([dataString]).size;
-        
-        if (dataSize > 2 * 1024 * 1024) {
-          const metadata = {
-            id: documentId,
-            count: questions.length,
-            isTruncated: true,
-            message: 'Data too large for cache',
-            timestamp: new Date().getTime()
-          };
-          if (isBrowser) {
+      // Only cache in browser environment
+      if (isBrowser()) {
+        try {
+          const dataString = JSON.stringify(questions);
+          const dataSize = new Blob([dataString]).size;
+          
+          if (dataSize > 2 * 1024 * 1024) {
+            const metadata = {
+              id: documentId,
+              count: questions.length,
+              isTruncated: true,
+              message: 'Data too large for cache',
+              timestamp: new Date().getTime()
+            };
             sessionStorage.setItem(`${cacheKey}_meta`, JSON.stringify(metadata));
-          }
-        } else {
-          if (isBrowser) {
+          } else {
             try {
               for (let i = 0; i < sessionStorage.length; i++) {
                 const key = sessionStorage.key(i);
@@ -91,10 +96,8 @@ export const getQuestionsByDocument = async (documentId) => {
             
             sessionStorage.setItem(cacheKey, dataString);
           }
-        }
-      } catch (e) {
-        console.error("Error caching questions data:", e);
-        if (isBrowser) {
+        } catch (e) {
+          console.error("Error caching questions data:", e);
           try {
             for (let i = 0; i < sessionStorage.length; i++) {
               const key = sessionStorage.key(i);
