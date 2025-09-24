@@ -4,14 +4,15 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Firebase configuration
+// Firebase configuration - Updated from Firebase console
 const firebaseConfig = {
-  apiKey: "AIzaSyB3d4zGYk5xC-Zjf4ZcE6MjTs6bwPhyfL8",
+  apiKey: "AIzaSyDj_FhdiYG8sgrqzSBlf9SrGF8FQR4fCI4",
   authDomain: "tailieu-89ca9.firebaseapp.com",
   projectId: "tailieu-89ca9",
-  storageBucket: "tailieu-89ca9.appspot.com",
-  messagingSenderId: "653674632756",
-  appId: "1:653674632756:web:390b744602b1ee93de0096"
+  storageBucket: "tailieu-89ca9.firebasestorage.app",
+  messagingSenderId: "739034600322",
+  appId: "1:739034600322:web:771c49578c29c8cabe359b",
+  measurementId: "G-4KTZWXH5KE"
 };
 
 // Initialize Firebase
@@ -29,7 +30,7 @@ const getAuthInstance = () => {
 let initialized = false;
 const reinitializeFirebase = () => {
   if (initialized) return { app, auth, db, storage };
-  
+
   // Already initialized, just return the existing instances
   initialized = true;
   return { app, auth, db, storage };
