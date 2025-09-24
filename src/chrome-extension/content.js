@@ -99,13 +99,20 @@ async function performAutoCompare(force = false) {
                 
                 // Notify popup about successful comparison
                 try {
-                    chrome.runtime.sendMessage({
-                        action: 'comparisonComplete',
-                        matched: result.matched,
-                        total: extensionQuestions.length
-                    });
+                    // Check if extension context is valid before sending message
+                    if (chrome?.runtime?.sendMessage) {
+                        chrome.runtime.sendMessage({
+                            action: 'comparisonComplete',
+                            matched: result.matched,
+                            total: extensionQuestions.length
+                        });
+                    }
                 } catch (err) {
-                    debugLog('Could not notify popup:', err.message);
+                    if (err.message.includes('Extension context invalidated')) {
+                        console.log('Extension was reloaded, message sending skipped');
+                    } else {
+                        debugLog('Could not notify popup:', err.message);
+                    }
                 }
             } else {
                 debugLog('Auto-compare completed, no matches found');
@@ -209,35 +216,37 @@ if (!window.tailieuHistoryOverridden) {
 }
 
 // Listen for storage changes to auto-trigger comparison
-chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes[QUESTIONS_CACHE_KEY]) {
-        console.log('Questions cache updated, triggering auto-compare');
-        
-        // Update local questions cache
-        if (changes[QUESTIONS_CACHE_KEY].newValue) {
-            extensionQuestions = changes[QUESTIONS_CACHE_KEY].newValue;
-            setTimeout(() => performAutoCompare(true), 500);
+if (chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes[QUESTIONS_CACHE_KEY]) {
+            console.log('Questions cache updated, triggering auto-compare');
+            
+            // Update local questions cache
+            if (changes[QUESTIONS_CACHE_KEY].newValue) {
+                extensionQuestions = changes[QUESTIONS_CACHE_KEY].newValue;
+                setTimeout(() => performAutoCompare(true), 500);
+            }
         }
-    }
-});
+    });
 
-// Also listen for more specific cache changes
-chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local') {
-        // Check for any tailieu cache updates
-        const tailieusKeys = ['tailieu_selected_category', 'tailieu_selected_document'];
-        const hasRelevantChanges = tailieusKeys.some(key => changes[key]);
-        
-        if (hasRelevantChanges) {
-            setTimeout(async () => {
-                await loadCachedQuestions();
-                if (extensionQuestions.length > 0) {
-                    performAutoCompare(true); // Force comparison
-                }
-            }, 1000);
+    // Also listen for more specific cache changes
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local') {
+            // Check for any tailieu cache updates
+            const tailieusKeys = ['tailieu_selected_category', 'tailieu_selected_document'];
+            const hasRelevantChanges = tailieusKeys.some(key => changes[key]);
+            
+            if (hasRelevantChanges) {
+                setTimeout(async () => {
+                    await loadCachedQuestions();
+                    if (extensionQuestions.length > 0) {
+                        performAutoCompare(true); // Force comparison
+                    }
+                }, 1000);
+            }
         }
-    }
-});
+    });
+}
 
 // Conditional logging function
 function debugLog(...args) {
@@ -317,6 +326,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Load cached questions from storage
 async function loadCachedQuestions() {
     try {
+        // Check if extension context is still valid
+        if (!chrome?.storage?.local) {
+            console.log('Extension context not available, skipping cache load');
+            return;
+        }
+        
         const result = await chrome.storage.local.get(QUESTIONS_CACHE_KEY);
         if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
             extensionQuestions = result[QUESTIONS_CACHE_KEY];
@@ -326,6 +341,10 @@ async function loadCachedQuestions() {
             showCachedQuestionsIndicator();
         }
     } catch (error) {
+        if (error.message.includes('Extension context invalidated')) {
+            console.log('Extension was reloaded, cache loading skipped');
+            return;
+        }
         console.error('Error loading cached questions:', error);
     }
 }
@@ -333,8 +352,18 @@ async function loadCachedQuestions() {
 // Save questions to cache
 async function saveCachedQuestions() {
     try {
+        // Check if extension context is still valid
+        if (!chrome?.storage?.local) {
+            console.log('Extension context not available, skipping cache save');
+            return;
+        }
+        
         await chrome.storage.local.set({ [QUESTIONS_CACHE_KEY]: extensionQuestions });
     } catch (error) {
+        if (error.message.includes('Extension context invalidated')) {
+            console.log('Extension was reloaded, cache saving skipped');
+            return;
+        }
         console.error('Error saving questions to cache:', error);
     }
 }

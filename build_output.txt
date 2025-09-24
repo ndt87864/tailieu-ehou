@@ -1,0 +1,73 @@
+
+> tailieu@1.0.1 build
+> node scripts/clear-cache.js && node scripts/build-extension.js --production && node scripts/generate-static-api.js && vite build
+
+🚀 Bắt đầu quá trình build mới: v1758705348539
+🧹 Xóa thư mục dist cũ...
+✅ Đã xóa thư mục dist cũ thành công
+✅ Đã tạo file version.json với phiên bản: v1758705348539
+✅ Đã tạo file .env.local với thông tin phiên bản
+🔄 Đang thử xóa cache Firebase Hosting...
+[1m[31mError:[39m[22m [1mhosting:clearCache[22m is not a Firebase command
+⚠️ Không thể xóa cache Firebase, nhưng quá trình build vẫn tiếp tục
+🚀 Sẵn sàng để build!
+✅ Updated Chrome Extension for production
+✅ Chrome Extension built successfully
+🔄 Generating static API files...
+Error getting categories: Error: Unable to detect a Project Id in the current environment. 
+To learn more about authentication and Google APIs, visit: 
+https://cloud.google.com/docs/authentication/getting-started
+    at GoogleAuth.findAndCacheProjectId (C:\tailieu\functions\node_modules\google-auth-library\build\src\auth\googleauth.js:124:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Firestore.initializeIfNeeded (C:\tailieu\functions\node_modules\@google-cloud\firestore\build\src\index.js:1185:35)
+Caused by: Error
+    at Query._get (C:\tailieu\functions\node_modules\@google-cloud\firestore\build\src\reference.js:1738:23)
+    at Query.get (C:\tailieu\functions\node_modules\@google-cloud\firestore\build\src\reference.js:1726:21)
+    at getAllCategories (C:\tailieu\functions\services\categoryService.js:15:73)
+    at checkIfOfflineMode (C:\tailieu\scripts\generate-static-api.js:173:11)
+    at generateStaticAPI (C:\tailieu\scripts\generate-static-api.js:24:29)
+    at Object.<anonymous> (C:\tailieu\scripts\generate-static-api.js:289:1)
+    at Module._compile (node:internal/modules/cjs/loader:1369:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1427:10)
+    at Module.load (node:internal/modules/cjs/loader:1206:32)
+    at Module._load (node:internal/modules/cjs/loader:1022:12)
+🔄 Running in offline mode - using existing static files...
+📂 Checking existing static files...
+🔄 Updating timestamps in existing files...
+✅ Static API offline mode completed!
+📊 Using 149 existing API files
+📋 Found 137 question files and 7 document files
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+[36mvite v5.4.19 [32mbuilding for production...[36m[39m
+
+/assets/index.css doesn't exist at build time, it will remain unchanged to be resolved at runtime
+transforming...
+[32m✓[39m 130 modules transformed.
+rendering chunks...
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/tailieu/node_modules/firebase/firestore/dist/esm/index.esm.js is dynamically imported by C:/tailieu/src/utils/downloadPermissions.js, C:/tailieu/src/utils/queryOptimizer.js but also statically imported by C:/tailieu/src/App.jsx, C:/tailieu/src/components/CalendarReminder.jsx, C:/tailieu/src/context/AuthContext.jsx, C:/tailieu/src/firebase/categoryService.js, C:/tailieu/src/firebase/documentService.js, C:/tailieu/src/firebase/firebase.js, C:/tailieu/src/firebase/firestoreService.js, C:/tailieu/src/firebase/questionService.js, C:/tailieu/src/firebase/userService.js, C:/tailieu/src/pages/DocumentView.jsx, C:/tailieu/src/pages/HomePage.jsx, C:/tailieu/src/pages/Pricing.jsx, C:/tailieu/src/pages/Profile.jsx, C:/tailieu/src/pages/admin/AdminDashboard.jsx, C:/tailieu/src/pages/admin/CalendarNoteManagement.jsx, C:/tailieu/src/pages/admin/PremiumUserManagement.jsx, C:/tailieu/src/pages/admin/PricingContentManagement.jsx, C:/tailieu/src/utils/adminHelper.js, C:/tailieu/src/utils/documentViewOptimizer.js, C:/tailieu/src/utils/excelUploader.js, C:/tailieu/src/utils/queryOptimizer.js, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/tailieu/src/firebase/firebase.js is dynamically imported by C:/tailieu/src/utils/downloadPermissions.js, C:/tailieu/src/utils/queryOptimizer.js but also statically imported by C:/tailieu/src/App.jsx, C:/tailieu/src/components/CalendarReminder.jsx, C:/tailieu/src/components/MobileHeader.jsx, C:/tailieu/src/components/Sidebar.jsx, C:/tailieu/src/components/ThemeColorPicker.jsx, C:/tailieu/src/components/UserHeader.jsx, C:/tailieu/src/components/admin/UserManagementContent.jsx, C:/tailieu/src/context/AuthContext.jsx, C:/tailieu/src/context/ThemeContext.jsx, C:/tailieu/src/firebase/authService.js, C:/tailieu/src/firebase/categoryService.js, C:/tailieu/src/firebase/documentService.js, C:/tailieu/src/firebase/firestoreService.js, C:/tailieu/src/firebase/questionService.js, C:/tailieu/src/firebase/userService.js, C:/tailieu/src/pages/DocumentView.jsx, C:/tailieu/src/pages/ForgotPassword.jsx, C:/tailieu/src/pages/GoogleAuth.jsx, C:/tailieu/src/pages/HomePage.jsx, C:/tailieu/src/pages/Login.jsx, C:/tailieu/src/pages/Pricing.jsx, C:/tailieu/src/pages/Profile.jsx, C:/tailieu/src/pages/Register.jsx, C:/tailieu/src/pages/admin/AdminDashboard.jsx, C:/tailieu/src/pages/admin/CalendarNoteManagement.jsx, C:/tailieu/src/pages/admin/CategoryManagement.jsx, C:/tailieu/src/pages/admin/DocumentManagement.jsx, C:/tailieu/src/pages/admin/FooterManagement.jsx, C:/tailieu/src/pages/admin/PremiumUserManagement.jsx, C:/tailieu/src/pages/admin/PricingContentManagement.jsx, C:/tailieu/src/pages/admin/question/QuestionManagement.jsx, C:/tailieu/src/pages/admin/user/AdminUserManagement.jsx, C:/tailieu/src/utils/adminHelper.js, C:/tailieu/src/utils/documentViewOptimizer.js, C:/tailieu/src/utils/excelUploader.js, C:/tailieu/src/utils/queryOptimizer.js, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/tailieu/src/firebase/firestoreService.js is dynamically imported by C:/tailieu/src/utils/adminHelper.js, C:/tailieu/src/utils/queryOptimizer.js but also statically imported by C:/tailieu/src/App.jsx, C:/tailieu/src/components/Footer.jsx, C:/tailieu/src/components/Sidebar.jsx, C:/tailieu/src/components/admin/UserManagementContent.jsx, C:/tailieu/src/context/ThemeContext.jsx, C:/tailieu/src/context/UserRoleContext.jsx, C:/tailieu/src/firebase/authService.js, C:/tailieu/src/pages/DocumentView.jsx, C:/tailieu/src/pages/GoogleAuth.jsx, C:/tailieu/src/pages/HomePage.jsx, C:/tailieu/src/pages/Pricing.jsx, C:/tailieu/src/pages/Register.jsx, C:/tailieu/src/pages/admin/AdminDashboard.jsx, C:/tailieu/src/pages/admin/CategoryManagement.jsx, C:/tailieu/src/pages/admin/DocumentManagement.jsx, C:/tailieu/src/pages/admin/FooterManagement.jsx, C:/tailieu/src/pages/admin/PricingContentManagement.jsx, C:/tailieu/src/pages/admin/question/QuestionManagement.jsx, C:/tailieu/src/pages/admin/user/AdminUserManagement.jsx, C:/tailieu/src/utils/adminHelper.js, C:/tailieu/src/utils/documentViewOptimizer.js, C:/tailieu/src/utils/queryOptimizer.js, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/tailieu/src/components/ThemeColorPicker.jsx is dynamically imported by C:/tailieu/src/pages/DocumentView.jsx but also statically imported by C:/tailieu/src/components/Sidebar.jsx, C:/tailieu/src/components/UserHeader.jsx, C:/tailieu/src/components/admin/UserManagementContent.jsx, C:/tailieu/src/pages/DocumentView.jsx, C:/tailieu/src/pages/HomePage.jsx, C:/tailieu/src/pages/Pricing.jsx, C:/tailieu/src/pages/admin/AdminDashboard.jsx, C:/tailieu/src/pages/admin/CalendarNoteManagement.jsx, C:/tailieu/src/pages/admin/CategoryManagement.jsx, C:/tailieu/src/pages/admin/DocumentManagement.jsx, C:/tailieu/src/pages/admin/FooterManagement.jsx, C:/tailieu/src/pages/admin/PremiumUserManagement.jsx, C:/tailieu/src/pages/admin/PricingContentManagement.jsx, C:/tailieu/src/pages/admin/question/QuestionManagement.jsx, C:/tailieu/src/pages/admin/user/AdminUserManagement.jsx, dynamic import will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m [33m[plugin vite:reporter] 
+(!) C:/tailieu/src/utils/queryOptimizer.js is dynamically imported by C:/tailieu/src/pages/HomePage.jsx, C:/tailieu/src/utils/adminHelper.js but also statically imported by C:/tailieu/src/components/Sidebar.jsx, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                                [39m[1m[2m    9.50 kB[22m[1m[22m[2m │ gzip:   2.99 kB[22m
+[2mdist/[22m[35massets/index-AQ085LKi.css                 [39m[1m[2m   27.37 kB[22m[1m[22m[2m │ gzip:   5.41 kB[22m
+[2mdist/[22m[36massets/excelUploader-CXFkTONE.js          [39m[1m[2m    2.73 kB[22m[1m[22m[2m │ gzip:   1.42 kB[22m
+[2mdist/[22m[36massets/documentViewOptimizer-B1eIKbRj.js  [39m[1m[2m    6.80 kB[22m[1m[22m[2m │ gzip:   2.46 kB[22m
+[2mdist/[22m[36massets/index-Ck2wu3kZ.js                  [39m[1m[33m2,120.93 kB[39m[22m[2m │ gzip: 573.97 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 11.36s[39m

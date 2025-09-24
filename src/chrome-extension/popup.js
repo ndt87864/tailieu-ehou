@@ -1,35 +1,33 @@
 // Chrome Extension Popup Script
-// API Base URL - tự động detect environment
+// API Base URL - ưu tiên API online
 function getApiBaseUrl() {
-  // Get current tab URL to determine environment
+  // Always try online API first
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
         const currentUrl = tabs[0].url;
         
-        // Check if we're on production domain
-        if (currentUrl.includes('tailieuehou.id.vn') || 
-            currentUrl.includes('firebaseapp.com') || 
-            currentUrl.includes('web.app')) {
-          resolve('https://tailieuehou.id.vn/api');
-        } else {
-          // Default to local development  
+        // Always prioritize online API unless explicitly on localhost
+        if (currentUrl.includes('localhost:5174') || currentUrl.includes('127.0.0.1:5174')) {
           resolve('http://localhost:5174/api');
+        } else {
+          // Use online API for all other cases
+          resolve('https://tailieuehou.id.vn/api');
         }
       } else {
-        // Fallback to local
-        resolve('http://localhost:5174/api');
+        // Default to online API
+        resolve('https://tailieuehou.id.vn/api');
       }
     });
   });
 }
 
-let API_BASE_URL = 'http://localhost:5174/api'; // Default
+let API_BASE_URL = 'https://tailieuehou.id.vn/api'; // Default to online
 
 // Initialize API URL
 getApiBaseUrl().then(url => {
   API_BASE_URL = url;
-  console.log('API Base URL:', API_BASE_URL);
+  console.log('Extension API Base URL:', API_BASE_URL);
 });
 
 // DOM Elements
@@ -253,22 +251,158 @@ async function clearCache() {
 // API Functions
 async function apiRequest(endpoint) {
     try {
-        const url = API_BASE_URL.includes('localhost') 
-            ? `${API_BASE_URL}${endpoint}` 
-            : `${API_BASE_URL}${endpoint}.json`; // Use .json for static files
+        let url;
         
-        console.log('API Request:', url);
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Determine URL based on API base and endpoint
+        if (API_BASE_URL.includes('localhost')) {
+            // Local development - dynamic API
+            url = `${API_BASE_URL}${endpoint}`;
+        } else {
+            // Online production - static JSON files
+            if (endpoint === '/categories') {
+                url = `${API_BASE_URL}/categories.json`;
+            } else if (endpoint === '/documents') {
+                url = `${API_BASE_URL}/documents.json`;
+            } else if (endpoint === '/questions') {
+                url = `${API_BASE_URL}/questions.json`;
+            } else if (endpoint.includes('categoryId=')) {
+                // Documents by category: /documents?categoryId=xxx
+                const categoryId = endpoint.split('categoryId=')[1];
+                url = `${API_BASE_URL}/documents-${categoryId}.json`;
+            } else if (endpoint.includes('documentId=')) {
+                // Questions by document: /questions?documentId=xxx
+                const documentId = endpoint.split('documentId=')[1];
+                url = `${API_BASE_URL}/questions-${documentId}.json`;
+            } else {
+                // Fallback - append .json for static files
+                url = `${API_BASE_URL}${endpoint}.json`;
+            }
         }
         
-        const data = await response.json();
-        return data;
+        console.log('Extension API Request:', url);
+        
+        // Add timeout and retry logic
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        try {
+            const response = await fetch(url, {
+                signal: controller.signal,
+                cache: 'no-cache', // Always fetch fresh data
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                // If online API fails, try fallback immediately
+                if (!API_BASE_URL.includes('localhost') && (response.status === 404 || response.status >= 400)) {
+                    console.warn(`API request failed: ${response.status} for ${url}, trying fallback...`);
+                    return await tryFallbackRequest(endpoint, controller);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+            
+            const data = await response.json();
+            console.log('Extension API Response:', { url, dataKeys: Object.keys(data), itemCount: data.categories?.length || data.documents?.length || data.questions?.length || 0 });
+            return data;
+            
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            // If fetch fails completely, try fallback
+            if (!API_BASE_URL.includes('localhost')) {
+                console.warn(`Fetch failed for ${url}:`, fetchError.message, ', trying fallback...');
+                return await tryFallbackRequest(endpoint, controller);
+            } else {
+                throw fetchError;
+            }
+        }
+        
     } catch (err) {
-        console.error('API Request failed:', err);
+        console.error('Extension API Request failed:', err);
+        
+        // If online API fails completely, show helpful message
+        if (!API_BASE_URL.includes('localhost')) {
+            console.warn('Online API failed, extension may work better on localhost for development');
+        }
+        
         throw err;
+    }
+}
+
+// Separate fallback function for better error handling
+async function tryFallbackRequest(endpoint, controller) {
+    try {
+        let fallbackUrl;
+        let shouldFilter = false;
+        let filterKey = '';
+        let filterValue = '';
+        
+        if (endpoint.includes('categoryId=')) {
+            fallbackUrl = `${API_BASE_URL}/documents.json`;
+            shouldFilter = true;
+            filterKey = 'categoryId';
+            filterValue = endpoint.split('categoryId=')[1];
+        } else if (endpoint.includes('documentId=')) {
+            fallbackUrl = `${API_BASE_URL}/questions.json`;
+            shouldFilter = true;
+            filterKey = 'documentId';  
+            filterValue = endpoint.split('documentId=')[1];
+        } else {
+            throw new Error(`No fallback available for endpoint: ${endpoint}`);
+        }
+        
+        console.log(`Trying fallback: ${fallbackUrl}${shouldFilter ? ` (filtering by ${filterKey}=${filterValue})` : ''}`);
+        
+        const fallbackResponse = await fetch(fallbackUrl, {
+            signal: controller.signal,
+            cache: 'no-cache',
+            headers: {
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache'
+            }
+        });
+        
+        if (!fallbackResponse.ok) {
+            throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText} - Fallback also failed`);
+        }
+        
+        const fallbackData = await fallbackResponse.json();
+        console.log('Fallback data loaded from:', fallbackUrl);
+        
+        if (shouldFilter) {
+            // Filter data based on the original request
+            if (endpoint.includes('categoryId=')) {
+                const filteredDocuments = fallbackData.documents?.filter(doc => doc.categoryId === filterValue) || [];
+                console.log(`Filtered ${fallbackData.documents?.length || 0} documents to ${filteredDocuments.length} for category ${filterValue}`);
+                return { documents: filteredDocuments };
+            } else if (endpoint.includes('documentId=')) {
+                const filteredQuestions = fallbackData.questions?.filter(q => q.documentId === filterValue) || [];
+                console.log(`Filtered ${fallbackData.questions?.length || 0} questions to ${filteredQuestions.length} for document ${filterValue}`);
+                return { questions: filteredQuestions };
+            }
+        }
+        
+        return fallbackData;
+        
+    } catch (fallbackError) {
+        console.error('Fallback request also failed:', fallbackError);
+        
+        // Return empty data structure as last resort
+        if (endpoint.includes('categoryId=')) {
+            console.log('Returning empty documents array as last resort');
+            return { documents: [] };
+        } else if (endpoint.includes('documentId=')) {
+            console.log('Returning empty questions array as last resort');
+            return { questions: [] };
+        }
+        
+        throw fallbackError;
     }
 }
 
@@ -564,17 +698,60 @@ async function loadQuestions(documentId) {
         
         console.log(`Loading questions for document: ${documentId}...`);
         const endpoint = documentId ? `/questions?documentId=${documentId}` : '/questions';
-        const data = await apiRequest(endpoint);
         
-        questions = data.questions || [];
-        console.log('Questions loaded:', questions.length);
-        
-        // Show simple status message instead of full questions list
-        showQuestionsStatus(questions.length);
+        try {
+            const data = await apiRequest(endpoint);
+            questions = data.questions || [];
+            console.log('Questions loaded:', questions.length);
+            
+            // Show simple status message instead of full questions list
+            showQuestionsStatus(questions.length);
+            
+            // Save questions to cache if we got some
+            if (questions.length > 0) {
+                await saveToCache(CACHE_KEYS.QUESTIONS, questions);
+                
+                // Send to content script
+                sendQuestionsToContentScript(questions);
+            } else {
+                console.log('No questions found for document:', documentId);
+                // Still show status even with 0 questions
+                showQuestionsStatus(0);
+            }
+            
+        } catch (apiError) {
+            console.error('API request failed:', apiError);
+            
+            // Try to use cached questions as fallback
+            const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
+            if (cachedQuestions && cachedQuestions.length > 0) {
+                // Filter cached questions for this document
+                const filteredQuestions = cachedQuestions.filter(q => q.documentId === documentId);
+                if (filteredQuestions.length > 0) {
+                    console.log('Using cached questions:', filteredQuestions.length);
+                    questions = filteredQuestions;
+                    showQuestionsStatus(questions.length);
+                    sendQuestionsToContentScript(questions);
+                    
+                    // Show cache indicator
+                    showCacheIndicator();
+                    return;
+                }
+            }
+            
+            // If no cache available, show user-friendly error
+            if (apiError.message.includes('404') || apiError.message.includes('not found')) {
+                showError('Không tìm thấy câu hỏi cho tài liệu này. Có thể tài liệu chưa có câu hỏi.');
+            } else if (apiError.message.includes('timeout') || apiError.message.includes('AbortError')) {
+                showError('Kết nối chậm. Vui lòng thử lại sau.');
+            } else {
+                showError('Không thể tải câu hỏi. Vui lòng kiểm tra kết nối internet.');
+            }
+        }
         
     } catch (err) {
         console.error('Failed to load questions:', err);
-        showError('Không thể tải danh sách câu hỏi.');
+        showError('Lỗi không mong đợi khi tải câu hỏi.');
     } finally {
         showLoading(false);
     }
