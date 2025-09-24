@@ -9,8 +9,10 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:3001/*",
-    "https://tailieuehou.id.vn/*"
+    "http://localhost:5174/*",
+    "https://tailieuehou.id.vn/*",
+    "https://*.firebaseapp.com/*",
+    "https://*.web.app/*"
   ],
   "action": {
     "default_popup": "popup.html",

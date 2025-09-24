@@ -5,6 +5,12 @@ const XLSX = require('xlsx');
 admin.initializeApp();
 const db = admin.firestore();
 
+// Import API functions
+const { api } = require('./api');
+
+// Export API endpoints
+exports.api = api;
+
 exports.uploadExcelData = functions.https.onRequest(async (req, res) => {
   // Set CORS headers
   res.set('Access-Control-Allow-Origin', '*');

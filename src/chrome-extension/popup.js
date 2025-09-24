@@ -1,6 +1,36 @@
 // Chrome Extension Popup Script
-// API Base URL - có thể thay đổi tùy theo environment
-const API_BASE_URL = 'http://localhost:3001/api';
+// API Base URL - tự động detect environment
+function getApiBaseUrl() {
+  // Get current tab URL to determine environment
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const currentUrl = tabs[0].url;
+        
+        // Check if we're on production domain
+        if (currentUrl.includes('tailieuehou.id.vn') || 
+            currentUrl.includes('firebaseapp.com') || 
+            currentUrl.includes('web.app')) {
+          resolve('https://tailieuehou.id.vn/api');
+        } else {
+          // Default to local development  
+          resolve('http://localhost:5174/api');
+        }
+      } else {
+        // Fallback to local
+        resolve('http://localhost:5174/api');
+      }
+    });
+  });
+}
+
+let API_BASE_URL = 'http://localhost:5174/api'; // Default
+
+// Initialize API URL
+getApiBaseUrl().then(url => {
+  API_BASE_URL = url;
+  console.log('API Base URL:', API_BASE_URL);
+});
 
 // DOM Elements
 let categorySelect, documentSelect, questionsSection, questionsList, loading, error;
@@ -223,7 +253,12 @@ async function clearCache() {
 // API Functions
 async function apiRequest(endpoint) {
     try {
-        const response = await fetch(`${API_BASE_URL}${endpoint}`);
+        const url = API_BASE_URL.includes('localhost') 
+            ? `${API_BASE_URL}${endpoint}` 
+            : `${API_BASE_URL}${endpoint}.json`; // Use .json for static files
+        
+        console.log('API Request:', url);
+        const response = await fetch(url);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
