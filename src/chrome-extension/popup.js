@@ -31,7 +31,7 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error;
+let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn;
 
 // Data storage
 let categories = [];
@@ -88,11 +88,12 @@ function initializeElements() {
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
             error = document.getElementById('error');
+            clearCacheBtn = document.getElementById('clearCacheBtn');
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
                 categorySelect, documentSearchInput, documentList, selectAllBtn,
-                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error
+                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn
             };
             
             const missingElements = Object.keys(elements).filter(key => !elements[key]);
@@ -120,6 +121,9 @@ function setupEventListeners() {
     // Control buttons
     selectAllBtn.addEventListener('click', selectAllDocuments);
     clearAllBtn.addEventListener('click', clearAllDocuments);
+    
+    // Clear cache button
+    clearCacheBtn.addEventListener('click', clearAllCache);
     
     // Document list will be populated dynamically with event listeners
 }
@@ -225,16 +229,62 @@ async function autoRestoreSelections() {
 async function sendQuestionsToContentScript(questionsData) {
     try {
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (activeTab && activeTab.id) {
-            await chrome.tabs.sendMessage(activeTab.id, {
-                action: 'setExtensionQuestions',
-                questions: questionsData
-            }).catch(err => {
-                console.log('Content script not ready for questions:', err.message);
-            });
+        if (!activeTab || !activeTab.id) {
+            console.log('No active tab for sending questions');
+            return;
         }
+        
+        // Check if tab is ready
+        if (activeTab.status === 'loading' || !activeTab.url || 
+            activeTab.url.startsWith('chrome://') || 
+            activeTab.url.startsWith('chrome-extension://') ||
+            activeTab.url.startsWith('edge://') ||
+            activeTab.url.startsWith('about:')) {
+            console.log('Tab not ready for questions:', activeTab.url);
+            return;
+        }
+        
+        try {
+            await Promise.race([
+                chrome.tabs.sendMessage(activeTab.id, {
+                    action: 'setExtensionQuestions',
+                    questions: questionsData
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Send questions timeout')), 3000)
+                )
+            ]);
+            
+            console.log('Questions sent to content script successfully');
+        } catch (messageError) {
+            console.log('Content script not ready for questions:', messageError.message);
+            // Try to inject content script and retry
+            try {
+                await chrome.scripting.executeScript({
+                    target: { tabId: activeTab.id },
+                    files: ['content.js']
+                });
+                
+                // Retry after injection
+                setTimeout(async () => {
+                    try {
+                        await chrome.tabs.sendMessage(activeTab.id, {
+                            action: 'setExtensionQuestions',
+                            questions: questionsData
+                        });
+                        console.log('Questions sent after injection');
+                    } catch (retryError) {
+                        console.log('Still could not send questions after injection');
+                    }
+                }, 1500);
+                
+            } catch (injectionError) {
+                console.log('Could not inject content script for questions');
+            }
+        }
+        
     } catch (error) {
-        console.log('Could not send questions to content script:', error);
+        console.log('Error sending questions to content script:', error.message);
     }
 }
 
@@ -246,15 +296,17 @@ async function clearCache() {
         // Reset local data
         categories = [];
         documents = [];
+        selectedDocuments = [];
+        filteredDocuments = [];
         questions = [];
         
         // Reset UI
-        categorySelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
-        documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
-        questionsList.innerHTML = '';
-        questionsSection.style.display = 'none';
+        resetUI();
         
         hideCacheIndicator();
+        
+        // Clear content script cache and questions popup
+        await clearContentScriptCache();
         
         // Reload categories
         await loadCategories();
@@ -263,6 +315,145 @@ async function clearCache() {
     } catch (error) {
         console.error('Error clearing cache:', error);
     }
+}
+
+// Clear all cache and reset extension state (triggered by button)
+async function clearAllCache() {
+    try {
+        // Show loading while clearing
+        showLoading(true);
+        
+        // Call the main clearCache function
+        await clearCache();
+        
+        // Show success message
+        showSuccessMessage('✅ Cache đã được xóa thành công! Extension được reset về trạng thái ban đầu.');
+        
+    } catch (error) {
+        console.error('Error clearing all cache:', error);
+        showError('Lỗi khi xóa cache: ' + error.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Reset UI to initial state
+function resetUI() {
+    try {
+        // Reset category select
+        categorySelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
+        categorySelect.value = '';
+        
+        // Reset document list
+        documentList.innerHTML = '<div class="no-documents">Chưa có tài liệu nào</div>';
+        
+        // Reset document search
+        documentSearchInput.value = '';
+        documentSearchInput.disabled = true;
+        
+        // Reset controls
+        selectAllBtn.disabled = true;
+        clearAllBtn.disabled = true;
+        selectedCountSpan.textContent = '0 được chọn';
+        
+        // Hide questions section
+        questionsSection.style.display = 'none';
+        
+        // Clear error messages
+        hideError();
+        
+        console.log('UI reset to initial state');
+        
+    } catch (error) {
+        console.error('Error resetting UI:', error);
+    }
+}
+
+// Clear content script cache
+async function clearContentScriptCache() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab) {
+            console.log('No active tab found for cache clearing');
+            return;
+        }
+        
+        // Check if tab is ready
+        if (tab.status === 'loading' || !tab.url || 
+            tab.url.startsWith('chrome://') || 
+            tab.url.startsWith('chrome-extension://') ||
+            tab.url.startsWith('edge://') ||
+            tab.url.startsWith('about:')) {
+            console.log('Tab not ready for cache clearing:', tab.url);
+            return;
+        }
+        
+        try {
+            // Send clear cache message with timeout
+            await Promise.race([
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'clearCache'
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Clear cache timeout')), 3000)
+                )
+            ]);
+            
+            // Also clear questions popup
+            await Promise.race([
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateQuestionsPopup',
+                    questions: []
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Clear popup timeout')), 3000)
+                )
+            ]);
+            
+            console.log('Content script cache cleared successfully');
+        } catch (messageError) {
+            console.log('Could not clear content script cache, content script not available:', messageError.message);
+            // This is not critical, continue silently
+        }
+        
+    } catch (error) {
+        console.log('Error clearing content script cache:', error.message);
+        // Not critical, continue silently
+    }
+}
+
+// Show success message
+function showSuccessMessage(message) {
+    // Remove existing success messages
+    const existingSuccess = document.querySelector('.success-message');
+    if (existingSuccess) {
+        existingSuccess.remove();
+    }
+    
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.style.cssText = `
+        color: #155724;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        font-size: 13px;
+        animation: fadeIn 0.3s ease;
+    `;
+    successDiv.textContent = message;
+    
+    // Insert after header
+    const header = document.querySelector('.header');
+    header.insertAdjacentElement('afterend', successDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (successDiv && successDiv.parentNode) {
+            successDiv.remove();
+        }
+    }, 5000);
 }
 
 // API Functions
@@ -977,11 +1168,8 @@ function showCacheIndicator() {
         indicator = document.createElement('div');
         indicator.id = 'cacheIndicator';
         indicator.innerHTML = `
-            <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: space-between;">
-                <span>Sử dụng dữ liệu đã lưu</span>
-                <button id="clearCacheBtn" style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; margin-left: 8px;">
-                    Xóa cache
-                </button>
+            <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: center;">
+                <span>📄 Sử dụng dữ liệu đã lưu cache</span>
             </div>
         `;
         
@@ -997,11 +1185,7 @@ function showCacheIndicator() {
             }
         }
         
-        // Add event listener for clear cache button
-        const clearCacheBtn = document.getElementById('clearCacheBtn');
-        if (clearCacheBtn) {
-            clearCacheBtn.addEventListener('click', clearCache);
-        }
+        // Removed old clear cache button - using new one in header instead
     }
     indicator.style.display = 'block';
 }
@@ -1418,14 +1602,72 @@ async function onDocumentsChange() {
 async function updateQuestionsPopup(questions) {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab) {
-            await chrome.tabs.sendMessage(tab.id, {
-                action: 'updateQuestionsPopup',
-                questions: questions
-            });
+        if (!tab) {
+            console.log('No active tab found for questions popup update');
+            return;
         }
+        
+        // Check if tab is ready for extension interaction
+        if (tab.status === 'loading' || !tab.url || 
+            tab.url.startsWith('chrome://') || 
+            tab.url.startsWith('chrome-extension://') ||
+            tab.url.startsWith('edge://') ||
+            tab.url.startsWith('about:')) {
+            console.log('Tab not ready for questions popup update:', tab.url);
+            return;
+        }
+        
+        // Try to send message with timeout
+        try {
+            await Promise.race([
+                chrome.tabs.sendMessage(tab.id, {
+                    action: 'updateQuestionsPopup',
+                    questions: questions
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Message timeout')), 3000)
+                )
+            ]);
+            
+            console.log('Questions popup updated successfully');
+        } catch (messageError) {
+            if (messageError.message.includes('Could not establish connection') || 
+                messageError.message.includes('Receiving end does not exist') ||
+                messageError.message === 'Message timeout') {
+                
+                console.log('Content script not available, trying to inject...');
+                
+                // Try to inject content script
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                    
+                    // Wait a bit and try again
+                    setTimeout(async () => {
+                        try {
+                            await chrome.tabs.sendMessage(tab.id, {
+                                action: 'updateQuestionsPopup',
+                                questions: questions
+                            });
+                            console.log('Questions popup updated after injection');
+                        } catch (retryError) {
+                            console.log('Still could not update questions popup after injection:', retryError.message);
+                        }
+                    }, 1500);
+                    
+                } catch (injectionError) {
+                    console.log('Could not inject content script:', injectionError.message);
+                }
+            } else {
+                console.log('Unexpected error updating questions popup:', messageError.message);
+            }
+        }
+        
     } catch (error) {
-        console.error('Failed to update questions popup:', error);
+        console.log('Error in updateQuestionsPopup:', error.message);
+        // Don't throw error to prevent breaking the popup functionality
     }
 }
 

@@ -269,6 +269,21 @@
             background: #5a6268;
         }
 
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
         .btn:disabled {
             background: #ccc;
             cursor: not-allowed;
@@ -335,12 +350,32 @@
             padding: 30px;
             color: #666;
         }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-message {
+            animation: fadeIn 0.3s ease;
+        }
     </style>
 </head>
 
 <body>
     <div class="header">
         <h1>Tìm đáp án</h1>
+        <div style="margin-top: 10px;">
+            <button id="clearCacheBtn" class="btn-danger" style="font-size: 12px; padding: 6px 12px; width: auto;">
+                🗑️ Xóa Cache
+            </button>
+        </div>
     </div>
 
     <div class="selection-section">

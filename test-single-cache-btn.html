@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Single Clear Cache Button</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+        }
+        
+        .test-step {
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #28a745;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .code {
+            background: #f1f3f4;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Test Single Clear Cache Button</h1>
+        <p>Kiểm tra nút xóa cache duy nhất trong header</p>
+    </div>
+
+    <div class="test-container">
+        <h2>✅ Thay đổi đã thực hiện</h2>
+        
+        <div class="test-step">
+            <strong>✅ Đã xóa:</strong> Nút "Xóa cache" cũ trong cache indicator
+        </div>
+        
+        <div class="test-step">
+            <strong>✅ Đã giữ:</strong> Nút "🗑️ Xóa Cache" mới trong header (màu đỏ)
+        </div>
+        
+        <div class="test-step">
+            <strong>✅ Đã sửa:</strong> Cache indicator chỉ hiển thị thông tin, không có nút
+        </div>
+        
+        <div class="test-step">
+            <strong>✅ Đã cải thiện:</strong> Style nút từ `btn-secondary` thành `btn-danger` (màu đỏ)
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔍 Cách kiểm tra</h2>
+        
+        <div class="test-step">
+            <strong>Bước 1:</strong> Mở extension popup
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 2:</strong> Chọn category và documents, tải questions
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 3:</strong> Kiểm tra cache indicator chỉ hiện <span class="success">"📄 Sử dụng dữ liệu đã lưu cache"</span>
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 4:</strong> Chỉ thấy 1 nút xóa cache ở header (màu đỏ): <span class="error">"🗑️ Xóa Cache"</span>
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 5:</strong> Click nút để test xóa cache
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🎯 Kết quả mong đợi</h2>
+        
+        <div class="code">
+            <strong>TRƯỚC khi sửa:</strong><br>
+            - Cache indicator: "Sử dụng dữ liệu đã lưu" + [Xóa cache]<br>
+            - Header: [🗑️ Xóa Cache]<br>
+            - Total: 2 nút xóa cache (trùng ID)
+        </div>
+        
+        <div class="code">
+            <strong>SAU khi sửa:</strong><br>
+            - Cache indicator: "📄 Sử dụng dữ liệu đã lưu cache" (chỉ text)<br>
+            - Header: [🗑️ Xóa Cache] (màu đỏ)<br>
+            - Total: 1 nút xóa cache duy nhất
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>⚠️ Lưu ý</h2>
+        
+        <div class="test-step">
+            <strong class="warning">ID conflict solved:</strong> Không còn 2 element cùng ID "clearCacheBtn"
+        </div>
+        
+        <div class="test-step">
+            <strong class="success">UX improved:</strong> Chỉ 1 nút rõ ràng, không gây nhầm lẫn
+        </div>
+        
+        <div class="test-step">
+            <strong class="success">Visual better:</strong> Nút màu đỏ nổi bật hơn
+        </div>
+    </div>
+
+    <script>
+        console.log('🧪 Test page for single clear cache button loaded');
+        
+        // Test to check for duplicate IDs
+        function checkDuplicateIds() {
+            const clearCacheBtns = document.querySelectorAll('#clearCacheBtn');
+            console.log(`Found ${clearCacheBtns.length} elements with ID 'clearCacheBtn'`);
+            
+            if (clearCacheBtns.length > 1) {
+                console.error('❌ Duplicate ID found!');
+            } else if (clearCacheBtns.length === 1) {
+                console.log('✅ Single clear cache button found');
+            } else {
+                console.log('ℹ️ No clear cache button found (extension not loaded)');
+            }
+        }
+        
+        // Check periodically
+        setInterval(checkDuplicateIds, 3000);
+        setTimeout(checkDuplicateIds, 1000);
+    </script>
+</body>
+</html>

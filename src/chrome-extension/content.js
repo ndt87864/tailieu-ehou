@@ -336,6 +336,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         return true;
     }
+    
+    if (request.action === 'clearCache') {
+        try {
+            // Clear extension questions
+            extensionQuestions = [];
+            
+            // Clear localStorage cache
+            localStorage.removeItem(QUESTIONS_CACHE_KEY);
+            localStorage.removeItem('tailieu-questions-popup-visible');
+            localStorage.removeItem('tailieu-questions-popup-minimized');
+            localStorage.removeItem('tailieu-questions-popup-position');
+            
+            // Clear chrome storage cache
+            if (chrome?.storage?.local) {
+                chrome.storage.local.remove([QUESTIONS_CACHE_KEY]);
+            }
+            
+            // Clear all highlights
+            clearAllHighlights();
+            
+            // Hide cached questions indicator
+            hideCachedQuestionsIndicator();
+            
+            // Clear questions popup
+            updateQuestionsPopup([]);
+            
+            console.log('Content script cache cleared');
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('Error handling clearCache:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
+    }
 });
 
 // Load cached questions from storage
@@ -948,6 +982,14 @@ function showCachedQuestionsIndicator() {
             indicator.remove();
         }
     }, 8000);
+}
+
+// Hide cached questions indicator
+function hideCachedQuestionsIndicator() {
+    const existingIndicator = document.getElementById('tailieu-cached-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
 }
 
 // Add a floating button to show extension (optional)

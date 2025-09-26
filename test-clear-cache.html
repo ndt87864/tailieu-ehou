@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extension Clear Cache</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+        }
+        
+        .test-step {
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .question {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Test Extension Clear Cache Feature</h1>
+        <p>Kiểm tra chức năng xóa cache và reset extension</p>
+    </div>
+
+    <div class="test-container">
+        <h2>📋 Hướng dẫn Test</h2>
+        
+        <div class="test-step">
+            <strong>Bước 1:</strong> Mở extension popup và chọn tài liệu, tải câu hỏi
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 2:</strong> Kiểm tra popup danh sách câu hỏi xuất hiện ở góc phải dưới
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 3:</strong> Click nút <span class="info">"🗑️ Xóa Cache"</span> trong extension popup
+        </div>
+        
+        <div class="test-step">
+            <strong>Bước 4:</strong> Kiểm tra xem:
+            <ul>
+                <li>Form được reset về trạng thái ban đầu ✅</li>
+                <li>Popup danh sách câu hỏi được xóa ✅</li>
+                <li>Hiển thị thông báo thành công ✅</li>
+                <li>Cache được xóa hoàn toàn ✅</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🎯 Câu hỏi test</h2>
+        
+        <div class="question">
+            <strong>Câu 1:</strong> React là gì?
+        </div>
+        
+        <div class="question">
+            <strong>Câu 2:</strong> JavaScript là ngôn ngữ lập trình gì?
+        </div>
+        
+        <div class="question">
+            <strong>Câu 3:</strong> HTML viết tắt của từ gì?
+        </div>
+        
+        <div class="question">
+            <strong>Câu 4:</strong> CSS dùng để làm gì?
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔍 Kiểm tra kết quả</h2>
+        
+        <div id="test-results">
+            <p>Mở Console (F12) để xem logs chi tiết...</p>
+        </div>
+    </div>
+
+    <script>
+        console.log('🧪 Test page for Extension Clear Cache feature loaded');
+        
+        // Test function to verify extension state
+        window.testExtensionState = function() {
+            console.log('=== TESTING EXTENSION STATE ===');
+            
+            // Check if questions popup exists
+            const questionsPopup = document.getElementById('tailieu-questions-popup');
+            console.log('Questions popup exists:', !!questionsPopup);
+            
+            // Check if cached indicator exists
+            const cachedIndicator = document.getElementById('tailieu-cached-indicator');
+            console.log('Cached indicator exists:', !!cachedIndicator);
+            
+            // Check localStorage
+            const cachedQuestions = localStorage.getItem('tailieu_questions');
+            console.log('localStorage cache:', cachedQuestions ? 'EXISTS' : 'EMPTY');
+            
+            // Update UI
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = `
+                <p><span class="${questionsPopup ? 'error' : 'success'}">Questions Popup:</span> ${questionsPopup ? 'Still exists ❌' : 'Cleaned ✅'}</p>
+                <p><span class="${cachedIndicator ? 'error' : 'success'}">Cached Indicator:</span> ${cachedIndicator ? 'Still exists ❌' : 'Cleaned ✅'}</p>
+                <p><span class="${cachedQuestions ? 'error' : 'success'}">localStorage:</span> ${cachedQuestions ? 'Still has cache ❌' : 'Cleaned ✅'}</p>
+            `;
+        };
+        
+        // Auto-check every 5 seconds
+        setInterval(window.testExtensionState, 5000);
+        
+        // Initial check after 2 seconds
+        setTimeout(window.testExtensionState, 2000);
+    </script>
+</body>
+</html>
