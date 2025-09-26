@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Popup Interface</title>
+    <style>
+        body {
+            width: 380px;
+            min-height: 500px;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .header {
+            padding: 15px;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .selection-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .document-checkbox-wrapper {
+            position: relative;
+        }
+
+        .search-and-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .document-search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .document-search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .document-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .btn-control {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+            color: #495057;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-control:hover:not(:disabled) {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .selected-count {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .document-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .document-item:last-child {
+            border-bottom: none;
+        }
+
+        .document-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .document-item.hidden {
+            display: none;
+        }
+
+        .document-checkbox {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .document-label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .no-documents {
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #questionsSection {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #loading,
+        #error {
+            display: none;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+
+        #loading {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        #error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🎯 Tài Liệu E-Hou Extension</h1>
+    </div>
+
+    <div class="selection-section">
+        <div class="form-group">
+            <label for="categorySelect">Chọn danh mục:</label>
+            <select id="categorySelect">
+                <option value="">-- Chọn danh mục --</option>
+                <option value="cat1">Danh mục 1</option>
+                <option value="cat2">Danh mục 2</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Chọn tài liệu:</label>
+            <div class="document-checkbox-wrapper">
+                <div class="search-and-controls">
+                    <input type="text" id="documentSearchInput" class="document-search-input"
+                        placeholder="🔍 Tìm kiếm tài liệu..." disabled>
+
+                    <div class="document-controls">
+                        <button id="selectAllBtn" class="btn-control" disabled>Chọn tất cả</button>
+                        <span id="selectedCount" class="selected-count">0 tài liệu được chọn</span>
+                        <button id="clearAllBtn" class="btn-control" disabled>Bỏ chọn</button>
+                    </div>
+                </div>
+
+                <div id="documentList" class="document-list">
+                    <div class="document-item">
+                        <input type="checkbox" id="doc-1" class="document-checkbox" value="doc1">
+                        <label for="doc-1" class="document-label">Tài liệu mẫu 1 - Kinh tế học đại cương</label>
+                    </div>
+                    <div class="document-item">
+                        <input type="checkbox" id="doc-2" class="document-checkbox" value="doc2">
+                        <label for="doc-2" class="document-label">Tài liệu mẫu 2 - Quản trị học cơ bản</label>
+                    </div>
+                    <div class="document-item">
+                        <input type="checkbox" id="doc-3" class="document-checkbox" value="doc3">
+                        <label for="doc-3" class="document-label">Tài liệu mẫu 3 - Marketing căn bản</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="loadQuestionsBtn" class="btn btn-primary" disabled>
+            📚 Tải câu hỏi (0 tài liệu)
+        </button>
+    </div>
+
+    <div id="loading">Đang tải...</div>
+    <div id="error">Có lỗi xảy ra</div>
+
+    <div id="questionsSection">
+        <h3>📋 Câu hỏi đã tải</h3>
+        <div id="questionsList">
+            <div>Đã tải 150 câu hỏi từ 3 tài liệu được chọn</div>
+        </div>
+    </div>
+
+    <script>
+        // Simple demo script
+        const checkboxes = document.querySelectorAll('.document-checkbox');
+        const selectedCount = document.getElementById('selectedCount');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const loadQuestionsBtn = document.getElementById('loadQuestionsBtn');
+        const searchInput = document.getElementById('documentSearchInput');
+        const categorySelect = document.getElementById('categorySelect');
+
+        let selectedDocuments = [];
+
+        function updateUI() {
+            const count = selectedDocuments.length;
+            selectedCount.textContent = `${count} tài liệu được chọn`;
+            loadQuestionsBtn.textContent = `📚 Tải câu hỏi (${count} tài liệu)`;
+
+            selectAllBtn.disabled = count === checkboxes.length;
+            clearAllBtn.disabled = count === 0;
+            loadQuestionsBtn.disabled = count === 0;
+        }
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    if (!selectedDocuments.includes(e.target.value)) {
+                        selectedDocuments.push(e.target.value);
+                    }
+                } else {
+                    selectedDocuments = selectedDocuments.filter(id => id !== e.target.value);
+                }
+                updateUI();
+            });
+        });
+
+        selectAllBtn.addEventListener('click', () => {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                if (!selectedDocuments.includes(checkbox.value)) {
+                    selectedDocuments.push(checkbox.value);
+                }
+            });
+            updateUI();
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            selectedDocuments = [];
+            updateUI();
+        });
+
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value) {
+                searchInput.disabled = false;
+                updateUI();
+            } else {
+                searchInput.disabled = true;
+                checkboxes.forEach(checkbox => checkbox.checked = false);
+                selectedDocuments = [];
+                updateUI();
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.document-item').forEach(item => {
+                const label = item.querySelector('.document-label').textContent.toLowerCase();
+                if (label.includes(term) || term === '') {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        // Initialize
+        updateUI();
+    </script>
+</body>
+
+</html>

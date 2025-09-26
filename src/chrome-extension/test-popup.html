@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Popup Interface</title>
+    <style>
+        body {
+            width: 350px;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f8f9fa;
+        }
+
+        .container {
+            padding: 0;
+        }
+
+        .header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .selection-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .document-checkbox-wrapper {
+            position: relative;
+        }
+
+        .search-and-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .document-search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .document-search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .document-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .btn-control {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+            color: #495057;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-control:hover:not(:disabled) {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .selected-count {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .document-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .document-item:last-child {
+            border-bottom: none;
+        }
+
+        .document-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .document-item.hidden {
+            display: none;
+        }
+
+        .document-checkbox {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .document-label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .no-documents {
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Tài liệu E-HOU</h1>
+        </div>
+
+        <div class="selection-section">
+            <div class="form-group">
+                <label for="categorySelect">Chọn danh mục:</label>
+                <select id="categorySelect">
+                    <option value="">-- Chọn danh mục --</option>
+                    <option value="cat1">Toán học</option>
+                    <option value="cat2">Vật lý</option>
+                    <option value="cat3">Hóa học</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Chọn tài liệu:</label>
+                <div class="document-checkbox-wrapper">
+                    <div class="search-and-controls">
+                        <input type="text" id="documentSearchInput" class="document-search-input"
+                            placeholder="Tìm kiếm tài liệu...">
+                        <div class="document-controls">
+                            <button id="selectAllBtn" class="btn-control">Chọn tất cả</button>
+                            <button id="clearAllBtn" class="btn-control">Bỏ chọn</button>
+                            <span id="selectedCount" class="selected-count">0/0 được chọn</span>
+                        </div>
+                    </div>
+                    <div id="documentList" class="document-list">
+                        <div class="document-item">
+                            <input type="checkbox" class="document-checkbox" id="doc-1" value="1">
+                            <label for="doc-1" class="document-label">Giải tích 1 - Chương 1: Giới hạn</label>
+                        </div>
+                        <div class="document-item">
+                            <input type="checkbox" class="document-checkbox" id="doc-2" value="2">
+                            <label for="doc-2" class="document-label">Giải tích 1 - Chương 2: Đạo hàm</label>
+                        </div>
+                        <div class="document-item">
+                            <input type="checkbox" class="document-checkbox" id="doc-3" value="3" checked>
+                            <label for="doc-3" class="document-label">Giải tích 1 - Chương 3: Tích phân</label>
+                        </div>
+                        <div class="document-item">
+                            <input type="checkbox" class="document-checkbox" id="doc-4" value="4">
+                            <label for="doc-4" class="document-label">Đại số tuyến tính - Ma trận</label>
+                        </div>
+                        <div class="document-item">
+                            <input type="checkbox" class="document-checkbox" id="doc-5" value="5" checked>
+                            <label for="doc-5" class="document-label">Xác suất thống kê - Biến cố</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="loadQuestionsBtn" class="btn btn-primary">
+                📚 Tải câu hỏi (2 tài liệu đã chọn)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Test functionality
+        document.addEventListener('DOMContentLoaded', function () {
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const selectedCountSpan = document.getElementById('selectedCount');
+            const documentList = document.getElementById('documentList');
+            const searchInput = document.getElementById('documentSearchInput');
+            const loadBtn = document.getElementById('loadQuestionsBtn');
+
+            function updateControlsState() {
+                const checkboxes = documentList.querySelectorAll('.document-checkbox');
+                const checkedBoxes = documentList.querySelectorAll('.document-checkbox:checked');
+
+                selectedCountSpan.textContent = `${checkedBoxes.length}/${checkboxes.length} được chọn`;
+                selectAllBtn.disabled = checkedBoxes.length === checkboxes.length;
+                clearAllBtn.disabled = checkedBoxes.length === 0;
+
+                loadBtn.textContent = `📚 Tải câu hỏi (${checkedBoxes.length} tài liệu đã chọn)`;
+                loadBtn.disabled = checkedBoxes.length === 0;
+            }
+
+            function selectAllDocuments() {
+                const checkboxes = documentList.querySelectorAll('.document-checkbox');
+                checkboxes.forEach(cb => cb.checked = true);
+                updateControlsState();
+            }
+
+            function clearAllDocuments() {
+                const checkboxes = documentList.querySelectorAll('.document-checkbox');
+                checkboxes.forEach(cb => cb.checked = false);
+                updateControlsState();
+            }
+
+            function filterDocuments() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const items = documentList.querySelectorAll('.document-item');
+
+                items.forEach(item => {
+                    const label = item.querySelector('.document-label').textContent.toLowerCase();
+                    if (label.includes(searchTerm)) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
+                });
+            }
+
+            // Event listeners
+            selectAllBtn.addEventListener('click', selectAllDocuments);
+            clearAllBtn.addEventListener('click', clearAllDocuments);
+            searchInput.addEventListener('input', filterDocuments);
+
+            documentList.addEventListener('change', function (e) {
+                if (e.target.classList.contains('document-checkbox')) {
+                    updateControlsState();
+                }
+            });
+
+            // Initial state
+            updateControlsState();
+        });
+    </script>
+</body>
+
+</html>

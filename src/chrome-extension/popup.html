@@ -119,100 +119,119 @@
             line-height: 1.4;
         }
 
-        .document-select-wrapper {
+        .document-checkbox-wrapper {
             position: relative;
         }
 
-        .document-select-wrapper.searching select {
-            opacity: 0.6;
+        .search-and-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
         }
 
-        .document-select-wrapper.searching .search-results {
-            display: block;
-            animation: slideDown 0.2s ease-out;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-5px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .search-results {
-            display: none;
-            position: relative;
-            top: 8px;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 2px solid #667eea;
+        .document-search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
             border-radius: 6px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 5;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-top: 8px;
-        }
-
-        .search-results::before {
-            content: '';
-            position: absolute;
-            top: -12px;
-            left: 20px;
-            right: 20px;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #e1e5e9 20%, #e1e5e9 80%, transparent);
-            z-index: -1;
-        }
-
-        .search-result-item {
-            padding: 12px 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
             font-size: 14px;
-            line-height: 1.4;
-            min-height: 20px;
+            background: white;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .document-search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .document-search-input:disabled {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .document-controls {
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
 
-        .search-result-item:hover {
-            background: #f8f9fa;
+        .btn-control {
+            padding: 6px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+            color: #495057;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .search-result-item:last-child {
+        .btn-control:hover:not(:disabled) {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .btn-control:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .selected-count {
+            font-size: 12px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        .document-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .document-item:last-child {
             border-bottom: none;
         }
 
-        .search-result-item.selected {
-            background: #667eea;
-            color: white;
+        .document-item:hover {
+            background-color: #f8f9fa;
         }
 
-        .no-results {
-            padding: 16px;
-            text-align: center;
-            color: #999;
-            font-style: italic;
-            line-height: 1.4;
-        }
-
-        .search-hint {
-            font-size: 11px;
-            color: #999;
-            margin-top: 4px;
+        .document-item.hidden {
             display: none;
         }
 
-        .document-select-wrapper:hover .search-hint,
-        .document-select-wrapper.has-documents .search-hint {
-            display: block;
+        .document-checkbox {
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .document-label {
+            flex: 1;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .no-documents {
+            padding: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
         }
 
         .btn {
@@ -333,15 +352,20 @@
         </div>
 
         <div class="form-group">
-            <label for="documentSelect">Chọn tài liệu:</label>
-            <div class="document-select-wrapper">
-                <select id="documentSelect" disabled>
-                    <option value="">-- Chọn tài liệu --</option>
-                </select>
-                <input type="text" id="documentSearchInput" class="search-input-overlay"
-                    placeholder="Gõ để tìm kiếm tài liệu..." style="display: none;">
-                <div class="search-results" id="searchResults"></div>
-                <div class="search-hint">💡 Click để tìm kiếm tài liệu</div>
+            <label for="documentList">Chọn tài liệu:</label>
+            <div class="document-checkbox-wrapper">
+                <div class="search-and-controls">
+                    <input type="text" id="documentSearchInput" class="document-search-input"
+                        placeholder="Gõ để tìm kiếm tài liệu..." disabled>
+                    <div class="document-controls">
+                        <button type="button" id="selectAllBtn" class="btn-control" disabled>Chọn tất cả</button>
+                        <button type="button" id="clearAllBtn" class="btn-control" disabled>Bỏ chọn</button>
+                        <span id="selectedCount" class="selected-count">0 được chọn</span>
+                    </div>
+                </div>
+                <div id="documentList" class="document-list">
+                    <div class="no-documents">Chưa có tài liệu nào</div>
+                </div>
             </div>
         </div>
 

@@ -31,11 +31,12 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSelect, documentSearchInput, searchResults, questionsSection, questionsList, loading, error;
+let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error;
 
 // Data storage
 let categories = [];
 let documents = [];
+let selectedDocuments = []; // Array of selected document IDs
 let filteredDocuments = []; // Filtered documents for search
 let questions = [];
 
@@ -45,7 +46,7 @@ const CACHE_KEYS = {
     DOCUMENTS: 'tailieu_documents', 
     QUESTIONS: 'tailieu_questions',
     SELECTED_CATEGORY: 'tailieu_selected_category',
-    SELECTED_DOCUMENT: 'tailieu_selected_document',
+    SELECTED_DOCUMENTS: 'tailieu_selected_documents', // Changed from SELECTED_DOCUMENT
     LAST_SESSION: 'tailieu_last_session'
 };
 
@@ -78,9 +79,11 @@ function initializeElements() {
             console.log('Initializing DOM elements...');
             
             categorySelect = document.getElementById('categorySelect');
-            documentSelect = document.getElementById('documentSelect');
             documentSearchInput = document.getElementById('documentSearchInput');
-            searchResults = document.getElementById('searchResults');
+            documentList = document.getElementById('documentList');
+            selectAllBtn = document.getElementById('selectAllBtn');
+            clearAllBtn = document.getElementById('clearAllBtn');
+            selectedCountSpan = document.getElementById('selectedCount');
             questionsSection = document.getElementById('questionsSection');
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
@@ -88,8 +91,8 @@ function initializeElements() {
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
-                categorySelect, documentSelect, documentSearchInput, searchResults,
-                questionsSection, questionsList, loading, error
+                categorySelect, documentSearchInput, documentList, selectAllBtn,
+                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error
             };
             
             const missingElements = Object.keys(elements).filter(key => !elements[key]);
@@ -110,18 +113,15 @@ function initializeElements() {
 
 function setupEventListeners() {
     categorySelect.addEventListener('change', onCategoryChange);
-    documentSelect.addEventListener('change', onDocumentChange);
     
-    // Document search functionality - integrated with select
-    documentSelect.addEventListener('click', showSearchInput);
-    documentSelect.addEventListener('focus', showSearchInput);
-    
+    // Document search functionality
     documentSearchInput.addEventListener('input', onDocumentSearch);
-    documentSearchInput.addEventListener('blur', hideSearchInputDelayed);
-    documentSearchInput.addEventListener('keydown', handleSearchKeydown);
     
-    // Handle clicks on search results
-    searchResults.addEventListener('mousedown', handleSearchResultClick);
+    // Control buttons
+    selectAllBtn.addEventListener('click', selectAllDocuments);
+    clearAllBtn.addEventListener('click', clearAllDocuments);
+    
+    // Document list will be populated dynamically with event listeners
 }
 
 // Cache Management Functions
@@ -182,22 +182,22 @@ async function restoreFromCache() {
 async function autoRestoreSelections() {
     try {
         const selectedCategoryId = await getFromCache(CACHE_KEYS.SELECTED_CATEGORY);
-        const selectedDocumentId = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENT);
+        const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
         
-        console.log('Auto-restoring selections:', { selectedCategoryId, selectedDocumentId });
+        console.log('Auto-restoring selections:', { selectedCategoryId, selectedDocumentIds });
         
         if (selectedCategoryId && categories.length > 0) {
             // Restore category selection
             categorySelect.value = selectedCategoryId;
             
-            // If we have documents, populate document select
+            // If we have documents, populate document list
             if (documents.length > 0) {
-                populateDocumentSelect();
-                // Search is enabled on demand
+                populateDocumentList();
                 
-                if (selectedDocumentId) {
-                    // Restore document selection
-                    documentSelect.value = selectedDocumentId;
+                if (selectedDocumentIds && selectedDocumentIds.length > 0) {
+                    // Restore document selections
+                    selectedDocuments = selectedDocumentIds;
+                    updateDocumentSelections();
                     
                     // If we have questions, show status and auto-compare
                     if (questions.length > 0) {
@@ -209,8 +209,10 @@ async function autoRestoreSelections() {
             } else {
                 // No cached documents, load from API
                 await loadDocuments(selectedCategoryId);
-                if (selectedDocumentId) {
-                    documentSelect.value = selectedDocumentId;
+                if (selectedDocumentIds && selectedDocumentIds.length > 0) {
+                    selectedDocuments = selectedDocumentIds;
+                    updateDocumentSelections();
+                    await onDocumentsChange();
                 }
             }
         }
@@ -460,7 +462,7 @@ async function loadDocuments(categoryId) {
             if (categoryDocuments.length > 0) {
                 console.log('Using cached documents for category:', categoryId, categoryDocuments.length);
                 documents = categoryDocuments;
-                populateDocumentSelect();
+                populateDocumentList();
                 return;
             }
         }
@@ -488,7 +490,7 @@ async function loadDocuments(categoryId) {
         
         await saveToCache(CACHE_KEYS.DOCUMENTS, mergedDocuments);
         
-        populateDocumentSelect();
+        populateDocumentList();
         
         // Enable search input after documents are loaded
         // documentSearchInput is enabled on demand when user clicks select
@@ -501,23 +503,61 @@ async function loadDocuments(categoryId) {
     }
 }
 
-async function loadQuestions(documentId) {
+async function loadQuestions(documentIds) {
     try {
         showLoading(true);
         hideError();
         
-        console.log(`Loading questions from API${documentId ? ` for document: ${documentId}` : ''}...`);
-        const endpoint = documentId ? `/questions?documentId=${documentId}` : '/questions';
-        const data = await apiRequest(endpoint);
+        if (!documentIds || documentIds.length === 0) {
+            console.log('No documents selected');
+            showQuestionsStatus(0);
+            showLoading(false);
+            return;
+        }
         
-        questions = data.questions || [];
-        console.log('Questions loaded from API:', questions.length);
+        console.log(`Loading questions for documents: ${documentIds.join(', ')}...`);
         
-        // Save questions to cache
-        await saveToCache(CACHE_KEYS.QUESTIONS, questions);
+        let allQuestions = [];
         
-        // Send to content script
-        sendQuestionsToContentScript(questions);
+        // Load questions for each selected document
+        for (const documentId of documentIds) {
+            const endpoint = `/questions?documentId=${documentId}`;
+            
+            try {
+                const data = await apiRequest(endpoint);
+                const documentQuestions = data.questions || [];
+                allQuestions = allQuestions.concat(documentQuestions);
+                console.log(`Questions loaded for ${documentId}:`, documentQuestions.length);
+            } catch (apiError) {
+                console.error(`API request failed for document ${documentId}:`, apiError);
+                
+                // Try to use cached questions as fallback
+                const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
+                if (cachedQuestions && cachedQuestions.length > 0) {
+                    const filteredQuestions = cachedQuestions.filter(q => q.documentId === documentId);
+                    allQuestions = allQuestions.concat(filteredQuestions);
+                    console.log(`Using cached questions for ${documentId}:`, filteredQuestions.length);
+                }
+            }
+        }
+        
+        questions = allQuestions;
+        console.log('Total questions loaded:', questions.length);
+        
+        // Show simple status message instead of full questions list
+        showQuestionsStatus(questions.length);
+        
+        // Save questions to cache if we got some
+        if (questions.length > 0) {
+            await saveToCache(CACHE_KEYS.QUESTIONS, questions);
+            
+            // Send to content script
+            sendQuestionsToContentScript(questions);
+        } else {
+            console.log('No questions found for selected documents');
+            // Still show status even with 0 questions
+            showQuestionsStatus(0);
+        }
         
     } catch (err) {
         console.error('Failed to load questions:', err);
@@ -549,46 +589,127 @@ function populateCategorySelect() {
     }
 }
 
-function populateDocumentSelect() {
-    // Clear existing options except first one
-    documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
+function populateDocumentList() {
+    // Clear existing documents
+    documentList.innerHTML = '';
     
     try {
+        // Show the document list container
+        documentList.style.display = 'block';
+        
         // Use filtered documents if search is active, otherwise use all documents
         const documentsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
         
-        documentsToShow.forEach(doc => {
-            const option = window.document.createElement('option');
-            option.value = doc.id;
-            option.textContent = doc.title;
-            documentSelect.appendChild(option);
-        });
-        documentSelect.disabled = false;
-        
-        // Add class for styling when documents are available
-        const wrapper = documentSelect.parentElement;
-        if (documents.length > 0) {
-            wrapper.classList.add('has-documents');
-            
-            // Update input overlay height to match select
-            setTimeout(() => {
-                const selectHeight = documentSelect.offsetHeight;
-                documentSearchInput.style.height = selectHeight + 'px';
-            }, 10);
-        } else {
-            wrapper.classList.remove('has-documents');
+        if (documentsToShow.length === 0) {
+            documentList.innerHTML = '<div class="no-documents">Không có tài liệu nào</div>';
+            documentSearchInput.disabled = true;
+            return;
         }
         
+        // Enable search input when we have documents
+        documentSearchInput.disabled = false;
+        
+        documentsToShow.forEach(doc => {
+            const documentItem = document.createElement('div');
+            documentItem.className = 'document-item';
+            documentItem.innerHTML = `
+                <input type="checkbox" id="doc-${doc.id}" class="document-checkbox" value="${doc.id}" ${selectedDocuments.includes(doc.id) ? 'checked' : ''}>
+                <label for="doc-${doc.id}" class="document-label">${doc.title}</label>
+            `;
+            
+            // Add event listener for checkbox change
+            const checkbox = documentItem.querySelector('.document-checkbox');
+            checkbox.addEventListener('change', onDocumentCheckboxChange);
+            
+            documentList.appendChild(documentItem);
+        });
+        
+        // Update controls state
+        updateControlsState();
+        updateSelectedCount();
+        
     } catch (error) {
-        console.error('Error populating document select:', error);
-        // Fallback: sử dụng innerHTML
-        const documentsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
-        const optionsHTML = documentsToShow.map(doc => 
-            `<option value="${doc.id}">${doc.title}</option>`
-        ).join('');
-        documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>' + optionsHTML;
-        documentSelect.disabled = false;
+        console.error('Error populating document list:', error);
+        documentList.innerHTML = '<div class="no-documents">Lỗi tải danh sách tài liệu</div>';
     }
+}
+
+function updateDocumentSelections() {
+    // Update checkboxes based on selectedDocuments array
+    const checkboxes = documentList.querySelectorAll('.document-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectedDocuments.includes(checkbox.value);
+    });
+    updateSelectedCount();
+    updateControlsState();
+}
+
+function updateSelectedCount() {
+    selectedCountSpan.textContent = `${selectedDocuments.length} tài liệu được chọn`;
+}
+
+function updateControlsState() {
+    const totalDocuments = documents.length;
+    const selectedCount = selectedDocuments.length;
+    
+    selectAllBtn.disabled = totalDocuments === 0 || selectedCount === totalDocuments;
+    clearAllBtn.disabled = selectedCount === 0;
+}
+
+function onDocumentCheckboxChange(event) {
+    const documentId = event.target.value;
+    const isChecked = event.target.checked;
+    
+    if (isChecked) {
+        if (!selectedDocuments.includes(documentId)) {
+            selectedDocuments.push(documentId);
+        }
+    } else {
+        const index = selectedDocuments.indexOf(documentId);
+        if (index > -1) {
+            selectedDocuments.splice(index, 1);
+        }
+    }
+    
+    updateSelectedCount();
+    updateControlsState();
+    
+    // Save to cache and trigger questions load
+    saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+    onDocumentsChange();
+}
+
+function selectAllDocuments() {
+    const checkboxes = documentList.querySelectorAll('.document-checkbox');
+    selectedDocuments = [];
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+        selectedDocuments.push(checkbox.value);
+    });
+    
+    updateSelectedCount();
+    updateControlsState();
+    
+    // Save to cache and trigger questions load
+    saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+    onDocumentsChange();
+}
+
+function clearAllDocuments() {
+    const checkboxes = documentList.querySelectorAll('.document-checkbox');
+    selectedDocuments = [];
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    updateSelectedCount();
+    updateControlsState();
+    
+    // Save to cache and clear questions
+    saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+    questionsSection.style.display = 'none';
 }
 
 function showQuestionsStatus(count) {
@@ -695,20 +816,17 @@ async function onCategoryChange() {
     // Save category selection to cache
     await saveToCache(CACHE_KEYS.SELECTED_CATEGORY, selectedCategoryId);
     
-    // Reset document select and hide questions
-    documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
-    documentSelect.disabled = true;
-    documentSearchInput.style.display = 'none';
-    documentSearchInput.style.visibility = 'hidden';
+    // Reset document selections and hide questions
+    selectedDocuments = [];
+    documentList.innerHTML = '<div class="no-documents">Đang tải tài liệu...</div>';
     documentSearchInput.value = '';
-    searchResults.innerHTML = '';
-    searchResults.style.display = 'none';
     filteredDocuments = [];
     questionsSection.style.display = 'none';
     
-    // Clear document selection from cache when category changes
-    await saveToCache(CACHE_KEYS.SELECTED_DOCUMENT, '');
+    // Clear document selections from cache when category changes
+    await saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, []);
     hideCacheIndicator();
+    updateControlsState();
     
     if (selectedCategoryId) {
         // Load documents filtered by selected category
@@ -716,80 +834,76 @@ async function onCategoryChange() {
     }
 }
 
-async function onDocumentChange() {
-    const selectedDocumentId = documentSelect.value;
+async function onDocumentsChange() {
+    // Save document selections to cache
+    await saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
     
-    // Save document selection to cache
-    await saveToCache(CACHE_KEYS.SELECTED_DOCUMENT, selectedDocumentId);
-    
-    if (selectedDocumentId) {
+    if (selectedDocuments.length > 0) {
         // Hide previous questions
         questionsSection.style.display = 'none';
         hideCacheIndicator();
         
-        // Tự động tải câu hỏi
+        // Load questions for selected documents
         await onLoadQuestions();
     } else {
         questionsSection.style.display = 'none';
     }
 }
 
-async function loadQuestions(documentId) {
+async function loadQuestions(documentIds) {
     try {
         showLoading(true);
         hideError();
         
-        console.log(`Loading questions for document: ${documentId}...`);
-        const endpoint = documentId ? `/questions?documentId=${documentId}` : '/questions';
+        if (!documentIds || documentIds.length === 0) {
+            console.log('No documents selected');
+            showQuestionsStatus(0);
+            showLoading(false);
+            return;
+        }
         
-        try {
-            const data = await apiRequest(endpoint);
-            questions = data.questions || [];
-            console.log('Questions loaded:', questions.length);
+        console.log(`Loading questions for documents: ${documentIds.join(', ')}...`);
+        
+        let allQuestions = [];
+        
+        // Load questions for each selected document
+        for (const documentId of documentIds) {
+            const endpoint = `/questions?documentId=${documentId}`;
             
-            // Show simple status message instead of full questions list
-            showQuestionsStatus(questions.length);
-            
-            // Save questions to cache if we got some
-            if (questions.length > 0) {
-                await saveToCache(CACHE_KEYS.QUESTIONS, questions);
+            try {
+                const data = await apiRequest(endpoint);
+                const documentQuestions = data.questions || [];
+                allQuestions = allQuestions.concat(documentQuestions);
+                console.log(`Questions loaded for ${documentId}:`, documentQuestions.length);
+            } catch (apiError) {
+                console.error(`API request failed for document ${documentId}:`, apiError);
                 
-                // Send to content script
-                sendQuestionsToContentScript(questions);
-            } else {
-                console.log('No questions found for document:', documentId);
-                // Still show status even with 0 questions
-                showQuestionsStatus(0);
-            }
-            
-        } catch (apiError) {
-            console.error('API request failed:', apiError);
-            
-            // Try to use cached questions as fallback
-            const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
-            if (cachedQuestions && cachedQuestions.length > 0) {
-                // Filter cached questions for this document
-                const filteredQuestions = cachedQuestions.filter(q => q.documentId === documentId);
-                if (filteredQuestions.length > 0) {
-                    console.log('Using cached questions:', filteredQuestions.length);
-                    questions = filteredQuestions;
-                    showQuestionsStatus(questions.length);
-                    sendQuestionsToContentScript(questions);
-                    
-                    // Show cache indicator
-                    showCacheIndicator();
-                    return;
+                // Try to use cached questions as fallback
+                const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
+                if (cachedQuestions && cachedQuestions.length > 0) {
+                    const filteredQuestions = cachedQuestions.filter(q => q.documentId === documentId);
+                    allQuestions = allQuestions.concat(filteredQuestions);
+                    console.log(`Using cached questions for ${documentId}:`, filteredQuestions.length);
                 }
             }
+        }
+        
+        questions = allQuestions;
+        console.log('Total questions loaded:', questions.length);
+        
+        // Show simple status message instead of full questions list
+        showQuestionsStatus(questions.length);
+        
+        // Save questions to cache if we got some
+        if (questions.length > 0) {
+            await saveToCache(CACHE_KEYS.QUESTIONS, questions);
             
-            // If no cache available, show user-friendly error
-            if (apiError.message.includes('404') || apiError.message.includes('not found')) {
-                showError('Không tìm thấy câu hỏi cho tài liệu này. Có thể tài liệu chưa có câu hỏi.');
-            } else if (apiError.message.includes('timeout') || apiError.message.includes('AbortError')) {
-                showError('Kết nối chậm. Vui lòng thử lại sau.');
-            } else {
-                showError('Không thể tải câu hỏi. Vui lòng kiểm tra kết nối internet.');
-            }
+            // Send to content script
+            sendQuestionsToContentScript(questions);
+        } else {
+            console.log('No questions found for selected documents');
+            // Still show status even with 0 questions
+            showQuestionsStatus(0);
         }
         
     } catch (err) {
@@ -801,14 +915,15 @@ async function loadQuestions(documentId) {
 }
 
 async function onLoadQuestions() {
-    const selectedDocumentId = documentSelect.value;
-    if (selectedDocumentId) {
-        await loadQuestions(selectedDocumentId);
+    if (selectedDocuments.length > 0) {
+        await loadQuestions(selectedDocuments);
         
         // After loading questions, compare with current page
-        await compareQuestionsWithPage();
+        if (questions.length > 0) {
+            setTimeout(() => compareQuestionsWithPage(), 500);
+        }
     } else {
-        showError('Vui lòng chọn tài liệu trước.');
+        showError('Vui lòng chọn ít nhất một tài liệu.');
     }
 }
 
@@ -1202,54 +1317,93 @@ function updateSelectedResult(items) {
 function onDocumentSearch() {
     const searchTerm = documentSearchInput.value.trim().toLowerCase();
     
-    let resultsToShow;
     if (searchTerm === '') {
         // Show all documents
-        resultsToShow = documents;
         filteredDocuments = [];
+        showAllDocuments();
     } else {
         // Filter documents based on search term
         filteredDocuments = documents.filter(doc => 
             doc.title.toLowerCase().includes(searchTerm)
         );
-        resultsToShow = filteredDocuments;
+        showFilteredDocuments(filteredDocuments);
     }
-    
-    showSearchResults(resultsToShow);
-    updateDocumentSelectPlaceholder();
 }
 
-function updateDocumentSelectPlaceholder() {
-    const resultsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
+function showAllDocuments() {
+    const documentItems = documentList.querySelectorAll('.document-item');
+    documentItems.forEach(item => {
+        item.classList.remove('hidden');
+    });
+}
+
+function showFilteredDocuments(filteredDocs) {
+    const documentItems = documentList.querySelectorAll('.document-item');
+    
+    documentItems.forEach(item => {
+        const checkbox = item.querySelector('.document-checkbox');
+        const documentId = checkbox.value;
+        
+        // Show item if it matches the filtered documents
+        const isVisible = filteredDocs.some(doc => doc.id === documentId);
+        if (isVisible) {
+            item.classList.remove('hidden');
+        } else {
+            item.classList.add('hidden');
+        }
+    });
+}
+
+// No longer needed - using checkbox interface
+
+// Duplicate function removed
+
+function updateControlsState() {
     const totalDocuments = documents.length;
+    const selectedCount = selectedDocuments.length;
     
-    if (filteredDocuments.length > 0) {
-        // Showing filtered results
-        const firstOption = documentSelect.querySelector('option[value=""]');
-        if (firstOption) {
-            firstOption.textContent = `-- Tìm thấy ${filteredDocuments.length}/${totalDocuments} tài liệu --`;
-        }
-    } else if (documentSearchInput.value.trim()) {
-        // No results found for search
-        const firstOption = documentSelect.querySelector('option[value=""]');
-        if (firstOption) {
-            firstOption.textContent = `-- Không tìm thấy tài liệu nào --`;
-        }
+    // Update selected count display
+    selectedCountSpan.textContent = `${selectedCount}/${totalDocuments} được chọn`;
+    
+    // Update button states
+    selectAllBtn.disabled = selectedCount === totalDocuments;
+    clearAllBtn.disabled = selectedCount === 0;
+}
+
+function selectAllDocuments() {
+    selectedDocuments = documents.map(doc => doc.id);
+    updateDocumentSelections();
+    updateControlsState();
+    saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+    onDocumentsChange();
+}
+
+function clearAllDocuments() {
+    selectedDocuments = [];
+    updateDocumentSelections();
+    updateControlsState();
+    saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+    onDocumentsChange();
+}
+
+function updateDocumentSelections() {
+    // Update checkbox states to match selectedDocuments array
+    documentList.querySelectorAll('.document-checkbox').forEach(checkbox => {
+        checkbox.checked = selectedDocuments.includes(checkbox.value);
+    });
+}
+
+async function onDocumentsChange() {
+    if (selectedDocuments.length > 0) {
+        // Hide previous questions
+        questionsSection.style.display = 'none';
+        hideCacheIndicator();
+        
+        // Load questions for selected documents
+        await onLoadQuestions();
     } else {
-        // Reset to default
-        const firstOption = documentSelect.querySelector('option[value=""]');
-        if (firstOption) {
-            firstOption.textContent = `-- Chọn tài liệu --`;
-        }
+        questionsSection.style.display = 'none';
     }
 }
 
-function clearDocumentSearch() {
-    documentSearchInput.value = '';
-    filteredDocuments = [];
-    selectedResultIndex = -1;
-    searchResults.innerHTML = '';
-    searchResults.style.display = 'none';
-    updateDocumentSelectPlaceholder();
-    populateDocumentSelect();
-}
+// No longer needed - using checkbox interface
