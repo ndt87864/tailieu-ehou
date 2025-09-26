@@ -569,6 +569,12 @@ function populateDocumentSelect() {
         const wrapper = documentSelect.parentElement;
         if (documents.length > 0) {
             wrapper.classList.add('has-documents');
+            
+            // Update input overlay height to match select
+            setTimeout(() => {
+                const selectHeight = documentSelect.offsetHeight;
+                documentSearchInput.style.height = selectHeight + 'px';
+            }, 10);
         } else {
             wrapper.classList.remove('has-documents');
         }
@@ -1075,6 +1081,10 @@ function showSearchInput() {
     if (!documentSelect.disabled && documents.length > 0) {
         const wrapper = documentSelect.parentElement;
         wrapper.classList.add('searching');
+        
+        // Match the height of the select element
+        const selectHeight = documentSelect.offsetHeight;
+        documentSearchInput.style.height = selectHeight + 'px';
         
         documentSearchInput.style.display = 'block';
         documentSearchInput.style.visibility = 'visible';
