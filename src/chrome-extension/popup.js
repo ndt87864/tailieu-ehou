@@ -31,7 +31,7 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSelect, documentSearchInput, questionsSection, questionsList, loading, error;
+let categorySelect, documentSelect, documentSearchInput, searchResults, questionsSection, questionsList, loading, error;
 
 // Data storage
 let categories = [];
@@ -80,6 +80,7 @@ function initializeElements() {
             categorySelect = document.getElementById('categorySelect');
             documentSelect = document.getElementById('documentSelect');
             documentSearchInput = document.getElementById('documentSearchInput');
+            searchResults = document.getElementById('searchResults');
             questionsSection = document.getElementById('questionsSection');
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
@@ -87,7 +88,7 @@ function initializeElements() {
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
-                categorySelect, documentSelect, documentSearchInput,
+                categorySelect, documentSelect, documentSearchInput, searchResults,
                 questionsSection, questionsList, loading, error
             };
             
@@ -116,8 +117,11 @@ function setupEventListeners() {
     documentSelect.addEventListener('focus', showSearchInput);
     
     documentSearchInput.addEventListener('input', onDocumentSearch);
-    documentSearchInput.addEventListener('blur', hideSearchInput);
+    documentSearchInput.addEventListener('blur', hideSearchInputDelayed);
     documentSearchInput.addEventListener('keydown', handleSearchKeydown);
+    
+    // Handle clicks on search results
+    searchResults.addEventListener('mousedown', handleSearchResultClick);
 }
 
 // Cache Management Functions
@@ -689,7 +693,10 @@ async function onCategoryChange() {
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     documentSelect.disabled = true;
     documentSearchInput.style.display = 'none';
+    documentSearchInput.style.visibility = 'hidden';
     documentSearchInput.value = '';
+    searchResults.innerHTML = '';
+    searchResults.style.display = 'none';
     filteredDocuments = [];
     questionsSection.style.display = 'none';
     
@@ -1062,12 +1069,15 @@ async function autoCompareOnOpen() {
 }
 
 // Document search functions - integrated with select dropdown
+let selectedResultIndex = -1;
+
 function showSearchInput() {
     if (!documentSelect.disabled && documents.length > 0) {
         const wrapper = documentSelect.parentElement;
         wrapper.classList.add('searching');
         
         documentSearchInput.style.display = 'block';
+        documentSearchInput.style.visibility = 'visible';
         documentSearchInput.classList.add('active');
         documentSearchInput.focus();
         
@@ -1080,57 +1090,123 @@ function showSearchInput() {
                 documentSearchInput.select(); // Select all text for easy replacement
             }
         }
+        
+        // Show initial results (all documents)
+        showSearchResults(documents);
     }
 }
 
 function hideSearchInput() {
+    const wrapper = documentSelect.parentElement;
+    wrapper.classList.remove('searching');
+    
+    documentSearchInput.style.display = 'none';
+    documentSearchInput.style.visibility = 'hidden';
+    documentSearchInput.classList.remove('active');
+    searchResults.style.display = 'none';
+    selectedResultIndex = -1;
+}
+
+function hideSearchInputDelayed() {
+    // Use mousedown instead of click to capture result selection before blur
     setTimeout(() => {
-        const wrapper = documentSelect.parentElement;
-        wrapper.classList.remove('searching');
-        
-        documentSearchInput.style.display = 'none';
-        documentSearchInput.classList.remove('active');
-        
-        // If no document was selected and there was a search, clear it
-        if (!documentSelect.value) {
-            clearDocumentSearch();
-        }
-    }, 150); // Small delay to allow for option selection
+        hideSearchInput();
+    }, 150);
+}
+
+function showSearchResults(results) {
+    searchResults.innerHTML = '';
+    selectedResultIndex = -1;
+    
+    if (results.length === 0) {
+        searchResults.innerHTML = '<div class="no-results">Không tìm thấy tài liệu nào</div>';
+    } else {
+        results.forEach((doc, index) => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+            item.textContent = doc.title;
+            item.dataset.docId = doc.id;
+            item.dataset.index = index;
+            searchResults.appendChild(item);
+        });
+    }
+    
+    searchResults.style.display = 'block';
+}
+
+function handleSearchResultClick(e) {
+    e.preventDefault();
+    const item = e.target.closest('.search-result-item');
+    if (item && item.dataset.docId) {
+        selectDocument(item.dataset.docId);
+    }
+}
+
+function selectDocument(docId) {
+    documentSelect.value = docId;
+    hideSearchInput();
+    onDocumentChange();
 }
 
 function handleSearchKeydown(e) {
-    if (e.key === 'Enter') {
+    const items = searchResults.querySelectorAll('.search-result-item:not(.no-results)');
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedResultIndex = Math.min(selectedResultIndex + 1, items.length - 1);
+        updateSelectedResult(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedResultIndex = Math.max(selectedResultIndex - 1, -1);
+        updateSelectedResult(items);
+    } else if (e.key === 'Enter') {
         e.preventDefault();
         
-        // If only one result, auto-select it
-        const resultsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
-        if (resultsToShow.length === 1) {
-            documentSelect.value = resultsToShow[0].id;
-            hideSearchInput();
-            onDocumentChange();
+        if (selectedResultIndex >= 0 && items[selectedResultIndex]) {
+            const docId = items[selectedResultIndex].dataset.docId;
+            selectDocument(docId);
+        } else {
+            // If only one result, auto-select it
+            if (items.length === 1) {
+                const docId = items[0].dataset.docId;
+                selectDocument(docId);
+            }
         }
     } else if (e.key === 'Escape') {
+        e.preventDefault();
         hideSearchInput();
         clearDocumentSearch();
     }
 }
 
+function updateSelectedResult(items) {
+    items.forEach((item, index) => {
+        if (index === selectedResultIndex) {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
+
 function onDocumentSearch() {
     const searchTerm = documentSearchInput.value.trim().toLowerCase();
     
+    let resultsToShow;
     if (searchTerm === '') {
-        // Reset to show all documents
+        // Show all documents
+        resultsToShow = documents;
         filteredDocuments = [];
-        updateDocumentSelectPlaceholder();
     } else {
         // Filter documents based on search term
         filteredDocuments = documents.filter(doc => 
             doc.title.toLowerCase().includes(searchTerm)
         );
-        updateDocumentSelectPlaceholder();
+        resultsToShow = filteredDocuments;
     }
     
-    populateDocumentSelect();
+    showSearchResults(resultsToShow);
+    updateDocumentSelectPlaceholder();
 }
 
 function updateDocumentSelectPlaceholder() {
@@ -1161,6 +1237,9 @@ function updateDocumentSelectPlaceholder() {
 function clearDocumentSearch() {
     documentSearchInput.value = '';
     filteredDocuments = [];
+    selectedResultIndex = -1;
+    searchResults.innerHTML = '';
+    searchResults.style.display = 'none';
     updateDocumentSelectPlaceholder();
     populateDocumentSelect();
 }
