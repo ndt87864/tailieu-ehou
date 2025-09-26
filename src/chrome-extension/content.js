@@ -996,7 +996,22 @@ function hideCachedQuestionsIndicator() {
 function createFloatingButton() {
     const button = document.createElement('div');
     button.id = 'tailieu-floating-btn';
-    button.innerHTML = '📚';
+    button.innerHTML = `<?xml version="1.0" encoding="utf-8"?>
+<!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+<svg 
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="#ffffff"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+</svg>`;
     button.style.cssText = `
         position: fixed;
         bottom: 20px;
@@ -1074,7 +1089,7 @@ function createQuestionsPopup() {
     `;
     
     const title = document.createElement('div');
-    title.textContent = '📚 Danh sách câu hỏi';
+    title.textContent = 'Danh sách câu hỏi';
     
     const controls = document.createElement('div');
     controls.style.cssText = `
@@ -1141,7 +1156,24 @@ function createQuestionsPopup() {
         color: #666;
     `;
     emptyState.innerHTML = `
-        <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+        <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
+            <?xml version="1.0" encoding="utf-8"?>
+            <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+            <svg 
+              xmlns="http://www.w3.org/2000/svg"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#666666"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+        </div>
         <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
         <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
     `;
@@ -1226,7 +1258,24 @@ function createQuestionsPopup() {
         transition: all 0.3s ease;
         font-size: 24px;
     `;
-    toggleBtn.innerHTML = '📝';
+    toggleBtn.innerHTML = `
+        <?xml version="1.0" encoding="utf-8"?>
+        <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+        <svg 
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+    `;
     toggleBtn.title = 'Hiển thị/Ẩn danh sách câu hỏi';
 
     toggleBtn.addEventListener('click', () => {
@@ -1297,7 +1346,24 @@ function updateQuestionsPopup(questions = []) {
     if (questions.length === 0) {
         content.innerHTML = `
             <div style="padding: 40px 20px; text-align: center; color: #666;">
-                <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#666666"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                </div>
                 <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
                 <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
             </div>
@@ -1418,7 +1484,7 @@ function updateQuestionsPopup(questions = []) {
     if (header) {
         const title = header.querySelector('div');
         if (title) {
-            title.textContent = `📚 Danh sách câu hỏi (${questions.length})`;
+            title.textContent = `Danh sách câu hỏi (${questions.length})`;
         }
     }
 }
@@ -1478,7 +1544,7 @@ function showHighlightNotification(questionText) {
     `;
     
     notification.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 4px;">✨ Đã tìm thấy câu hỏi</div>
+        <div style="font-weight: 600; margin-bottom: 4px;"> Đã tìm thấy câu hỏi</div>
         <div style="font-size: 11px; opacity: 0.9;">${questionText.substring(0, 60)}${questionText.length > 60 ? '...' : ''}</div>
     `;
     
@@ -1515,7 +1581,5 @@ window.tailieuDebug = {
     }
 };
 
-// Uncomment the line below if you want a floating button on every page
-// createFloatingButton();
 
-} // End of extension load guard
+} 
