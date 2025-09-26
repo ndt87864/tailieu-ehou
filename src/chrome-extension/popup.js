@@ -900,10 +900,16 @@ async function loadQuestions(documentIds) {
             
             // Send to content script
             sendQuestionsToContentScript(questions);
+            
+            // Update questions popup
+            await updateQuestionsPopup(questions);
         } else {
             console.log('No questions found for selected documents');
             // Still show status even with 0 questions
             showQuestionsStatus(0);
+            
+            // Clear questions popup
+            await updateQuestionsPopup([]);
         }
         
     } catch (err) {
@@ -1403,6 +1409,23 @@ async function onDocumentsChange() {
         await onLoadQuestions();
     } else {
         questionsSection.style.display = 'none';
+        // Clear questions popup when no documents selected
+        updateQuestionsPopup([]);
+    }
+}
+
+// Update questions popup in content script
+async function updateQuestionsPopup(questions) {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) {
+            await chrome.tabs.sendMessage(tab.id, {
+                action: 'updateQuestionsPopup',
+                questions: questions
+            });
+        }
+    } catch (error) {
+        console.error('Failed to update questions popup:', error);
     }
 }
 

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Extension Popup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+        }
+
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 Test Extension Popup</h1>
+
+    <div class="test-section">
+        <h3>Kiểm tra Extension</h3>
+        <div class="status" id="extensionStatus">Đang kiểm tra extension...</div>
+
+        <button onclick="checkExtensionLoaded()">Kiểm tra Extension</button>
+        <button onclick="testQuestionsPopup()">Test Questions Popup</button>
+        <button onclick="sendTestQuestions()">Gửi Test Questions</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Test Questions</h3>
+        <div class="question-text">Câu 1: HTML là viết tắt của gì?</div>
+        <div class="question-text">Câu 2: CSS viết tắt của gì?</div>
+        <div class="question-text">Câu 3: JavaScript được tạo ra bởi ai?</div>
+    </div>
+
+    <script>
+        function checkExtensionLoaded() {
+            const status = document.getElementById('extensionStatus');
+
+            if (window.tailieuExtensionLoaded) {
+                status.innerHTML = '✅ Extension đã được load thành công!';
+                status.style.background = '#e8f5e8';
+                status.style.borderColor = '#4caf50';
+            } else {
+                status.innerHTML = '❌ Extension chưa được load. Vui lòng kiểm tra lại.';
+                status.style.background = '#ffebee';
+                status.style.borderColor = '#f44336';
+            }
+        }
+
+        function testQuestionsPopup() {
+            const popup = document.getElementById('tailieu-questions-popup');
+            const toggleBtn = document.getElementById('tailieu-questions-toggle-btn');
+
+            if (popup) {
+                console.log('✅ Questions popup element found');
+                console.log('Popup display:', popup.style.display);
+                console.log('Popup position:', {
+                    bottom: popup.style.bottom,
+                    right: popup.style.right
+                });
+            } else {
+                console.log('❌ Questions popup element not found');
+            }
+
+            if (toggleBtn) {
+                console.log('✅ Toggle button found');
+                console.log('Button position:', {
+                    bottom: toggleBtn.style.bottom,
+                    right: toggleBtn.style.right
+                });
+            } else {
+                console.log('❌ Toggle button not found');
+            }
+        }
+
+        function sendTestQuestions() {
+            const testQuestions = [
+                {
+                    question: "HTML là viết tắt của gì?",
+                    answer: "HyperText Markup Language",
+                    documentId: "test-doc-1"
+                },
+                {
+                    question: "CSS viết tắt của gì?",
+                    answer: "Cascading Style Sheets",
+                    documentId: "test-doc-1"
+                },
+                {
+                    question: "JavaScript được tạo ra bởi ai?",
+                    answer: "Brendan Eich",
+                    documentId: "test-doc-1"
+                }
+            ];
+
+            if (window.tailieuExtensionLoaded && typeof window.updateQuestionsPopup === 'function') {
+                window.updateQuestionsPopup(testQuestions);
+                console.log('✅ Test questions sent to popup');
+            } else {
+                console.log('❌ Extension functions not available');
+
+                // Try sending via postMessage as fallback
+                window.postMessage({
+                    type: 'TAILIEU_UPDATE_QUESTIONS',
+                    questions: testQuestions
+                }, '*');
+            }
+        }
+
+        // Auto-check extension status on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(() => {
+                checkExtensionLoaded();
+                testQuestionsPopup();
+            }, 1000);
+        });
+
+        // Listen for messages
+        window.addEventListener('message', function (event) {
+            if (event.data.type === 'TAILIEU_UPDATE_QUESTIONS') {
+                console.log('Received questions update message:', event.data.questions);
+            }
+        });
+    </script>
+</body>
+
+</html>

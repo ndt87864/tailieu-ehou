@@ -303,6 +303,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // Save to cache
             saveCachedQuestions();
             showCachedQuestionsIndicator();
+            
+            // Update questions popup with new questions
+            updateQuestionsPopup(extensionQuestions);
+            
             sendResponse({ success: true });
         } catch (error) {
             console.error('Error handling setExtensionQuestions:', error);
@@ -317,6 +321,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: true });
         } catch (error) {
             console.error('Error handling clearHighlights:', error);
+            sendResponse({ error: error.message });
+        }
+        return true;
+    }
+    
+    if (request.action === 'updateQuestionsPopup') {
+        try {
+            updateQuestionsPopup(request.questions || []);
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('Error handling updateQuestionsPopup:', error);
             sendResponse({ error: error.message });
         }
         return true;
@@ -339,6 +354,9 @@ async function loadCachedQuestions() {
             
             // Show cached questions indicator
             showCachedQuestionsIndicator();
+            
+            // Update questions popup with cached questions
+            updateQuestionsPopup(extensionQuestions);
         }
     } catch (error) {
         if (error.message.includes('Extension context invalidated')) {
@@ -976,6 +994,484 @@ function createFloatingButton() {
     
     document.body.appendChild(button);
 }
+
+// Create questions popup at bottom right
+function createQuestionsPopup() {
+    // Create popup container
+    const popup = document.createElement('div');
+    popup.id = 'tailieu-questions-popup';
+    popup.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 400px;
+        max-height: 500px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        z-index: 999999;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        display: block;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    `;
+
+    // Create header
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        cursor: move;
+    `;
+    
+    const title = document.createElement('div');
+    title.textContent = '📚 Danh sách câu hỏi';
+    
+    const controls = document.createElement('div');
+    controls.style.cssText = `
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    `;
+    
+    // Minimize button
+    const minimizeBtn = document.createElement('button');
+    minimizeBtn.innerHTML = '−';
+    minimizeBtn.style.cssText = `
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Close button
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.style.cssText = `
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    controls.appendChild(minimizeBtn);
+    controls.appendChild(closeBtn);
+    header.appendChild(title);
+    header.appendChild(controls);
+
+    // Create content area
+    const content = document.createElement('div');
+    content.id = 'tailieu-questions-content';
+    content.style.cssText = `
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 0;
+    `;
+
+    // Create empty state
+    const emptyState = document.createElement('div');
+    emptyState.style.cssText = `
+        padding: 40px 20px;
+        text-align: center;
+        color: #666;
+    `;
+    emptyState.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+        <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
+        <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
+    `;
+    content.appendChild(emptyState);
+
+    popup.appendChild(header);
+    popup.appendChild(content);
+    document.body.appendChild(popup);
+
+    // Add event listeners
+    closeBtn.addEventListener('click', () => {
+        popup.style.display = 'none';
+        // Save state
+        localStorage.setItem('tailieu-questions-popup-visible', 'false');
+    });
+
+    let isMinimized = false;
+    minimizeBtn.addEventListener('click', () => {
+        isMinimized = !isMinimized;
+        if (isMinimized) {
+            content.style.display = 'none';
+            popup.style.height = 'auto';
+            minimizeBtn.innerHTML = '□';
+        } else {
+            content.style.display = 'block';
+            minimizeBtn.innerHTML = '−';
+        }
+        localStorage.setItem('tailieu-questions-popup-minimized', isMinimized.toString());
+    });
+
+    // Make header draggable
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    header.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragOffset.x = e.clientX - popup.offsetLeft;
+        dragOffset.y = e.clientY - popup.offsetTop;
+        header.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            popup.style.left = (e.clientX - dragOffset.x) + 'px';
+            popup.style.top = (e.clientY - dragOffset.y) + 'px';
+            popup.style.right = 'auto';
+            popup.style.bottom = 'auto';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            header.style.cursor = 'move';
+            // Save position
+            localStorage.setItem('tailieu-questions-popup-position', JSON.stringify({
+                left: popup.style.left,
+                top: popup.style.top,
+                right: popup.style.right,
+                bottom: popup.style.bottom
+            }));
+        }
+    });
+
+    // Create toggle button to show/hide popup
+    const toggleBtn = document.createElement('div');
+    toggleBtn.id = 'tailieu-questions-toggle-btn';
+    toggleBtn.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 80px;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999998;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        font-size: 24px;
+    `;
+    toggleBtn.innerHTML = '📝';
+    toggleBtn.title = 'Hiển thị/Ẩn danh sách câu hỏi';
+
+    toggleBtn.addEventListener('click', () => {
+        const isVisible = popup.style.display !== 'none';
+        popup.style.display = isVisible ? 'none' : 'block';
+        localStorage.setItem('tailieu-questions-popup-visible', (!isVisible).toString());
+        console.log('Toggle button clicked, popup now:', !isVisible ? 'visible' : 'hidden');
+    });
+
+    toggleBtn.addEventListener('mouseenter', () => {
+        toggleBtn.style.transform = 'scale(1.1)';
+    });
+
+    toggleBtn.addEventListener('mouseleave', () => {
+        toggleBtn.style.transform = 'scale(1)';
+    });
+
+    document.body.appendChild(toggleBtn);
+    console.log('Toggle button created and added to DOM');
+
+    // Restore saved state
+    const savedVisible = localStorage.getItem('tailieu-questions-popup-visible');
+    if (savedVisible === 'true') {
+        popup.style.display = 'block';
+    } else if (savedVisible === null) {
+        // First time - show popup by default if we have questions
+        popup.style.display = 'block';
+        localStorage.setItem('tailieu-questions-popup-visible', 'true');
+    }
+
+    const savedMinimized = localStorage.getItem('tailieu-questions-popup-minimized');
+    if (savedMinimized === 'true') {
+        isMinimized = true;
+        content.style.display = 'none';
+        minimizeBtn.innerHTML = '□';
+    }
+
+    const savedPosition = localStorage.getItem('tailieu-questions-popup-position');
+    if (savedPosition) {
+        try {
+            const position = JSON.parse(savedPosition);
+            if (position.left && position.left !== 'auto') popup.style.left = position.left;
+            if (position.top && position.top !== 'auto') popup.style.top = position.top;
+            if (position.right && position.right !== 'auto') popup.style.right = position.right;
+            if (position.bottom && position.bottom !== 'auto') popup.style.bottom = position.bottom;
+        } catch (e) {
+            console.log('Could not restore popup position:', e);
+        }
+    }
+
+    console.log('Questions popup created successfully');
+    return popup;
+}
+
+// Update questions popup content
+function updateQuestionsPopup(questions = []) {
+    const popup = document.getElementById('tailieu-questions-popup');
+    const content = document.getElementById('tailieu-questions-content');
+    
+    if (!popup || !content) {
+        console.log('Popup or content not found, creating popup...');
+        createQuestionsPopup();
+        // Try again after creating
+        setTimeout(() => updateQuestionsPopup(questions), 100);
+        return;
+    }
+
+    if (questions.length === 0) {
+        content.innerHTML = `
+            <div style="padding: 40px 20px; text-align: center; color: #666;">
+                <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+                <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
+                <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Show popup when questions are available
+    popup.style.display = 'block';
+    localStorage.setItem('tailieu-questions-popup-visible', 'true');
+
+    // Create questions list
+    content.innerHTML = '';
+    
+    // Add search bar
+    const searchContainer = document.createElement('div');
+    searchContainer.style.cssText = `
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+        background: #f8f9fa;
+    `;
+    
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Tìm kiếm câu hỏi...';
+    searchInput.style.cssText = `
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 13px;
+        box-sizing: border-box;
+    `;
+    
+    searchContainer.appendChild(searchInput);
+    content.appendChild(searchContainer);
+
+    // Questions container
+    const questionsContainer = document.createElement('div');
+    questionsContainer.id = 'questions-list-container';
+    
+    questions.forEach((question, index) => {
+        const questionItem = document.createElement('div');
+        questionItem.className = 'question-item-popup';
+        questionItem.style.cssText = `
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        `;
+        
+        questionItem.addEventListener('mouseenter', () => {
+            questionItem.style.backgroundColor = '#f8f9fa';
+        });
+        
+        questionItem.addEventListener('mouseleave', () => {
+            questionItem.style.backgroundColor = 'white';
+        });
+
+        // Question number and text
+        const questionHeader = document.createElement('div');
+        questionHeader.style.cssText = `
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        `;
+        questionHeader.innerHTML = `<span style="color: #667eea;">#${index + 1}</span> ${question.question}`;
+
+        // Answer
+        const answerDiv = document.createElement('div');
+        answerDiv.style.cssText = `
+            color: #666;
+            font-size: 12px;
+            background: #f0f8ff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border-left: 3px solid #667eea;
+            margin-top: 8px;
+            line-height: 1.4;
+        `;
+        answerDiv.innerHTML = `<strong>Đáp án:</strong> ${question.answer}`;
+
+        questionItem.appendChild(questionHeader);
+        questionItem.appendChild(answerDiv);
+
+        // Click to highlight on page
+        questionItem.addEventListener('click', () => {
+            // Try to find and highlight this question on the page
+            highlightQuestionOnPage(question.question);
+            
+            // Visual feedback
+            questionItem.style.backgroundColor = '#e3f2fd';
+            setTimeout(() => {
+                questionItem.style.backgroundColor = '';
+            }, 1000);
+        });
+
+        questionsContainer.appendChild(questionItem);
+    });
+
+    content.appendChild(questionsContainer);
+
+    // Add search functionality
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const questionItems = questionsContainer.querySelectorAll('.question-item-popup');
+        
+        questionItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+        });
+    });
+
+    // Update header title with count
+    const header = popup.querySelector('div');
+    if (header) {
+        const title = header.querySelector('div');
+        if (title) {
+            title.textContent = `📚 Danh sách câu hỏi (${questions.length})`;
+        }
+    }
+}
+
+// Highlight question on page when clicked from popup
+function highlightQuestionOnPage(questionText) {
+    // Clear previous highlights
+    clearAllHighlights();
+    
+    const pageQuestions = extractQuestionsFromPage();
+    const cleanTargetText = cleanQuestionText(questionText);
+    
+    for (const pageQuestion of pageQuestions) {
+        const cleanPageText = cleanQuestionText(pageQuestion.text);
+        if (isQuestionSimilar(cleanTargetText, cleanPageText)) {
+            // Highlight this element
+            pageQuestion.element.style.cssText += `
+                background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%) !important;
+                padding: 8px !important;
+                border-radius: 6px !important;
+                border: 2px solid #ff9800 !important;
+                box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3) !important;
+                animation: highlightPulse 2s ease-in-out !important;
+            `;
+            
+            // Scroll to element
+            pageQuestion.element.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center' 
+            });
+            
+            // Show notification
+            showHighlightNotification(questionText);
+            break;
+        }
+    }
+}
+
+// Show highlight notification
+function showHighlightNotification(questionText) {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-size: 13px;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        max-width: 400px;
+        text-align: center;
+    `;
+    
+    notification.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 4px;">✨ Đã tìm thấy câu hỏi</div>
+        <div style="font-size: 11px; opacity: 0.9;">${questionText.substring(0, 60)}${questionText.length > 60 ? '...' : ''}</div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Create questions popup at bottom right
+console.log('Creating questions popup...');
+const questionsPopup = createQuestionsPopup();
+console.log('Questions popup created:', questionsPopup ? 'Success' : 'Failed');
+
+// Expose functions for debugging
+window.tailieuDebug = {
+    updateQuestionsPopup: updateQuestionsPopup,
+    createQuestionsPopup: createQuestionsPopup,
+    extensionQuestions: () => extensionQuestions,
+    showPopup: () => {
+        const popup = document.getElementById('tailieu-questions-popup');
+        if (popup) {
+            popup.style.display = 'block';
+            console.log('Popup forced to show');
+        }
+    },
+    hidePopup: () => {
+        const popup = document.getElementById('tailieu-questions-popup');
+        if (popup) {
+            popup.style.display = 'none';
+            console.log('Popup hidden');
+        }
+    }
+};
 
 // Uncomment the line below if you want a floating button on every page
 // createFloatingButton();
