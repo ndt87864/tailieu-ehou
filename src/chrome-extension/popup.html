@@ -63,6 +63,71 @@
             border-color: #667eea;
         }
 
+        .search-select {
+            position: relative;
+        }
+
+        .search-select select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+
+        .search-input-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            z-index: 2;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .search-input-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+            background: white;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .search-input-overlay:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .document-select-wrapper {
+            position: relative;
+        }
+
+        .document-select-wrapper.searching select {
+            opacity: 0.3;
+        }
+
+        .search-hint {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .document-select-wrapper:hover .search-hint,
+        .document-select-wrapper.has-documents .search-hint {
+            display: block;
+        }
+
         .btn {
             width: 100%;
             padding: 10px;
@@ -182,9 +247,14 @@
 
         <div class="form-group">
             <label for="documentSelect">Chọn tài liệu:</label>
-            <select id="documentSelect" disabled>
-                <option value="">-- Chọn tài liệu --</option>
-            </select>
+            <div class="document-select-wrapper">
+                <select id="documentSelect" disabled>
+                    <option value="">-- Chọn tài liệu --</option>
+                </select>
+                <input type="text" id="documentSearchInput" class="search-input-overlay"
+                    placeholder="Gõ để tìm kiếm tài liệu..." style="display: none;">
+                <div class="search-hint">💡 Click để tìm kiếm tài liệu</div>
+            </div>
         </div>
 
 

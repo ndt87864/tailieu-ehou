@@ -31,11 +31,12 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSelect, questionsSection, questionsList, loading, error;
+let categorySelect, documentSelect, documentSearchInput, questionsSection, questionsList, loading, error;
 
 // Data storage
 let categories = [];
 let documents = [];
+let filteredDocuments = []; // Filtered documents for search
 let questions = [];
 
 // Cache keys for persistent storage
@@ -78,6 +79,7 @@ function initializeElements() {
             
             categorySelect = document.getElementById('categorySelect');
             documentSelect = document.getElementById('documentSelect');
+            documentSearchInput = document.getElementById('documentSearchInput');
             questionsSection = document.getElementById('questionsSection');
             questionsList = document.getElementById('questionsList');
             loading = document.getElementById('loading');
@@ -85,7 +87,7 @@ function initializeElements() {
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
-                categorySelect, documentSelect,
+                categorySelect, documentSelect, documentSearchInput,
                 questionsSection, questionsList, loading, error
             };
             
@@ -108,6 +110,14 @@ function initializeElements() {
 function setupEventListeners() {
     categorySelect.addEventListener('change', onCategoryChange);
     documentSelect.addEventListener('change', onDocumentChange);
+    
+    // Document search functionality - integrated with select
+    documentSelect.addEventListener('click', showSearchInput);
+    documentSelect.addEventListener('focus', showSearchInput);
+    
+    documentSearchInput.addEventListener('input', onDocumentSearch);
+    documentSearchInput.addEventListener('blur', hideSearchInput);
+    documentSearchInput.addEventListener('keydown', handleSearchKeydown);
 }
 
 // Cache Management Functions
@@ -179,6 +189,7 @@ async function autoRestoreSelections() {
             // If we have documents, populate document select
             if (documents.length > 0) {
                 populateDocumentSelect();
+                // Search is enabled on demand
                 
                 if (selectedDocumentId) {
                     // Restore document selection
@@ -475,6 +486,9 @@ async function loadDocuments(categoryId) {
         
         populateDocumentSelect();
         
+        // Enable search input after documents are loaded
+        // documentSearchInput is enabled on demand when user clicks select
+        
     } catch (err) {
         console.error('Failed to load documents:', err);
         showError('Không thể tải danh sách tài liệu.');
@@ -536,17 +550,30 @@ function populateDocumentSelect() {
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     
     try {
-        documents.forEach(doc => {
+        // Use filtered documents if search is active, otherwise use all documents
+        const documentsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
+        
+        documentsToShow.forEach(doc => {
             const option = window.document.createElement('option');
             option.value = doc.id;
             option.textContent = doc.title;
             documentSelect.appendChild(option);
         });
         documentSelect.disabled = false;
+        
+        // Add class for styling when documents are available
+        const wrapper = documentSelect.parentElement;
+        if (documents.length > 0) {
+            wrapper.classList.add('has-documents');
+        } else {
+            wrapper.classList.remove('has-documents');
+        }
+        
     } catch (error) {
         console.error('Error populating document select:', error);
         // Fallback: sử dụng innerHTML
-        const optionsHTML = documents.map(doc => 
+        const documentsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
+        const optionsHTML = documentsToShow.map(doc => 
             `<option value="${doc.id}">${doc.title}</option>`
         ).join('');
         documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>' + optionsHTML;
@@ -661,6 +688,9 @@ async function onCategoryChange() {
     // Reset document select and hide questions
     documentSelect.innerHTML = '<option value="">-- Chọn tài liệu --</option>';
     documentSelect.disabled = true;
+    documentSearchInput.style.display = 'none';
+    documentSearchInput.value = '';
+    filteredDocuments = [];
     questionsSection.style.display = 'none';
     
     // Clear document selection from cache when category changes
@@ -1029,4 +1059,108 @@ async function autoCompareOnOpen() {
     if (questions && questions.length > 0) {
         await compareQuestionsWithPage();
     }
+}
+
+// Document search functions - integrated with select dropdown
+function showSearchInput() {
+    if (!documentSelect.disabled && documents.length > 0) {
+        const wrapper = documentSelect.parentElement;
+        wrapper.classList.add('searching');
+        
+        documentSearchInput.style.display = 'block';
+        documentSearchInput.classList.add('active');
+        documentSearchInput.focus();
+        
+        // Pre-fill with current selection if any
+        const currentValue = documentSelect.value;
+        if (currentValue) {
+            const currentDoc = documents.find(doc => doc.id === currentValue);
+            if (currentDoc) {
+                documentSearchInput.value = currentDoc.title;
+                documentSearchInput.select(); // Select all text for easy replacement
+            }
+        }
+    }
+}
+
+function hideSearchInput() {
+    setTimeout(() => {
+        const wrapper = documentSelect.parentElement;
+        wrapper.classList.remove('searching');
+        
+        documentSearchInput.style.display = 'none';
+        documentSearchInput.classList.remove('active');
+        
+        // If no document was selected and there was a search, clear it
+        if (!documentSelect.value) {
+            clearDocumentSearch();
+        }
+    }, 150); // Small delay to allow for option selection
+}
+
+function handleSearchKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        // If only one result, auto-select it
+        const resultsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
+        if (resultsToShow.length === 1) {
+            documentSelect.value = resultsToShow[0].id;
+            hideSearchInput();
+            onDocumentChange();
+        }
+    } else if (e.key === 'Escape') {
+        hideSearchInput();
+        clearDocumentSearch();
+    }
+}
+
+function onDocumentSearch() {
+    const searchTerm = documentSearchInput.value.trim().toLowerCase();
+    
+    if (searchTerm === '') {
+        // Reset to show all documents
+        filteredDocuments = [];
+        updateDocumentSelectPlaceholder();
+    } else {
+        // Filter documents based on search term
+        filteredDocuments = documents.filter(doc => 
+            doc.title.toLowerCase().includes(searchTerm)
+        );
+        updateDocumentSelectPlaceholder();
+    }
+    
+    populateDocumentSelect();
+}
+
+function updateDocumentSelectPlaceholder() {
+    const resultsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
+    const totalDocuments = documents.length;
+    
+    if (filteredDocuments.length > 0) {
+        // Showing filtered results
+        const firstOption = documentSelect.querySelector('option[value=""]');
+        if (firstOption) {
+            firstOption.textContent = `-- Tìm thấy ${filteredDocuments.length}/${totalDocuments} tài liệu --`;
+        }
+    } else if (documentSearchInput.value.trim()) {
+        // No results found for search
+        const firstOption = documentSelect.querySelector('option[value=""]');
+        if (firstOption) {
+            firstOption.textContent = `-- Không tìm thấy tài liệu nào --`;
+        }
+    } else {
+        // Reset to default
+        const firstOption = documentSelect.querySelector('option[value=""]');
+        if (firstOption) {
+            firstOption.textContent = `-- Chọn tài liệu --`;
+        }
+    }
+}
+
+function clearDocumentSearch() {
+    documentSearchInput.value = '';
+    filteredDocuments = [];
+    updateDocumentSelectPlaceholder();
+    populateDocumentSelect();
 }
