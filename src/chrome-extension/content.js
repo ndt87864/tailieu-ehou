@@ -1298,15 +1298,11 @@ function createQuestionsPopup() {
 
     // Restore saved state
     const savedVisible = localStorage.getItem('tailieu-questions-popup-visible');
-    if (savedVisible === 'true') {
-        popup.style.display = 'block';
-    } else if (savedVisible === null) {
-        // First time - show popup by default if we have questions
-        popup.style.display = 'block';
-        localStorage.setItem('tailieu-questions-popup-visible', 'true');
-    }
-
     const savedMinimized = localStorage.getItem('tailieu-questions-popup-minimized');
+    
+    // Initially hide popup - only show when there are questions
+    popup.style.display = 'none';
+
     if (savedMinimized === 'true') {
         isMinimized = true;
         content.style.display = 'none';
@@ -1344,6 +1340,10 @@ function updateQuestionsPopup(questions = []) {
     }
 
     if (questions.length === 0) {
+        // Hide popup when no questions
+        popup.style.display = 'none';
+        localStorage.setItem('tailieu-questions-popup-visible', 'false');
+        
         content.innerHTML = `
             <div style="padding: 40px 20px; text-align: center; color: #666;">
                 <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
