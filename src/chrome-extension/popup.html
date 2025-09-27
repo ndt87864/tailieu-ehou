@@ -29,6 +29,45 @@
             font-weight: 600;
         }
 
+        .cache-section {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .cache-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1976d2;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .cache-clear-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+        }
+
+        .cache-clear-btn:hover {
+            background: #d32f2f;
+        }
+
         .selection-section {
             background: white;
             padding: 20px;
@@ -372,19 +411,28 @@
 <body>
     <div class="header">
         <h1>Tìm đáp án</h1>
-        <div style="margin-top: 10px;">
-            <div style="display: flex; justify-content: center;">
-                <button id="clearCacheBtn" class="btn-danger"
-                    style="font-size: 12px; padding: 6px 12px; width: auto; display: flex; align-items: center; gap: 6px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path
-                            d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z"
-                            fill="#FFFFFF" />
-                    </svg>
-                    Xóa Cache
-                </button>
-            </div>
+    </div>
+
+    <div class="cache-section">
+        <div class="cache-info">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="#1976d2"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M14 2v6h6" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M16 13H8" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M16 17H8" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M10 9H8" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Sử dụng dữ liệu đã lưu cache
         </div>
+        <button id="clearCacheBtn" class="cache-clear-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M7 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2h4a1 1 0 1 1 0 2h-1.069l-.867 12.142A2 2 0 0 1 17.069 22H6.93a2 2 0 0 1-1.995-1.858L4.07 8H3a1 1 0 0 1 0-2h4V4zm2 2h6V4H9v2zM6.074 8l.857 12H17.07l.857-12H6.074zM10 10a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1z"
+                    fill="#FFFFFF" />
+            </svg>
+            Xóa
+        </button>
     </div>
 
     <div class="selection-section">
