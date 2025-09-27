@@ -923,7 +923,6 @@ function showQuestionsStatus(count) {
                     box-shadow: 0 2px 10px rgba(66, 165, 245, 0.3);
                 ">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 16px;">📋</span>
                         <span style="font-weight: 600; font-size: 14px;">${count} câu hỏi sẵn sàng</span>
                     </div>
                     <button id="compareNowBtn" style="
@@ -1168,8 +1167,17 @@ function showCacheIndicator() {
         indicator = document.createElement('div');
         indicator.id = 'cacheIndicator';
         indicator.innerHTML = `
-            <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: center;">
-                <span>📄 Sử dụng dữ liệu đã lưu cache</span>
+            <div style="background: #e3f2fd; border: 1px solid #1976d2; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span style="display: flex; align-items: center;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
+            <path d="M4 4C4 3.44772 4.44772 3 5 3H14H14.5858C14.851 3 15.1054 3.10536 15.2929 3.29289L19.7071 7.70711C19.8946 7.89464 20 8.149 20 8.41421V20C20 20.5523 19.5523 21 19 21H5C4.44772 21 4 20.5523 4 20V4Z" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 8H15V3" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 16L15 16" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
+            <path d="M9 12L15 12" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
+            <path d="M9 8L11 8" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Sử dụng dữ liệu đã lưu cache
+            </span>
             </div>
         `;
         
