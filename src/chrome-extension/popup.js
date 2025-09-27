@@ -31,7 +31,7 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn;
+let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection;
 
 // Data storage
 let categories = [];
@@ -89,11 +89,12 @@ function initializeElements() {
             loading = document.getElementById('loading');
             error = document.getElementById('error');
             clearCacheBtn = document.getElementById('clearCacheBtn');
+            cacheSection = document.getElementById('cacheSection');
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
                 categorySelect, documentSearchInput, documentList, selectAllBtn,
-                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn
+                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection
             };
             
             const missingElements = Object.keys(elements).filter(key => !elements[key]);
@@ -152,6 +153,8 @@ async function restoreFromCache() {
     try {
         console.log('Restoring data from cache...');
         
+        let hasUsefulCache = false;
+        
         // Restore categories
         const cachedCategories = await getFromCache(CACHE_KEYS.CATEGORIES);
         if (cachedCategories && cachedCategories.length > 0) {
@@ -166,19 +169,30 @@ async function restoreFromCache() {
             console.log('Restored documents from cache:', documents.length);
         }
 
-        // Restore questions
+        // Restore questions and check if we have useful cache (questions + selected documents)
         const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
-        if (cachedQuestions && cachedQuestions.length > 0) {
+        const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
+        
+        if (cachedQuestions && cachedQuestions.length > 0 && selectedDocumentIds && selectedDocumentIds.length > 0) {
             questions = cachedQuestions;
+            hasUsefulCache = true;
             console.log('Restored questions from cache:', questions.length);
             
             // Send to content script immediately
             sendQuestionsToContentScript(questions);
         }
 
-        return true;
+        // Only show cache section if we have useful cache (questions + selected documents)
+        if (hasUsefulCache) {
+            showCacheSection();
+        } else {
+            hideCacheSection();
+        }
+
+        return hasUsefulCache;
     } catch (error) {
         console.error('Error restoring from cache:', error);
+        hideCacheSection();
         return false;
     }
 }
@@ -303,7 +317,7 @@ async function clearCache() {
         // Reset UI
         resetUI();
         
-        hideCacheIndicator();
+        hideCacheSection();
         
         // Clear content script cache and questions popup
         await clearContentScriptCache();
@@ -990,8 +1004,10 @@ function showQuestionsStatus(count) {
         // Save questions to cache
         saveToCache(CACHE_KEYS.QUESTIONS, questions);
         
-        // Show cache indicator
-        showCacheIndicator();
+        // Only show cache section if we have questions (useful cache)
+        if (count > 0) {
+            showCacheSection();
+        }
         
     } catch (err) {
         console.error('Error showing questions status:', err);
@@ -1015,7 +1031,7 @@ async function onCategoryChange() {
     
     // Clear document selections from cache when category changes
     await saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, []);
-    hideCacheIndicator();
+    hideCacheSection(); // Hide cache when changing category
     updateControlsState();
     
     if (selectedCategoryId) {
@@ -1031,12 +1047,13 @@ async function onDocumentsChange() {
     if (selectedDocuments.length > 0) {
         // Hide previous questions
         questionsSection.style.display = 'none';
-        hideCacheIndicator();
+        hideCacheSection();
         
         // Load questions for selected documents
         await onLoadQuestions();
     } else {
         questionsSection.style.display = 'none';
+        hideCacheSection(); // Hide cache when no documents selected
     }
 }
 
@@ -1161,48 +1178,28 @@ function hideError() {
 }
 
 // Cache UI Functions
-function showCacheIndicator() {
-    let indicator = document.getElementById('cacheIndicator');
-    if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.id = 'cacheIndicator';
-        indicator.innerHTML = `
-            <div style="background: #e3f2fd; border: 1px solid #1976d2; border-radius: 4px; padding: 8px; margin: 10px 0; font-size: 12px; color: #1976d2; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            <span style="display: flex; align-items: center;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 4px;">
-            <path d="M4 4C4 3.44772 4.44772 3 5 3H14H14.5858C14.851 3 15.1054 3.10536 15.2929 3.29289L19.7071 7.70711C19.8946 7.89464 20 8.149 20 8.41421V20C20 20.5523 19.5523 21 19 21H5C4.44772 21 4 20.5523 4 20V4Z" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
-            <path d="M20 8H15V3" stroke="#1976d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M9 16L15 16" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
-            <path d="M9 12L15 12" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
-            <path d="M9 8L11 8" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Sử dụng dữ liệu đã lưu cache
-            </span>
-            </div>
-        `;
-        
-        // Insert after header
-        const header = document.querySelector('.header');
-        if (header && header.nextSibling) {
-            header.parentNode.insertBefore(indicator, header.nextSibling);
-        } else {
-            // Fallback: insert before selection section
-            const selectionSection = document.querySelector('.selection-section');
-            if (selectionSection) {
-                selectionSection.parentNode.insertBefore(indicator, selectionSection);
-            }
-        }
-        
-        // Removed old clear cache button - using new one in header instead
+function showCacheSection() {
+    if (cacheSection) {
+        cacheSection.style.display = 'flex';
+        console.log('Cache section shown');
     }
-    indicator.style.display = 'block';
+}
+
+function hideCacheSection() {
+    if (cacheSection) {
+        cacheSection.style.display = 'none';
+        console.log('Cache section hidden');
+    }
+}
+
+function showCacheIndicator() {
+    // Use the static cache section instead of creating dynamic indicator
+    showCacheSection();
 }
 
 function hideCacheIndicator() {
-    const indicator = document.getElementById('cacheIndicator');
-    if (indicator) {
-        indicator.style.display = 'none';
-    }
+    // Use the static cache section instead of hiding dynamic indicator
+    hideCacheSection();
 }
 
 // Question comparison functionality
