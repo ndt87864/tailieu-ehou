@@ -1169,13 +1169,19 @@ function highlightAnswerOnPage(answerText, questionElement) {
             
             // Boost score for exact matches or elements with answer-like classes
             let boostedScore = similarity;
-            if (elementText === patternLower || elementText.includes(patternLower)) {
-                boostedScore = Math.min(1.0, similarity + 0.2); // Increased boost for exact matches
+            
+            // MAJOR boost for exact substring matches
+            if (elementText === patternLower) {
+                boostedScore = 1.0; // Perfect match
+            } else if (elementText.includes(patternLower)) {
+                boostedScore = Math.min(1.0, similarity + 0.15);
+            } else if (patternLower.includes(elementText) && elementText.length > 3) {
+                boostedScore = Math.min(1.0, similarity + 0.1); // Element is part of pattern
             }
             
             if (candidateElement.className && 
                 candidateElement.className.match(/(answer|correct|option|choice|dap-an)/i)) {
-                boostedScore = Math.min(1.0, boostedScore + 0.1); // Increased boost for answer elements
+                boostedScore = Math.min(1.0, boostedScore + 0.08);
             }
             
             // Boost score for longer matching patterns (prefer complete answers)
@@ -1183,30 +1189,54 @@ function highlightAnswerOnPage(answerText, questionElement) {
                 boostedScore = Math.min(1.0, boostedScore + 0.05);
             }
             
-            if (boostedScore > 0.7) { // Raised threshold for better quality
+            // Lower threshold to catch simple answers like "Gmail"
+            if (boostedScore > 0.6) {
                 allMatches.push({ 
                     element: candidateElement, 
                     pattern: pattern, 
                     score: boostedScore,
                     elementText: elementText,
-                    patternLength: pattern.length
+                    patternLength: pattern.length,
+                    originalSimilarity: similarity
                 });
             }
         }
     }
     
-    // Sort matches by score (descending) and pattern length (descending for completeness)
+    // Sort matches with better logic: prioritize exact matches, then completeness, then score
     allMatches.sort((a, b) => {
-        if (Math.abs(a.score - b.score) < 0.05) { // If scores are close, prefer longer patterns
+        const aIsExact = a.elementText === a.pattern.toLowerCase();
+        const bIsExact = b.elementText === b.pattern.toLowerCase();
+        
+        // Exact matches get highest priority
+        if (aIsExact && !bIsExact) return -1;
+        if (!aIsExact && bIsExact) return 1;
+        
+        // If both are exact or both are not exact, compare scores
+        if (Math.abs(a.score - b.score) > 0.05) {
+            return b.score - a.score;
+        }
+        
+        // If scores are similar, prefer longer patterns (more complete answers)
+        if (Math.abs(a.patternLength - b.patternLength) > 3) {
             return b.patternLength - a.patternLength;
         }
-        return b.score - a.score;
+        
+        // Finally, prefer higher original similarity
+        return b.originalSimilarity - a.originalSimilarity;
     });
     
     // Only highlight the BEST match (avoid multiple highlights)
     if (allMatches.length > 0) {
         bestMatch = allMatches[0];
         bestScore = bestMatch.score;
+        
+        debugLog('Best match found:', {
+            pattern: bestMatch.pattern,
+            elementText: bestMatch.elementText,
+            score: bestScore,
+            element: bestMatch.element
+        });
         
         // Additional filtering to avoid wrong highlights
         const elementText = bestMatch.elementText.toLowerCase();
@@ -1219,7 +1249,7 @@ function highlightAnswerOnPage(answerText, questionElement) {
         const isGenericAllAnswer = /(tất cả|all|toàn bộ).*(phương án|đáp án|options?).*(đúng|correct)/i.test(elementText);
         const hasSpecificContent = answerLower.length > 20 && !/(tất cả|all|toàn bộ)/i.test(answerLower);
         
-        // Skip if the pattern is much shorter than the answer (likely incomplete match)
+        // Skip if the pattern is much shorter than the answer (likely incomplete match) - but be more lenient for short answers
         const patternTooShort = bestMatch.pattern.length < answerLower.length * 0.3 && answerLower.length > 20;
         
         if (!hasNegativeIndicators && !(isGenericAllAnswer && hasSpecificContent) && !patternTooShort) {
@@ -1262,17 +1292,34 @@ function highlightAnswerOnPage(answerText, questionElement) {
     
     if (!found) {
         debugLog('Answer not found on page for:', cleanAnswer);
+        debugLog('Total candidates checked:', elementsArray.length);
+        debugLog('Total matches found:', allMatches.length);
         
-        // Try more aggressive search if no answer found
-        const aggressivePatterns = [
-            cleanAnswer.split(' ').slice(0, 3).join(' '), // First 3 words
-            cleanAnswer.split(' ').slice(-3).join(' '), // Last 3 words
-            cleanAnswer.replace(/[^\w\sÀ-ỹ]/g, '').trim() // Remove special chars
-        ].filter(p => p.length > 3);
+        // Try more aggressive/simpler search if no answer found
+        const simplePatterns = [
+            cleanAnswer, // Try exact again
+            cleanAnswer.toLowerCase(), // Try lowercase
+            cleanAnswer.split(' ')[0], // First word only
+            cleanAnswer.split(',')[0].trim(), // First part before comma
+        ].filter(p => p && p.length > 2);
         
-        for (const pattern of aggressivePatterns) {
-            const found = tryHighlightPartialAnswer(pattern, elementsArray);
-            if (found) break;
+        for (const simplePattern of simplePatterns) {
+            debugLog('Trying simple pattern:', simplePattern);
+            
+            // Simple text search across all elements
+            const simpleMatches = elementsArray.filter(el => {
+                const text = el.textContent.toLowerCase().trim();
+                return text === simplePattern.toLowerCase() || 
+                       (text.includes(simplePattern.toLowerCase()) && text.length < simplePattern.length * 2);
+            });
+            
+            if (simpleMatches.length > 0) {
+                const bestSimpleMatch = simpleMatches[0]; // Take first match
+                highlightAnswerTextInElement(bestSimpleMatch, simplePattern);
+                debugLog('Simple pattern match found:', simplePattern, 'in element:', bestSimpleMatch);
+                found = true;
+                break;
+            }
         }
     }
     
@@ -1366,10 +1413,10 @@ function tryHighlightPartialAnswer(pattern, elementsArray) {
 function generateAnswerPatterns(cleanAnswer) {
     const patterns = new Set();
     
-    // Add the original answer as highest priority
+    // PRIORITY 1: Add the exact original answer first (highest priority)
     patterns.add(cleanAnswer);
     
-    // Add without common Vietnamese prefixes/suffixes
+    // PRIORITY 2: Add without common Vietnamese prefixes/suffixes
     const prefixes = ['đáp án:', 'trả lời:', 'kết quả:', 'phương án:', 'là:', 'bao gồm:', 'chính là:'];
     const suffixes = ['là đáp án đúng', 'là câu trả lời', 'là kết quả', 'chính xác'];
     
@@ -1387,11 +1434,11 @@ function generateAnswerPatterns(cleanAnswer) {
         workingAnswer = workingAnswer.replace(regex, '').trim();
     });
     
-    if (workingAnswer !== cleanAnswer && workingAnswer.length > 5) {
+    if (workingAnswer !== cleanAnswer && workingAnswer.length > 3) {
         patterns.add(workingAnswer);
     }
     
-    // Add variations with different answer markers removed
+    // PRIORITY 3: Add variations with different answer markers removed
     const markerVariations = [
         workingAnswer.replace(/^[A-Da-d][\.\)\s]+/i, '').trim(), // Remove A. B. C. D.
         workingAnswer.replace(/^\d+[\.\)\s]+/, '').trim(), // Remove 1. 2. 3.
@@ -1399,57 +1446,76 @@ function generateAnswerPatterns(cleanAnswer) {
     ];
     
     markerVariations.forEach(variation => {
-        if (variation.length > 5 && variation !== workingAnswer) {
+        if (variation.length > 3 && variation !== workingAnswer) {
             patterns.add(variation);
         }
     });
     
-    // For longer answers, create meaningful fragments that preserve context
+    // PRIORITY 4: Add with common answer prefixes (for finding in text)
+    const commonPrefixes = ['A. ', 'B. ', 'C. ', 'D. ', 'a. ', 'b. ', 'c. ', 'd. ', '- ', '• '];
+    commonPrefixes.forEach(prefix => {
+        patterns.add(prefix + workingAnswer);
+        patterns.add(prefix + cleanAnswer);
+    });
+    
+    // PRIORITY 5: For longer answers, add the complete answer first, then fragments
     const words = workingAnswer.split(' ').filter(word => word.length > 0);
-    if (words.length > 3) {
-        // Create overlapping fragments for better matching
-        for (let start = 0; start < words.length - 2; start++) {
-            for (let length = Math.min(words.length - start, 8); length >= 3; length--) {
-                const fragment = words.slice(start, start + length).join(' ');
-                if (fragment.length > 10) {
-                    patterns.add(fragment);
+    if (words.length > 2) {
+        // Add complete answer variations with different spacing
+        patterns.add(words.join(' ')); // Normal spacing
+        patterns.add(words.join(', ')); // With commas (common in lists)
+        
+        // Only add fragments if we have many words (to avoid losing context for shorter answers)
+        if (words.length > 5) {
+            // Create meaningful fragments, but prefer longer ones
+            for (let length = Math.min(words.length, 8); length >= 3; length--) {
+                for (let start = 0; start <= words.length - length; start++) {
+                    const fragment = words.slice(start, start + length).join(' ');
+                    if (fragment.length > 8) {
+                        patterns.add(fragment);
+                    }
                 }
             }
         }
         
-        // Add combinations of important words (skip common words)
-        const importantWords = words.filter(word => 
-            word.length > 2 && 
-            !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến', 
-              'trong', 'trên', 'dưới', 'về', 'theo', 'như', 'khi', 'nếu', 'nhưng',
-              'để', 'đã', 'sẽ', 'đang', 'các', 'những', 'một', 'hai', 'ba', 'bốn', 'năm'].includes(word.toLowerCase())
-        );
-        
-        if (importantWords.length > 1 && importantWords.length < words.length) {
-            patterns.add(importantWords.join(' '));
+        // Add combinations of important words (skip common words) - but only for very long answers
+        if (words.length > 6) {
+            const importantWords = words.filter(word => 
+                word.length > 2 && 
+                !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến', 
+                  'trong', 'trên', 'dưới', 'về', 'theo', 'như', 'khi', 'nếu', 'nhưng',
+                  'để', 'đã', 'sẽ', 'đang', 'các', 'những', 'một', 'hai', 'ba', 'bốn', 'năm'].includes(word.toLowerCase())
+            );
             
-            // Also try with original spacing/context around important words
-            const importantWordsPattern = workingAnswer;
-            let contextualPattern = importantWordsPattern;
-            for (const word of importantWords) {
-                const wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi');
-                if (wordRegex.test(contextualPattern)) {
-                    patterns.add(word); // Add individual important words too
-                }
+            if (importantWords.length > 2 && importantWords.length < words.length) {
+                patterns.add(importantWords.join(' '));
+                patterns.add(importantWords.join(', '));
             }
         }
     }
     
-    // Add normalized version (remove special chars, normalize spaces)
-    const normalized = workingAnswer.replace(/[^\w\sÀ-ỹ]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (normalized !== workingAnswer && normalized.length > 5) {
+    // PRIORITY 6: Add normalized version (remove special chars, normalize spaces)
+    const normalized = workingAnswer.replace(/[^\w\sÀ-ỹ,]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (normalized !== workingAnswer && normalized.length > 3) {
         patterns.add(normalized);
     }
     
-    // Filter out very short patterns and return as array, sorted by length (longest first)
-    return Array.from(patterns)
-        .filter(p => p.trim().length > 4)
-        .sort((a, b) => b.length - a.length); // Prefer longer, more complete matches
+    // Filter out very short patterns and return as array, sorted by length (longest first for better context matching)
+    const finalPatterns = Array.from(patterns)
+        .filter(p => p.trim().length > 2)
+        .sort((a, b) => {
+            // First sort by completeness (prefer patterns that contain more of the original)
+            const aCompleteness = a.length / cleanAnswer.length;
+            const bCompleteness = b.length / cleanAnswer.length;
+            if (Math.abs(aCompleteness - bCompleteness) > 0.1) {
+                return bCompleteness - aCompleteness;
+            }
+            // Then by length
+            return b.length - a.length;
+        });
+    
+    debugLog('Generated patterns for "' + cleanAnswer + '":', finalPatterns.slice(0, 5)); // Log top 5 patterns
+    return finalPatterns;
 }
 
 // Clean answer text for better matching
@@ -1464,35 +1530,93 @@ function cleanAnswerText(text) {
 
 // Calculate similarity between element text and answer pattern
 function calculateAnswerSimilarity(elementText, pattern) {
-    // Direct substring match gets high score
-    if (elementText.includes(pattern)) {
-        const ratio = pattern.length / elementText.length;
-        return Math.min(0.95, 0.8 + ratio * 0.15); // Bonus for exact match
+    const elementLower = elementText.toLowerCase().trim();
+    const patternLower = pattern.toLowerCase().trim();
+    
+    // HIGHEST PRIORITY: Exact match
+    if (elementLower === patternLower) {
+        return 1.0;
     }
     
-    // Check for word-based similarity
-    const elementWords = elementText.toLowerCase().split(/\s+/);
-    const patternWords = pattern.toLowerCase().split(/\s+/);
+    // HIGH PRIORITY: Direct substring match
+    if (elementLower.includes(patternLower)) {
+        const ratio = patternLower.length / elementLower.length;
+        // Give very high score for substantial substring matches
+        if (ratio > 0.7) return 0.98; // Almost the whole element is the pattern
+        if (ratio > 0.5) return 0.95; // Pattern is majority of element
+        if (ratio > 0.3) return 0.90; // Pattern is significant part of element
+        return Math.min(0.85, 0.75 + ratio * 0.2); // Smaller part but still exact match
+    }
     
-    let matchedWords = 0;
+    // MEDIUM PRIORITY: Pattern contains element (element is part of answer)
+    if (patternLower.includes(elementLower)) {
+        const ratio = elementLower.length / patternLower.length;
+        if (ratio > 0.5) return 0.88; // Element is significant part of pattern
+        return Math.min(0.80, 0.65 + ratio * 0.3);
+    }
+    
+    // WORD-BASED MATCHING: Check individual words
+    const elementWords = elementLower.split(/[\s,\.\-\(\)]+/).filter(w => w.length > 0);
+    const patternWords = patternLower.split(/[\s,\.\-\(\)]+/).filter(w => w.length > 0);
+    
+    if (patternWords.length === 0 || elementWords.length === 0) return 0;
+    
+    let exactWordMatches = 0;
+    let partialWordMatches = 0;
+    
     patternWords.forEach(patternWord => {
-        if (elementWords.some(elementWord => 
-            elementWord.includes(patternWord) || 
-            patternWord.includes(elementWord) ||
-            levenshteinDistance(elementWord, patternWord) <= Math.max(1, Math.floor(patternWord.length * 0.2))
-        )) {
-            matchedWords++;
+        if (patternWord.length <= 2) return; // Skip very short words
+        
+        let bestMatch = 0;
+        elementWords.forEach(elementWord => {
+            if (elementWord === patternWord) {
+                exactWordMatches++;
+                bestMatch = 1;
+            } else if (bestMatch < 1) {
+                // Check for partial word matches
+                if (elementWord.includes(patternWord) || patternWord.includes(elementWord)) {
+                    const longer = Math.max(elementWord.length, patternWord.length);
+                    const shorter = Math.min(elementWord.length, patternWord.length);
+                    const partialScore = shorter / longer;
+                    if (partialScore > 0.6) { // At least 60% overlap
+                        bestMatch = Math.max(bestMatch, partialScore * 0.8);
+                    }
+                }
+                // Check edit distance for typos
+                else if (patternWord.length > 3) {
+                    const distance = levenshteinDistance(elementWord, patternWord);
+                    const maxLen = Math.max(elementWord.length, patternWord.length);
+                    if (distance <= Math.max(1, Math.floor(maxLen * 0.25))) { // Allow 25% character differences
+                        bestMatch = Math.max(bestMatch, 1 - (distance / maxLen));
+                    }
+                }
+            }
+        });
+        
+        if (bestMatch >= 0.6) {
+            partialWordMatches += bestMatch;
         }
     });
     
-    const wordSimilarity = matchedWords / patternWords.length;
+    // Calculate word-based similarity
+    const wordSimilarity = (exactWordMatches + partialWordMatches) / patternWords.length;
     
-    // Use Levenshtein distance for overall similarity
-    const maxLen = Math.max(elementText.length, pattern.length);
-    const levenSimilarity = maxLen > 0 ? 1 - (levenshteinDistance(elementText, pattern) / maxLen) : 0;
+    // For single word patterns, be more lenient
+    if (patternWords.length === 1 && patternWords[0].length > 2) {
+        if (wordSimilarity > 0.7) return Math.min(0.85, wordSimilarity);
+    }
     
-    // Combine both similarities
-    return Math.max(wordSimilarity * 0.7 + levenSimilarity * 0.3, levenSimilarity);
+    // For multi-word patterns, require higher match rate
+    if (wordSimilarity > 0.8) return Math.min(0.82, wordSimilarity * 0.9);
+    if (wordSimilarity > 0.6) return Math.min(0.75, wordSimilarity * 0.85);
+    if (wordSimilarity > 0.4) return Math.min(0.65, wordSimilarity * 0.8);
+    
+    // Use Levenshtein distance as fallback for overall similarity
+    const maxLen = Math.max(elementLower.length, patternLower.length);
+    const levenSimilarity = maxLen > 0 ? 1 - (levenshteinDistance(elementLower, patternLower) / maxLen) : 0;
+    
+    // Return the better of word similarity or Levenshtein similarity, but cap it
+    return Math.min(0.6, Math.max(wordSimilarity, levenSimilarity));
 }
 
 // Clean answer text for better matching
