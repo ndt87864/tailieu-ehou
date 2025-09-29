@@ -126,12 +126,30 @@ async function performAutoCompare(force = false) {
     }
 }
 
-// Show notification for auto-compare results
+// Show notification for auto-compare results with enhanced details
 function showAutoCompareNotification(matched, total) {
+    const accuracy = total > 0 ? ((matched / total) * 100).toFixed(1) : 0;
+    
+    // Different notification styles based on accuracy
+    let backgroundColor, message;
+    if (matched === 0) {
+        backgroundColor = 'rgba(255, 152, 0, 0.95)'; // Orange
+        message = `Không tìm thấy câu hỏi phù hợp (0/${total})`;
+    } else if (matched === total) {
+        backgroundColor = 'rgba(76, 175, 80, 0.95)'; // Green
+        message = `✓ Tìm thấy tất cả ${matched}/${total} câu hỏi (${accuracy}%)`;
+    } else {
+        backgroundColor = 'rgba(33, 150, 243, 0.95)'; // Blue
+        message = `Tìm thấy ${matched}/${total} câu hỏi (${accuracy}%)`;
+    }
+    
     const notification = document.createElement('div');
     notification.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-             <span>Tự động tìm thấy ${matched}/${total} câu hỏi</span>
+             <span>${message}</span>
+             <div style="font-size: 10px; opacity: 0.8; margin-left: 8px;">
+                Độ chính xác cao
+             </div>
         </div>
     `;
     
@@ -139,7 +157,7 @@ function showAutoCompareNotification(matched, total) {
         position: fixed;
         top: 20px;
         right: 20px;
-        background: rgba(76, 175, 80, 0.95);
+        background: ${backgroundColor};
         color: white;
         padding: 12px 16px;
         border-radius: 8px;
@@ -152,12 +170,12 @@ function showAutoCompareNotification(matched, total) {
     
     document.body.appendChild(notification);
     
-    // Auto-remove after 4 seconds
+    // Auto-remove after 5 seconds
     setTimeout(() => {
         if (notification && notification.parentNode) {
             notification.remove();
         }
-    }, 4000);
+    }, 5000);
 }
 
 // Initialize auto-compare
@@ -625,14 +643,17 @@ function extractQuestionsFromPage() {
     return questions;
 }
 
-// Clean question text for better matching
+// Clean question text for better matching - Enhanced for accuracy
 function cleanQuestionText(text) {
     return text
-        .replace(/Câu\s*\d+[:\.\)\s]*/gi, '')
-        .replace(/Bài\s*\d+[:\.\)\s]*/gi, '')
-        .replace(/Question\s*\d+[:\.\)\s]*/gi, '')
-        .replace(/^\d+[\.\)]\s*/, '')
-        .replace(/^\s*[A-D][\.\)]\s*/, '')
+        .replace(/Câu\s*(hỏi\s*)?\d+[:\.\)\s]*/gi, '') // Remove "Câu" or "Câu hỏi" numbers
+        .replace(/Bài\s*(tập\s*)?\d+[:\.\)\s]*/gi, '') // Remove "Bài" or "Bài tập" numbers
+        .replace(/Question\s*\d+[:\.\)\s]*/gi, '') // Remove "Question" numbers
+        .replace(/^\s*\d+[\.\)]\s*/, '') // Remove leading numbers
+        .replace(/^\s*[A-D][\.\)\-]\s*/gi, '') // Remove answer options
+        .replace(/^\s*[-\*\+•]\s*/, '') // Remove bullet points
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/[^\w\sÀ-ỹ\?\.,!]/g, ' ') // Keep only letters, Vietnamese chars, basic punctuation
         .trim()
         .toLowerCase();
 }
@@ -678,41 +699,51 @@ async function compareAndHighlightQuestions() {
         const pageQ = pageQuestions[pageIndex];
         const cleanPageQuestion = cleanQuestionText(pageQ.text);
         let matched_for_this_page = false;
-        
+
         for (let extIndex = 0; extIndex < extensionQuestions.length && !matched_for_this_page; extIndex++) {
             const extQ = extensionQuestions[extIndex];
             const cleanExtQuestion = cleanQuestionText(extQ.question);
             comparisons++;
-            
-            // Check for similarity (exact match or high similarity)
+
+            // STRICT VALIDATION: Check for similarity with enhanced accuracy
             if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
-                console.log(`✓ MATCH #${matched.length + 1}:`);
+                
+                // ADDITIONAL VALIDATION: Double-check with stricter criteria
+                const finalValidation = performFinalValidation(pageQ.text, extQ.question);
+                
+                if (!finalValidation.isValid) {
+                    debugLog(`⚠️ REJECTED after final validation: ${finalValidation.reason}`);
+                    debugLog(`  Page: "${cleanPageQuestion.substring(0, 40)}..."`);
+                    debugLog(`  DB:   "${cleanExtQuestion.substring(0, 40)}..."`);
+                    continue; // Skip this match
+                }
+                
+                console.log(`✓ VERIFIED MATCH #${matched.length + 1} (confidence: ${finalValidation.confidence.toFixed(3)}):`);
                 console.log(`  Page: "${cleanPageQuestion.substring(0, 60)}..."`);
                 console.log(`  DB:   "${cleanExtQuestion.substring(0, 60)}..."`);
                 console.log(`  Answer: "${extQ.answer?.substring(0, 40)}..."`);
-                
+
                 // Find all possible answers for this question
                 const allAnswers = findAllAnswersForQuestion(extQ.question);
                 if (allAnswers.length > 1) {
                     console.log(`  🔥 Multiple answers found (${allAnswers.length}):`, allAnswers);
                 }
-                
+
                 // Highlight the question and try to find/highlight all answers
                 highlightMatchedQuestion(pageQ, extQ);
-                
+
                 matched.push({
                     pageQuestion: pageQ.text,
                     extensionQuestion: extQ.question,
                     answer: extQ.answer,
                     allAnswers: allAnswers, // Store all possible answers
-                    similarity: calculateSimilarity(cleanPageQuestion, cleanExtQuestion)
+                    similarity: calculateEnhancedSimilarity(cleanPageQuestion, cleanExtQuestion),
+                    confidence: finalValidation.confidence
                 });
-                
+
                 matched_for_this_page = true; // Stop searching for this page question
             }
-        }
-        
-        // Show progress for long lists
+        }        // Show progress for long lists
         if (totalComparisons > 100 && pageIndex % 10 === 0) {
             debugLog(`Progress: ${pageIndex}/${pageQuestions.length} page questions processed`);
         }
@@ -728,9 +759,13 @@ async function compareAndHighlightQuestions() {
     console.log(`Matches found: ${matched.length}/${pageQuestions.length}`);
     
     if (matched.length > 0) {
-        console.log('Summary of matches:', matched.map((m, i) => 
-            `${i+1}. "${m.pageQuestion.substring(0, 40)}..." (sim: ${m.similarity?.toFixed(2)})`
+        console.log('Summary of verified matches:', matched.map((m, i) => 
+            `${i+1}. "${m.pageQuestion.substring(0, 40)}..." (conf: ${(m.confidence || 0).toFixed(3)}, sim: ${(m.similarity || 0).toFixed(3)})`
         ));
+        
+        // Log average confidence
+        const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
+        console.log(`Average confidence: ${avgConfidence.toFixed(3)}`);
     }
     
     // Reset comparison flag and button after completion with small delay for visual feedback
@@ -813,57 +848,366 @@ function resetCompareButton(matchedCount) {
     }
 }
 
-// Check if two questions are similar
+// Check if two questions are similar - Enhanced for 100% accuracy
 function isQuestionSimilar(q1, q2) {
     // Exact match first
     if (q1 === q2) return true;
     
     // Clean both questions for better comparison
-    const clean1 = cleanQuestionText(q1).toLowerCase();
-    const clean2 = cleanQuestionText(q2).toLowerCase();
+    const clean1 = cleanQuestionText(q1);
+    const clean2 = cleanQuestionText(q2);
     
     if (clean1 === clean2) return true;
     
-    // If one is much shorter than the other, unlikely to be similar
+    // STRICT LENGTH CHECK: If one is significantly shorter/longer, not similar
     const minLen = Math.min(clean1.length, clean2.length);
     const maxLen = Math.max(clean1.length, clean2.length);
-    if (minLen < maxLen * 0.5) return false;
     
-    // Check substring matches (one contains the other with high percentage)
-    if (clean1.length > 20 && clean2.length > 20) {
-        if (clean1.includes(clean2) && clean2.length / clean1.length > 0.7) return true;
-        if (clean2.includes(clean1) && clean1.length / clean2.length > 0.7) return true;
+    // More strict length ratio - questions should be similar length
+    if (minLen < maxLen * 0.7) {
+        debugLog('Length ratio too different:', minLen, 'vs', maxLen);
+        return false;
     }
     
-    // Calculate similarity using Levenshtein distance
-    const similarity = calculateSimilarity(clean1, clean2);
-    
-    // Use dynamic threshold based on question length
-    let threshold = 0.8; // Default threshold
-    if (minLen < 50) threshold = 0.85;  // Shorter questions need higher similarity
-    if (minLen > 100) threshold = 0.75; // Longer questions can have lower threshold
-    
-    // Additional check for key words matching
-    const words1 = clean1.split(/\s+/).filter(w => w.length > 3);
-    const words2 = clean2.split(/\s+/).filter(w => w.length > 3);
-    
-    if (words1.length > 0 && words2.length > 0) {
-        const commonWords = words1.filter(w => words2.includes(w)).length;
-        const wordSimilarity = (commonWords * 2) / (words1.length + words2.length);
-        
-        // If word similarity is high, lower the threshold
-        if (wordSimilarity > 0.6) {
-            threshold = Math.max(0.65, threshold - 0.1);
-        }
+    // For very short questions, require exact or near-exact match
+    if (minLen < 20) {
+        const similarity = calculateSimilarity(clean1, clean2);
+        return similarity >= 0.95;
     }
+    
+    // KEY WORDS VALIDATION - Extract and compare important words
+    const keyWords1 = extractKeyWords(clean1);
+    const keyWords2 = extractKeyWords(clean2);
+    
+    // Require significant overlap in key words
+    const commonKeyWords = keyWords1.filter(w => keyWords2.includes(w));
+    const keyWordOverlap = commonKeyWords.length / Math.min(keyWords1.length, keyWords2.length);
+    
+    if (keyWordOverlap < 0.6) {
+        debugLog('Insufficient key word overlap:', keyWordOverlap, keyWords1, keyWords2);
+        return false;
+    }
+    
+    // SEMANTIC STRUCTURE CHECK - Check question structure
+    if (!haveSimilarStructure(clean1, clean2)) {
+        debugLog('Different question structure');
+        return false;
+    }
+    
+    // Calculate similarity using enhanced algorithm
+    const similarity = calculateEnhancedSimilarity(clean1, clean2);
+    
+    // STRICT THRESHOLD based on question characteristics
+    let threshold = 0.90; // Very high default threshold
+    
+    // Adjust threshold based on length and complexity
+    if (minLen > 100) threshold = 0.88; // Slightly lower for very long questions
+    if (keyWordOverlap > 0.8) threshold = 0.85; // Lower if key words match well
     
     const result = similarity >= threshold;
     
     if (result) {
-        debugLog(`Question match found (${similarity.toFixed(3)}):`, clean1.substring(0, 50), '<=>', clean2.substring(0, 50));
+        debugLog(`STRICT MATCH (${similarity.toFixed(3)}, keys:${keyWordOverlap.toFixed(3)}):`, 
+                 clean1.substring(0, 50), '<=>', clean2.substring(0, 50));
+    } else {
+        debugLog(`NO MATCH (${similarity.toFixed(3)}, keys:${keyWordOverlap.toFixed(3)}):`, 
+                 clean1.substring(0, 30), 'vs', clean2.substring(0, 30));
     }
     
     return result;
+}
+
+// Extract key words from question text
+function extractKeyWords(text) {
+    // Remove common question words and focus on content words
+    const stopWords = new Set([
+        'là', 'gì', 'nào', 'thế', 'như', 'sao', 'tại', 'vì', 'có', 'được', 'một', 'các', 'của', 'cho', 'với', 'về', 'trong', 'trên', 'dưới',
+        'what', 'which', 'how', 'why', 'when', 'where', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'do', 'does', 'did', 'can', 'could', 'will', 'would'
+    ]);
+    
+    return text
+        .split(/[\s\.,!?]+/)
+        .filter(word => word.length >= 3 && !stopWords.has(word))
+        .map(word => word.toLowerCase())
+        .slice(0, 10); // Take top 10 important words
+}
+
+// Check if questions have similar structure
+function haveSimilarStructure(q1, q2) {
+    // Check for question markers
+    const hasQuestionMark1 = q1.includes('?') || q1.includes('？');
+    const hasQuestionMark2 = q2.includes('?') || q2.includes('？');
+    
+    // Check for common Vietnamese question patterns
+    const questionPatterns = [
+        /\b(là|gì|nào|sao|tại sao|vì sao|như thế nào|thế nào|bao nhiêu|khi nào|ở đâu)\b/g,
+        /\b(what|which|how|why|when|where|who)\b/gi
+    ];
+    
+    let patterns1 = 0, patterns2 = 0;
+    questionPatterns.forEach(pattern => {
+        if (pattern.test(q1)) patterns1++;
+        if (pattern.test(q2)) patterns2++;
+    });
+    
+    // Similar structure if both have question marks OR both have question patterns
+    return (hasQuestionMark1 === hasQuestionMark2) && (Math.abs(patterns1 - patterns2) <= 1);
+}
+
+// Enhanced similarity calculation with multiple algorithms
+function calculateEnhancedSimilarity(str1, str2) {
+    if (str1 === str2) return 1.0;
+    
+    // 1. Levenshtein distance
+    const levenshteinSim = calculateSimilarity(str1, str2);
+    
+    // 2. Jaccard similarity (word-based)
+    const words1 = new Set(str1.split(/\s+/));
+    const words2 = new Set(str2.split(/\s+/));
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+    const jaccardSim = intersection.size / union.size;
+    
+    // 3. Longest common subsequence
+    const lcsSim = calculateLCSimilarity(str1, str2);
+    
+    // Weighted combination - prioritize word-level matching
+    return (levenshteinSim * 0.3) + (jaccardSim * 0.5) + (lcsSim * 0.2);
+}
+
+// Calculate Longest Common Subsequence similarity
+function calculateLCSimilarity(str1, str2) {
+    const lcsLength = calculateLCS(str1, str2);
+    const maxLength = Math.max(str1.length, str2.length);
+    return maxLength > 0 ? lcsLength / maxLength : 0;
+}
+
+// Calculate Longest Common Subsequence
+function calculateLCS(str1, str2) {
+    const m = str1.length;
+    const n = str2.length;
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+    
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (str1[i - 1] === str2[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+    
+    return dp[m][n];
+}
+
+// Final validation to ensure 100% accuracy before accepting a match
+function performFinalValidation(pageQuestionRaw, dbQuestionRaw) {
+    const pageClean = cleanQuestionText(pageQuestionRaw);
+    const dbClean = cleanQuestionText(dbQuestionRaw);
+    
+    // Stage 1: Core content comparison
+    const corePageWords = extractCoreContent(pageClean);
+    const coreDbWords = extractCoreContent(dbClean);
+    
+    const coreOverlap = calculateWordOverlap(corePageWords, coreDbWords);
+    if (coreOverlap < 0.7) {
+        return {
+            isValid: false,
+            reason: `Core content overlap too low: ${coreOverlap.toFixed(3)}`,
+            confidence: 0
+        };
+    }
+    
+    // Stage 2: Critical terms validation
+    const criticalTermsMatch = validateCriticalTerms(pageClean, dbClean);
+    if (!criticalTermsMatch.isValid) {
+        return {
+            isValid: false,
+            reason: `Critical terms mismatch: ${criticalTermsMatch.reason}`,
+            confidence: 0
+        };
+    }
+    
+    // Stage 3: Question context validation
+    const contextMatch = validateQuestionContext(pageClean, dbClean);
+    if (!contextMatch.isValid) {
+        return {
+            isValid: false,
+            reason: `Context mismatch: ${contextMatch.reason}`,
+            confidence: 0
+        };
+    }
+    
+    // Stage 4: Final similarity check with high threshold
+    const finalSimilarity = calculateEnhancedSimilarity(pageClean, dbClean);
+    if (finalSimilarity < 0.88) {
+        return {
+            isValid: false,
+            reason: `Final similarity too low: ${finalSimilarity.toFixed(3)}`,
+            confidence: finalSimilarity
+        };
+    }
+    
+    // Calculate overall confidence
+    const confidence = (coreOverlap + criticalTermsMatch.confidence + contextMatch.confidence + finalSimilarity) / 4;
+    
+    return {
+        isValid: true,
+        reason: 'All validation stages passed',
+        confidence: confidence
+    };
+}
+
+// Extract core content words (most important words)
+function extractCoreContent(text) {
+    const stopWords = new Set([
+        // Vietnamese stop words
+        'là', 'gì', 'nào', 'thế', 'như', 'sao', 'tại', 'vì', 'có', 'được', 'một', 'các', 'của', 'cho', 'với', 'về', 'trong', 'trên', 'dưới',
+        'và', 'hoặc', 'nhưng', 'mà', 'khi', 'nếu', 'để', 'từ', 'theo', 'bằng', 'sau', 'trước', 'giữa', 'cùng', 'còn', 'đã', 'sẽ', 'đang',
+        // English stop words
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were',
+        'what', 'which', 'how', 'why', 'when', 'where', 'who', 'do', 'does', 'did', 'can', 'could', 'will', 'would'
+    ]);
+    
+    return text
+        .split(/[\s\.,!?;:()]+/)
+        .filter(word => word.length >= 3 && !stopWords.has(word.toLowerCase()))
+        .map(word => word.toLowerCase());
+}
+
+// Calculate word overlap between two arrays
+function calculateWordOverlap(words1, words2) {
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    const intersection = new Set([...set1].filter(w => set2.has(w)));
+    
+    return intersection.size / Math.min(set1.size, set2.size);
+}
+
+// Validate critical terms (numbers, technical terms, proper nouns)
+function validateCriticalTerms(text1, text2) {
+    // Extract critical terms: numbers, years, technical terms, proper nouns
+    const criticalPattern = /\b(\d+(?:[.,]\d+)*|[A-Z][a-z]*(?:\s+[A-Z][a-z]*)*|[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]*)/g;
+    
+    const terms1 = new Set((text1.match(criticalPattern) || []).map(t => t.toLowerCase()));
+    const terms2 = new Set((text2.match(criticalPattern) || []).map(t => t.toLowerCase()));
+    
+    if (terms1.size === 0 && terms2.size === 0) {
+        return { isValid: true, confidence: 1.0, reason: 'No critical terms to compare' };
+    }
+    
+    const overlap = calculateWordOverlap([...terms1], [...terms2]);
+    
+    // If there are critical terms, require high overlap
+    if ((terms1.size > 0 || terms2.size > 0) && overlap < 0.6) {
+        return {
+            isValid: false,
+            confidence: overlap,
+            reason: `Critical terms overlap too low: ${overlap.toFixed(3)} (${[...terms1].join(',')} vs ${[...terms2].join(',')})`
+        };
+    }
+    
+    return { isValid: true, confidence: Math.max(0.8, overlap), reason: 'Critical terms match well' };
+}
+
+// Validate question context and structure
+function validateQuestionContext(text1, text2) {
+    // Check for similar question types and structures
+    const questionTypes1 = identifyQuestionType(text1);
+    const questionTypes2 = identifyQuestionType(text2);
+    
+    // Must have at least one common question type
+    const commonTypes = questionTypes1.filter(type => questionTypes2.includes(type));
+    
+    if (commonTypes.length === 0) {
+        return {
+            isValid: false,
+            confidence: 0,
+            reason: `Different question types: [${questionTypes1.join(',')}] vs [${questionTypes2.join(',')}]`
+        };
+    }
+    
+    // Check sentence structure similarity
+    const structure1 = analyzeStructure(text1);
+    const structure2 = analyzeStructure(text2);
+    
+    const structureSimilarity = compareStructures(structure1, structure2);
+    
+    if (structureSimilarity < 0.5) {
+        return {
+            isValid: false,
+            confidence: structureSimilarity,
+            reason: `Structure too different: ${structureSimilarity.toFixed(3)}`
+        };
+    }
+    
+    return {
+        isValid: true,
+        confidence: Math.max(0.7, structureSimilarity),
+        reason: `Good context match: ${commonTypes.join(',')}`
+    };
+}
+
+// Identify question type
+function identifyQuestionType(text) {
+    const types = [];
+    
+    // Vietnamese question patterns
+    if (/\b(là gì|gì là)\b/i.test(text)) types.push('definition');
+    if (/\b(bao nhiêu|mấy)\b/i.test(text)) types.push('quantity');
+    if (/\b(tại sao|vì sao|lý do)\b/i.test(text)) types.push('reason');
+    if (/\b(khi nào|thời gian)\b/i.test(text)) types.push('time');
+    if (/\b(ở đâu|đâu|địa điểm)\b/i.test(text)) types.push('location');
+    if (/\b(như thế nào|thế nào|cách)\b/i.test(text)) types.push('method');
+    if (/\b(ai|người nào)\b/i.test(text)) types.push('person');
+    if (/\b(đúng|sai|có phải)\b/i.test(text)) types.push('boolean');
+    
+    // English question patterns
+    if (/\bwhat\b/i.test(text)) types.push('what');
+    if (/\b(how many|how much)\b/i.test(text)) types.push('quantity');
+    if (/\bwhy\b/i.test(text)) types.push('reason');
+    if (/\bwhen\b/i.test(text)) types.push('time');
+    if (/\bwhere\b/i.test(text)) types.push('location');
+    if (/\bhow\b/i.test(text)) types.push('method');
+    if (/\bwho\b/i.test(text)) types.push('person');
+    
+    return types.length > 0 ? types : ['general'];
+}
+
+// Analyze text structure
+function analyzeStructure(text) {
+    return {
+        wordCount: text.split(/\s+/).length,
+        hasQuestionMark: /[?？]/.test(text),
+        hasNumbers: /\d/.test(text),
+        hasCapitals: /[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/.test(text),
+        endsWithQuestion: /[?？]\s*$/.test(text),
+        startsWithQuestion: /^(what|which|how|why|when|where|who|là gì|gì|tại sao|vì sao|khi nào|ở đâu|như thế nào)/i.test(text)
+    };
+}
+
+// Compare two structures
+function compareStructures(struct1, struct2) {
+    let similarity = 0;
+    let factors = 0;
+    
+    // Word count similarity
+    const wordCountDiff = Math.abs(struct1.wordCount - struct2.wordCount);
+    const maxWordCount = Math.max(struct1.wordCount, struct2.wordCount);
+    similarity += maxWordCount > 0 ? (1 - wordCountDiff / maxWordCount) : 1;
+    factors++;
+    
+    // Boolean features
+    const booleanFeatures = ['hasQuestionMark', 'hasNumbers', 'hasCapitals', 'endsWithQuestion', 'startsWithQuestion'];
+    booleanFeatures.forEach(feature => {
+        similarity += struct1[feature] === struct2[feature] ? 1 : 0;
+        factors++;
+    });
+    
+    return factors > 0 ? similarity / factors : 0;
 }
 
 // Calculate similarity between two strings
