@@ -444,22 +444,59 @@ function extractQuestionsFromPage() {
     ];
     
     // Look for question-like elements with enhanced selectors, prioritize content over labels
+    // Exclude extension elements directly in selector
     const questionSelectors = [
-        '.question-text', '.question-content', '.question-item', 
-        '[class*="question"]:not([class*="number"]):not([class*="label"])', 
-        '[class*="cau"]:not([class*="so"]):not([class*="stt"])', 
-        '[class*="bai"]:not([class*="so"]):not([class*="stt"])',
-        'div:not([class*="number"]):not([class*="label"])', 
-        'p:not([class*="number"]):not([class*="label"])', 
-        'span:not([class*="number"]):not([class*="label"])', 
-        'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+        '.question-text:not([id*="tailieu"]):not([class*="tailieu"])', 
+        '.question-content:not([id*="tailieu"]):not([class*="tailieu"])', 
+        '.question-item:not([id*="tailieu"]):not([class*="tailieu"])', 
+        '[class*="question"]:not([class*="number"]):not([class*="label"]):not([id*="tailieu"]):not([class*="tailieu"])', 
+        '[class*="cau"]:not([class*="so"]):not([class*="stt"]):not([id*="tailieu"]):not([class*="tailieu"])', 
+        '[class*="bai"]:not([class*="so"]):not([class*="stt"]):not([id*="tailieu"]):not([class*="tailieu"])',
+        'div:not([class*="number"]):not([class*="label"]):not([id*="tailieu"]):not([class*="tailieu"])', 
+        'p:not([class*="number"]):not([class*="label"]):not([id*="tailieu"]):not([class*="tailieu"])', 
+        'span:not([class*="number"]):not([class*="label"]):not([id*="tailieu"]):not([class*="tailieu"])', 
+        'li:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h1:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h2:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h3:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h4:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h5:not([id*="tailieu"]):not([class*="tailieu"])', 
+        'h6:not([id*="tailieu"]):not([class*="tailieu"])'
     ];
     
-    const questionElements = document.querySelectorAll(questionSelectors.join(', '));
+    // Additional filter to exclude elements inside extension containers
+    let questionElements = document.querySelectorAll(questionSelectors.join(', '));
     
+    // Filter out elements inside extension containers
+    questionElements = Array.from(questionElements).filter(element => {
+        // Skip if element is inside extension popup
+        const extensionContainer = element.closest('#tailieu-questions-popup, [id*="tailieu"], [class*="tailieu"], [data-extension="true"]');
+        if (extensionContainer) {
+            debugLog('Filtering out element inside extension container:', element);
+            return false;
+        }
+        
+        // Additional check for high z-index containers (likely extension UI)
+        const highZIndexContainer = element.closest('[style*="z-index"]');
+        if (highZIndexContainer && highZIndexContainer.style.zIndex && parseInt(highZIndexContainer.style.zIndex) > 9999) {
+            debugLog('Filtering out element inside high z-index container:', element);
+            return false;
+        }
+        
+        return true;
+    });
+    
+    debugLog('Original elements found:', Array.from(document.querySelectorAll(questionSelectors.join(', '))).length);
+    debugLog('Filtered elements after extension check:', questionElements.length);
     debugLog('Scanning', questionElements.length, 'elements for questions');
     
     questionElements.forEach((element, index) => {
+        // Skip elements that belong to the extension
+        if (isExtensionElement(element)) {
+            debugLog('Skipping extension element:', element);
+            return;
+        }
+        
         const text = element.textContent.trim();
         
         // Skip if too short, too long, or just whitespace
@@ -1198,7 +1235,14 @@ function isExtensionElement(element) {
         '.tailieu-answer-highlight',
         '.tailieu-text-highlight',
         '[class*="tailieu"]',
-        '[id*="tailieu"]'
+        '[id*="tailieu"]',
+        // Chrome extension popup and UI elements
+        'body > [style*="z-index: 10"]', // High z-index elements
+        '[data-extension]',
+        '[data-tailieu]',
+        '.chrome-extension-popup',
+        '.extension-popup',
+        '.extension-ui'
     ];
     
     for (const selector of extensionSelectors) {
@@ -1231,15 +1275,13 @@ function isExtensionElement(element) {
                 // Ignore selector errors
             }
         }
-            
+        
         parent = parent.parentElement;
         depth++;
     }
     
     return false;
-}
-
-// Helper function for partial answer matching
+}// Helper function for partial answer matching
 function tryHighlightPartialAnswer(pattern, elementsArray) {
     const patternLower = pattern.toLowerCase();
     
