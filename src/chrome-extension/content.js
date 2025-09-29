@@ -1068,10 +1068,16 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
 
 // Function to highlight answer text on the page
 function highlightAnswerOnPage(answerText, questionElement) {
-    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) return;
+    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
+        debugLog('Skipping answer highlight - no answer text or highlighting disabled');
+        return;
+    }
     
     const cleanAnswer = cleanAnswerText(answerText);
-    debugLog('Looking for answer on page:', cleanAnswer);
+    debugLog('=== ANSWER HIGHLIGHTING START ===');
+    debugLog('Original answer:', answerText);
+    debugLog('Clean answer:', cleanAnswer);
+    debugLog('Answer highlighting enabled:', answerHighlightingEnabled);
     
     // Search for answer in nearby elements and the whole page
     const searchContainers = [
@@ -1140,8 +1146,18 @@ function highlightAnswerOnPage(answerText, questionElement) {
         el && el.textContent && el.textContent.trim().length > 2 && !isExtensionElement(el)
     );
     
+    debugLog('Total candidate elements found:', elementsArray.length);
+    if (elementsArray.length > 0) {
+        debugLog('Sample candidate elements:', elementsArray.slice(0, 5).map(el => ({
+            tag: el.tagName,
+            text: el.textContent.trim().substring(0, 50),
+            classes: el.className
+        })));
+    }
+    
     // Look for various answer patterns
     const answerPatterns = generateAnswerPatterns(cleanAnswer);
+    debugLog('Generated patterns:', answerPatterns.slice(0, 3));
     
     let found = false;
     let bestMatch = null;
@@ -1189,8 +1205,8 @@ function highlightAnswerOnPage(answerText, questionElement) {
                 boostedScore = Math.min(1.0, boostedScore + 0.05);
             }
             
-            // Lower threshold to catch simple answers like "Gmail"
-            if (boostedScore > 0.6) {
+            // Lower threshold to catch more potential matches
+            if (boostedScore > 0.5) { // Lowered from 0.6
                 allMatches.push({ 
                     element: candidateElement, 
                     pattern: pattern, 
@@ -1198,6 +1214,13 @@ function highlightAnswerOnPage(answerText, questionElement) {
                     elementText: elementText,
                     patternLength: pattern.length,
                     originalSimilarity: similarity
+                });
+                
+                debugLog('Match found:', {
+                    pattern: pattern.substring(0, 30),
+                    elementText: elementText.substring(0, 30),
+                    score: boostedScore,
+                    similarity: similarity
                 });
             }
         }
@@ -1228,17 +1251,24 @@ function highlightAnswerOnPage(answerText, questionElement) {
     
     // Only highlight the BEST match (avoid multiple highlights)
     if (allMatches.length > 0) {
+        debugLog('Total matches found:', allMatches.length);
+        debugLog('Top matches:', allMatches.slice(0, 3).map(m => ({
+            pattern: m.pattern.substring(0, 30),
+            score: m.score,
+            elementText: m.elementText.substring(0, 30)
+        })));
+        
         bestMatch = allMatches[0];
         bestScore = bestMatch.score;
         
-        debugLog('Best match found:', {
+        debugLog('Best match selected:', {
             pattern: bestMatch.pattern,
             elementText: bestMatch.elementText,
             score: bestScore,
             element: bestMatch.element
         });
         
-        // Additional filtering to avoid wrong highlights
+        // More relaxed filtering to avoid wrong highlights
         const elementText = bestMatch.elementText.toLowerCase();
         const answerLower = cleanAnswer.toLowerCase();
         
@@ -1247,26 +1277,48 @@ function highlightAnswerOnPage(answerText, questionElement) {
         
         // Skip if this looks like a generic "all options correct" when we have a specific answer
         const isGenericAllAnswer = /(tất cả|all|toàn bộ).*(phương án|đáp án|options?).*(đúng|correct)/i.test(elementText);
-        const hasSpecificContent = answerLower.length > 20 && !/(tất cả|all|toàn bộ)/i.test(answerLower);
+        const hasSpecificContent = answerLower.length > 15 && !/(tất cả|all|toàn bộ)/i.test(answerLower); // More lenient
         
-        // Skip if the pattern is much shorter than the answer (likely incomplete match) - but be more lenient for short answers
-        const patternTooShort = bestMatch.pattern.length < answerLower.length * 0.3 && answerLower.length > 20;
+        // More lenient pattern length check
+        const patternTooShort = bestMatch.pattern.length < answerLower.length * 0.2 && answerLower.length > 30; // More lenient
+        
+        debugLog('Filter checks:', {
+            hasNegativeIndicators,
+            isGenericAllAnswer,
+            hasSpecificContent,
+            patternTooShort,
+            answerLength: answerLower.length,
+            patternLength: bestMatch.pattern.length
+        });
         
         if (!hasNegativeIndicators && !(isGenericAllAnswer && hasSpecificContent) && !patternTooShort) {
             // Before highlighting, check if there are already highlighted answers
             const existingHighlights = document.querySelectorAll('.tailieu-answer-highlight');
             let shouldHighlight = true;
             
-            // If there are existing highlights, only proceed if this is a better/longer match
+            debugLog('Existing highlights found:', existingHighlights.length);
+            
+            // If there are existing highlights, only proceed if this is a better match
             if (existingHighlights.length > 0) {
+                let maxExistingScore = 0;
                 let maxExistingLength = 0;
                 existingHighlights.forEach(highlight => {
-                    maxExistingLength = Math.max(maxExistingLength, highlight.textContent.length);
+                    const length = highlight.textContent.length;
+                    maxExistingLength = Math.max(maxExistingLength, length);
+                    // Estimate score based on length (simple heuristic)
+                    maxExistingScore = Math.max(maxExistingScore, Math.min(1.0, length / cleanAnswer.length));
                 });
                 
-                // Only highlight if this match is significantly better (longer and higher score)
-                if (bestMatch.pattern.length > maxExistingLength * 1.2 && bestScore > 0.85) {
+                debugLog('Existing highlight stats:', { maxExistingLength, maxExistingScore });
+                debugLog('Current match stats:', { 
+                    patternLength: bestMatch.pattern.length, 
+                    score: bestScore 
+                });
+                
+                // More lenient comparison - highlight if this is notably better
+                if (bestScore > maxExistingScore + 0.1 || bestMatch.pattern.length > maxExistingLength * 1.1) {
                     // Clear existing highlights first
+                    debugLog('Replacing existing highlights with better match');
                     existingHighlights.forEach(highlight => {
                         const parent = highlight.parentNode;
                         if (parent && !isExtensionElement(parent)) {
@@ -1275,13 +1327,13 @@ function highlightAnswerOnPage(answerText, questionElement) {
                     });
                 } else {
                     shouldHighlight = false;
-                    debugLog('Skipped highlighting - existing highlight is better or similar');
+                    debugLog('Keeping existing highlight - current match not significantly better');
                 }
             }
             
             if (shouldHighlight) {
                 highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
-                debugLog('Answer highlighted:', bestMatch.pattern, 'in element:', bestMatch.element, 'score:', bestScore);
+                debugLog('✅ Answer highlighted successfully:', bestMatch.pattern);
                 found = true;
             }
         } else {
@@ -1291,38 +1343,75 @@ function highlightAnswerOnPage(answerText, questionElement) {
     }
     
     if (!found) {
-        debugLog('Answer not found on page for:', cleanAnswer);
+        debugLog('❌ Answer not found with standard matching');
+        debugLog('Clean answer:', cleanAnswer);
         debugLog('Total candidates checked:', elementsArray.length);
         debugLog('Total matches found:', allMatches.length);
         
-        // Try more aggressive/simpler search if no answer found
-        const simplePatterns = [
-            cleanAnswer, // Try exact again
-            cleanAnswer.toLowerCase(), // Try lowercase
-            cleanAnswer.split(' ')[0], // First word only
-            cleanAnswer.split(',')[0].trim(), // First part before comma
-        ].filter(p => p && p.length > 2);
+        if (allMatches.length > 0) {
+            debugLog('Best matches that were rejected:');
+            allMatches.slice(0, 3).forEach((match, i) => {
+                debugLog(`Match ${i + 1}:`, {
+                    pattern: match.pattern,
+                    score: match.score,
+                    elementText: match.elementText.substring(0, 50)
+                });
+            });
+        }
         
-        for (const simplePattern of simplePatterns) {
-            debugLog('Trying simple pattern:', simplePattern);
+        // Try VERY simple exact text search as last resort
+        debugLog('Trying simple exact search...');
+        const simpleSearchTerms = [
+            cleanAnswer.trim(),
+            cleanAnswer.toLowerCase().trim(),
+        ];
+        
+        // Add first word if answer has multiple words
+        const words = cleanAnswer.split(' ').filter(w => w.length > 2);
+        if (words.length > 1) {
+            simpleSearchTerms.push(words[0]);
+            if (words.length > 2) {
+                simpleSearchTerms.push(words.slice(0, 2).join(' '));
+            }
+        }
+        
+        debugLog('Simple search terms:', simpleSearchTerms);
+        
+        for (const searchTerm of simpleSearchTerms) {
+            if (searchTerm.length < 3) continue;
             
-            // Simple text search across all elements
-            const simpleMatches = elementsArray.filter(el => {
+            const matches = elementsArray.filter(el => {
                 const text = el.textContent.toLowerCase().trim();
-                return text === simplePattern.toLowerCase() || 
-                       (text.includes(simplePattern.toLowerCase()) && text.length < simplePattern.length * 2);
+                return text === searchTerm.toLowerCase() || 
+                       text.includes(searchTerm.toLowerCase());
             });
             
-            if (simpleMatches.length > 0) {
-                const bestSimpleMatch = simpleMatches[0]; // Take first match
-                highlightAnswerTextInElement(bestSimpleMatch, simplePattern);
-                debugLog('Simple pattern match found:', simplePattern, 'in element:', bestSimpleMatch);
+            debugLog(`Simple search for "${searchTerm}" found ${matches.length} matches`);
+            
+            if (matches.length > 0) {
+                const bestMatch = matches[0];
+                highlightAnswerTextInElement(bestMatch, searchTerm);
+                debugLog('✅ Simple search success:', searchTerm);
                 found = true;
                 break;
             }
         }
+        
+        if (!found) {
+            debugLog('❌ All search methods failed for answer:', cleanAnswer);
+            
+            // Final debug - show what elements we actually have
+            debugLog('Sample elements on page:', elementsArray.slice(0, 10).map(el => ({
+                tag: el.tagName,
+                text: el.textContent.trim().substring(0, 30),
+                fullText: el.textContent.trim()
+            })));
+        }
+    } else {
+        debugLog('✅ Answer highlighting completed successfully');
     }
     
+    debugLog('=== ANSWER HIGHLIGHTING END ===');
     return found;
 }
 
