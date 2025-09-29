@@ -1147,10 +1147,10 @@ function highlightAnswerOnPage(answerText, questionElement) {
     let bestMatch = null;
     let bestScore = 0;
     
-    // Search in candidate elements
+    // Search in candidate elements and find the BEST match only
+    const allMatches = [];
+    
     for (const candidateElement of elementsArray) {
-        if (found && bestScore >= 0.95) break; // Stop if we found a very good match
-        
         // Double check to skip extension elements
         if (isExtensionElement(candidateElement)) continue;
         
@@ -1170,31 +1170,94 @@ function highlightAnswerOnPage(answerText, questionElement) {
             // Boost score for exact matches or elements with answer-like classes
             let boostedScore = similarity;
             if (elementText === patternLower || elementText.includes(patternLower)) {
-                boostedScore = Math.min(1.0, similarity + 0.1);
+                boostedScore = Math.min(1.0, similarity + 0.2); // Increased boost for exact matches
             }
             
             if (candidateElement.className && 
                 candidateElement.className.match(/(answer|correct|option|choice|dap-an)/i)) {
+                boostedScore = Math.min(1.0, boostedScore + 0.1); // Increased boost for answer elements
+            }
+            
+            // Boost score for longer matching patterns (prefer complete answers)
+            if (pattern.length > 20) {
                 boostedScore = Math.min(1.0, boostedScore + 0.05);
             }
             
-            if (boostedScore > 0.6 && boostedScore > bestScore) { // Lowered threshold for better matching
-                bestMatch = { element: candidateElement, pattern: pattern, score: boostedScore };
-                bestScore = boostedScore;
-                
-                if (boostedScore >= 0.9) {
-                    found = true;
-                    break;
-                }
+            if (boostedScore > 0.7) { // Raised threshold for better quality
+                allMatches.push({ 
+                    element: candidateElement, 
+                    pattern: pattern, 
+                    score: boostedScore,
+                    elementText: elementText,
+                    patternLength: pattern.length
+                });
             }
         }
     }
     
-    // Highlight the best match if found
-    if (bestMatch && bestScore > 0.6) {
-        highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
-        debugLog('Answer highlighted:', bestMatch.pattern, 'in element:', bestMatch.element, 'score:', bestScore);
-        found = true;
+    // Sort matches by score (descending) and pattern length (descending for completeness)
+    allMatches.sort((a, b) => {
+        if (Math.abs(a.score - b.score) < 0.05) { // If scores are close, prefer longer patterns
+            return b.patternLength - a.patternLength;
+        }
+        return b.score - a.score;
+    });
+    
+    // Only highlight the BEST match (avoid multiple highlights)
+    if (allMatches.length > 0) {
+        bestMatch = allMatches[0];
+        bestScore = bestMatch.score;
+        
+        // Additional filtering to avoid wrong highlights
+        const elementText = bestMatch.elementText.toLowerCase();
+        const answerLower = cleanAnswer.toLowerCase();
+        
+        // Skip if the element contains negative indicators
+        const hasNegativeIndicators = /(sai|wrong|incorrect|false|không đúng|không chính xác)/i.test(elementText);
+        
+        // Skip if this looks like a generic "all options correct" when we have a specific answer
+        const isGenericAllAnswer = /(tất cả|all|toàn bộ).*(phương án|đáp án|options?).*(đúng|correct)/i.test(elementText);
+        const hasSpecificContent = answerLower.length > 20 && !/(tất cả|all|toàn bộ)/i.test(answerLower);
+        
+        // Skip if the pattern is much shorter than the answer (likely incomplete match)
+        const patternTooShort = bestMatch.pattern.length < answerLower.length * 0.3 && answerLower.length > 20;
+        
+        if (!hasNegativeIndicators && !(isGenericAllAnswer && hasSpecificContent) && !patternTooShort) {
+            // Before highlighting, check if there are already highlighted answers
+            const existingHighlights = document.querySelectorAll('.tailieu-answer-highlight');
+            let shouldHighlight = true;
+            
+            // If there are existing highlights, only proceed if this is a better/longer match
+            if (existingHighlights.length > 0) {
+                let maxExistingLength = 0;
+                existingHighlights.forEach(highlight => {
+                    maxExistingLength = Math.max(maxExistingLength, highlight.textContent.length);
+                });
+                
+                // Only highlight if this match is significantly better (longer and higher score)
+                if (bestMatch.pattern.length > maxExistingLength * 1.2 && bestScore > 0.85) {
+                    // Clear existing highlights first
+                    existingHighlights.forEach(highlight => {
+                        const parent = highlight.parentNode;
+                        if (parent && !isExtensionElement(parent)) {
+                            parent.innerHTML = parent.textContent; // Remove highlight
+                        }
+                    });
+                } else {
+                    shouldHighlight = false;
+                    debugLog('Skipped highlighting - existing highlight is better or similar');
+                }
+            }
+            
+            if (shouldHighlight) {
+                highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
+                debugLog('Answer highlighted:', bestMatch.pattern, 'in element:', bestMatch.element, 'score:', bestScore);
+                found = true;
+            }
+        } else {
+            debugLog('Skipped highlighting due to filters - negative:', hasNegativeIndicators, 
+                    'generic:', isGenericAllAnswer, 'specific:', hasSpecificContent, 'short:', patternTooShort);
+        }
     }
     
     if (!found) {
@@ -1303,60 +1366,90 @@ function tryHighlightPartialAnswer(pattern, elementsArray) {
 function generateAnswerPatterns(cleanAnswer) {
     const patterns = new Set();
     
-    // Add the clean answer
+    // Add the original answer as highest priority
     patterns.add(cleanAnswer);
     
-    // Add with common prefixes
-    const prefixes = ['A.', 'B.', 'C.', 'D.', 'a)', 'b)', 'c)', 'd)', '1.', '2.', '3.', '4.', 'A)', 'B)', 'C)', 'D)'];
+    // Add without common Vietnamese prefixes/suffixes
+    const prefixes = ['đáp án:', 'trả lời:', 'kết quả:', 'phương án:', 'là:', 'bao gồm:', 'chính là:'];
+    const suffixes = ['là đáp án đúng', 'là câu trả lời', 'là kết quả', 'chính xác'];
+    
+    let workingAnswer = cleanAnswer;
+    
+    // Remove prefixes
     prefixes.forEach(prefix => {
-        patterns.add(`${prefix} ${cleanAnswer}`);
-        patterns.add(`${prefix}${cleanAnswer}`); // Without space
+        const regex = new RegExp(`^${prefix.replace(':', '\\s*:?\\s*')}`, 'gi');
+        workingAnswer = workingAnswer.replace(regex, '').trim();
     });
     
-    // Add with Vietnamese answer markers
-    const vietnameseMarkers = ['Đáp án:', 'Trả lời:', 'Kết quả:', 'Phương án:', 'Chọn:', 'Lựa chọn:'];
-    vietnameseMarkers.forEach(marker => {
-        patterns.add(`${marker} ${cleanAnswer}`);
-        patterns.add(`${marker}${cleanAnswer}`); // Without space
+    // Remove suffixes  
+    suffixes.forEach(suffix => {
+        const regex = new RegExp(`${suffix}\\s*$`, 'gi');
+        workingAnswer = workingAnswer.replace(regex, '').trim();
     });
     
-    // Add variations of the answer without common words
-    const words = cleanAnswer.split(' ').filter(word => word.length > 0);
-    if (words.length > 1) {
-        // Try with only the most important words (skip common words)
+    if (workingAnswer !== cleanAnswer && workingAnswer.length > 5) {
+        patterns.add(workingAnswer);
+    }
+    
+    // Add variations with different answer markers removed
+    const markerVariations = [
+        workingAnswer.replace(/^[A-Da-d][\.\)\s]+/i, '').trim(), // Remove A. B. C. D.
+        workingAnswer.replace(/^\d+[\.\)\s]+/, '').trim(), // Remove 1. 2. 3.
+        workingAnswer.replace(/^[-\*\+]\s*/, '').trim(), // Remove bullet points
+    ];
+    
+    markerVariations.forEach(variation => {
+        if (variation.length > 5 && variation !== workingAnswer) {
+            patterns.add(variation);
+        }
+    });
+    
+    // For longer answers, create meaningful fragments that preserve context
+    const words = workingAnswer.split(' ').filter(word => word.length > 0);
+    if (words.length > 3) {
+        // Create overlapping fragments for better matching
+        for (let start = 0; start < words.length - 2; start++) {
+            for (let length = Math.min(words.length - start, 8); length >= 3; length--) {
+                const fragment = words.slice(start, start + length).join(' ');
+                if (fragment.length > 10) {
+                    patterns.add(fragment);
+                }
+            }
+        }
+        
+        // Add combinations of important words (skip common words)
         const importantWords = words.filter(word => 
             word.length > 2 && 
             !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến', 
               'trong', 'trên', 'dưới', 'về', 'theo', 'như', 'khi', 'nếu', 'nhưng',
-              'để', 'đã', 'sẽ', 'đang', 'các', 'những', 'một', 'hai', 'ba'].includes(word.toLowerCase())
+              'để', 'đã', 'sẽ', 'đang', 'các', 'những', 'một', 'hai', 'ba', 'bốn', 'năm'].includes(word.toLowerCase())
         );
-        if (importantWords.length > 0 && importantWords.length < words.length) {
-            patterns.add(importantWords.join(' '));
-        }
         
-        // Try first and last parts
-        if (words.length > 3) {
-            patterns.add(words.slice(0, Math.ceil(words.length / 2)).join(' '));
-            patterns.add(words.slice(Math.floor(words.length / 2)).join(' '));
+        if (importantWords.length > 1 && importantWords.length < words.length) {
+            patterns.add(importantWords.join(' '));
+            
+            // Also try with original spacing/context around important words
+            const importantWordsPattern = workingAnswer;
+            let contextualPattern = importantWordsPattern;
+            for (const word of importantWords) {
+                const wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'gi');
+                if (wordRegex.test(contextualPattern)) {
+                    patterns.add(word); // Add individual important words too
+                }
+            }
         }
     }
     
-    // Add without special characters and extra spaces
-    const cleanedAnswer = cleanAnswer.replace(/[^\w\sÀ-ỹ]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (cleanedAnswer !== cleanAnswer) {
-        patterns.add(cleanedAnswer);
+    // Add normalized version (remove special chars, normalize spaces)
+    const normalized = workingAnswer.replace(/[^\w\sÀ-ỹ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (normalized !== workingAnswer && normalized.length > 5) {
+        patterns.add(normalized);
     }
     
-    // Add shorter versions for long answers
-    if (cleanAnswer.length > 50) {
-        // First 30 characters
-        patterns.add(cleanAnswer.substring(0, 30).trim());
-        // Last 30 characters
-        patterns.add(cleanAnswer.substring(cleanAnswer.length - 30).trim());
-    }
-    
-    // Filter out very short patterns and return as array
-    return Array.from(patterns).filter(p => p.trim().length > 2);
+    // Filter out very short patterns and return as array, sorted by length (longest first)
+    return Array.from(patterns)
+        .filter(p => p.trim().length > 4)
+        .sort((a, b) => b.length - a.length); // Prefer longer, more complete matches
 }
 
 // Clean answer text for better matching
