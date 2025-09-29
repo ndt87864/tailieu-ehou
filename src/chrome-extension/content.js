@@ -691,13 +691,20 @@ async function compareAndHighlightQuestions() {
                 console.log(`  DB:   "${cleanExtQuestion.substring(0, 60)}..."`);
                 console.log(`  Answer: "${extQ.answer?.substring(0, 40)}..."`);
                 
-                // Highlight the question and try to find/highlight the answer
+                // Find all possible answers for this question
+                const allAnswers = findAllAnswersForQuestion(extQ.question);
+                if (allAnswers.length > 1) {
+                    console.log(`  🔥 Multiple answers found (${allAnswers.length}):`, allAnswers);
+                }
+                
+                // Highlight the question and try to find/highlight all answers
                 highlightMatchedQuestion(pageQ, extQ);
                 
                 matched.push({
                     pageQuestion: pageQ.text,
                     extensionQuestion: extQ.question,
                     answer: extQ.answer,
+                    allAnswers: allAnswers, // Store all possible answers
                     similarity: calculateSimilarity(cleanPageQuestion, cleanExtQuestion)
                 });
                 
@@ -995,7 +1002,33 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
-// Highlight matched question and try to find the answer
+// Find all possible answers for a question from extension questions
+function findAllAnswersForQuestion(questionText) {
+    const cleanQuestion = cleanQuestionText(questionText);
+    const allAnswers = new Set(); // Use Set to avoid duplicates
+    
+    debugLog('Finding all answers for question:', cleanQuestion);
+    
+    // Search through all extension questions for similar questions
+    extensionQuestions.forEach(extQuestion => {
+        const cleanExtQuestion = cleanQuestionText(extQuestion.question || '');
+        
+        // Check if questions are similar (same logic as isQuestionSimilar)
+        if (isQuestionSimilar(cleanQuestion, cleanExtQuestion)) {
+            if (extQuestion.answer && extQuestion.answer.trim()) {
+                allAnswers.add(extQuestion.answer.trim());
+                debugLog('Found matching answer:', extQuestion.answer.trim());
+            }
+        }
+    });
+    
+    const answersArray = Array.from(allAnswers);
+    debugLog('Total unique answers found:', answersArray.length);
+    
+    return answersArray;
+}
+
+// Highlight matched question and try to find all possible answers
 function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     const element = pageQuestion.element;
     
@@ -1021,9 +1054,24 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         `;
         element.classList.add('tailieu-highlighted-question');
         
-        // Add answer tooltip
+        // Find ALL possible answers for this question
+        const allAnswersForQuestion = findAllAnswersForQuestion(extensionQuestion.question);
+        debugLog('Found all answers for question:', allAnswersForQuestion);
+        
+        // Add answer tooltip showing all possible answers
         const tooltip = document.createElement('div');
         tooltip.className = 'tailieu-answer-tooltip';
+        
+        // Create tooltip content with all answers
+        let tooltipContent = '<strong>Đáp án:</strong><br>';
+        if (allAnswersForQuestion.length > 1) {
+            tooltipContent += allAnswersForQuestion.map((answer, index) => 
+                `${index + 1}. ${answer}`
+            ).join('<br>');
+        } else {
+            tooltipContent += allAnswersForQuestion[0] || extensionQuestion.answer;
+        }
+        
         tooltip.innerHTML = `
             <div style="
                 background: #2c3e50;
@@ -1036,8 +1084,7 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
                 z-index: 10001;
                 line-height: 1.4;
             ">
-                <strong>Đáp án:</strong><br>
-                ${extensionQuestion.answer}
+                ${tooltipContent}
             </div>
         `;
         tooltip.style.cssText = `
@@ -1059,11 +1106,40 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
             tooltip.style.display = 'none';
         });
         
-        // Try to highlight the answer on the page (only if enabled)
+        // Try to highlight ALL possible answers on the page (only if enabled)
         if (answerHighlightingEnabled) {
-            highlightAnswerOnPage(extensionQuestion.answer, element);
+            highlightAllAnswersOnPage(allAnswersForQuestion, element);
         }
     }
+}
+
+// Function to highlight all possible answers on the page
+function highlightAllAnswersOnPage(answersArray, questionElement) {
+    if (!answersArray || answersArray.length === 0 || !answerHighlightingEnabled) {
+        debugLog('Skipping all answers highlighting - no answers or highlighting disabled');
+        return;
+    }
+    
+    debugLog('=== HIGHLIGHTING ALL ANSWERS START ===');
+    debugLog('Total answers to highlight:', answersArray.length);
+    debugLog('Answers:', answersArray);
+    
+    let totalFound = 0;
+    
+    // Try to highlight each answer
+    answersArray.forEach((answer, index) => {
+        debugLog(`--- Attempting to highlight answer ${index + 1}: "${answer}" ---`);
+        const found = highlightAnswerOnPage(answer, questionElement);
+        if (found) {
+            totalFound++;
+            debugLog(`✅ Answer ${index + 1} highlighted successfully`);
+        } else {
+            debugLog(`❌ Answer ${index + 1} not found on page`);
+        }
+    });
+    
+    debugLog(`=== HIGHLIGHTING ALL ANSWERS COMPLETE: ${totalFound}/${answersArray.length} ===`);
+    return totalFound;
 }
 
 // Function to highlight answer text on the page
@@ -1298,36 +1374,26 @@ function highlightAnswerOnPage(answerText, questionElement) {
             
             debugLog('Existing highlights found:', existingHighlights.length);
             
-            // If there are existing highlights, only proceed if this is a better match
+            // For multiple answers, be more permissive about highlighting
             if (existingHighlights.length > 0) {
-                let maxExistingScore = 0;
-                let maxExistingLength = 0;
+                // Check if this exact answer is already highlighted
+                let alreadyHighlighted = false;
                 existingHighlights.forEach(highlight => {
-                    const length = highlight.textContent.length;
-                    maxExistingLength = Math.max(maxExistingLength, length);
-                    // Estimate score based on length (simple heuristic)
-                    maxExistingScore = Math.max(maxExistingScore, Math.min(1.0, length / cleanAnswer.length));
+                    const highlightText = highlight.textContent.toLowerCase().trim();
+                    const patternLower = bestMatch.pattern.toLowerCase().trim();
+                    if (highlightText === patternLower || 
+                        highlightText.includes(patternLower) || 
+                        patternLower.includes(highlightText)) {
+                        alreadyHighlighted = true;
+                    }
                 });
                 
-                debugLog('Existing highlight stats:', { maxExistingLength, maxExistingScore });
-                debugLog('Current match stats:', { 
-                    patternLength: bestMatch.pattern.length, 
-                    score: bestScore 
-                });
-                
-                // More lenient comparison - highlight if this is notably better
-                if (bestScore > maxExistingScore + 0.1 || bestMatch.pattern.length > maxExistingLength * 1.1) {
-                    // Clear existing highlights first
-                    debugLog('Replacing existing highlights with better match');
-                    existingHighlights.forEach(highlight => {
-                        const parent = highlight.parentNode;
-                        if (parent && !isExtensionElement(parent)) {
-                            parent.innerHTML = parent.textContent; // Remove highlight
-                        }
-                    });
-                } else {
+                if (alreadyHighlighted) {
                     shouldHighlight = false;
-                    debugLog('Keeping existing highlight - current match not significantly better');
+                    debugLog('Skipping highlight - this answer already highlighted');
+                } else {
+                    // Allow multiple different answers to be highlighted
+                    debugLog('Allowing additional answer highlight');
                 }
             }
             
