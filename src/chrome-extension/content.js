@@ -1418,10 +1418,11 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         debugLog('Trying to highlight answers:', allPotentialAnswers);
         
         // Try to highlight each answer and collect successful ones
+        // IMPORTANT: Pass the specific question element and pageQuestion to limit search scope
         if (answerHighlightingEnabled && allPotentialAnswers.length > 0) {
             allPotentialAnswers.forEach((answer, index) => {
-                debugLog(`Attempting to highlight answer ${index + 1}: "${answer}"`);
-                const wasHighlighted = highlightAnswerOnPage(answer, element);
+                debugLog(`Attempting to highlight answer ${index + 1} for this specific question: "${answer}"`);
+                const wasHighlighted = highlightAnswerOnPage(answer, element, pageQuestion);
                 if (wasHighlighted) {
                     actuallyHighlightedAnswers.push(answer);
                     debugLog(`✅ Successfully highlighted answer ${index + 1}: "${answer}"`);
@@ -1489,7 +1490,7 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
 }
 
 // Function to highlight all possible answers on the page
-function highlightAllAnswersOnPage(answersArray, questionElement) {
+function highlightAllAnswersOnPage(answersArray, questionElement, pageQuestion = null) {
     if (!answersArray || answersArray.length === 0 || !answerHighlightingEnabled) {
         debugLog('Skipping all answers highlighting - no answers or highlighting disabled');
         return;
@@ -1498,13 +1499,14 @@ function highlightAllAnswersOnPage(answersArray, questionElement) {
     debugLog('=== HIGHLIGHTING ALL ANSWERS START ===');
     debugLog('Total answers to highlight:', answersArray.length);
     debugLog('Answers:', answersArray);
+    debugLog('Question context provided:', !!pageQuestion);
     
     let totalFound = 0;
     
-    // Try to highlight each answer
+    // Try to highlight each answer with question context
     answersArray.forEach((answer, index) => {
-        debugLog(`--- Attempting to highlight answer ${index + 1}: "${answer}" ---`);
-        const found = highlightAnswerOnPage(answer, questionElement);
+        debugLog(`--- Attempting to highlight answer ${index + 1} for specific question: "${answer}" ---`);
+        const found = highlightAnswerOnPage(answer, questionElement, pageQuestion);
         if (found) {
             totalFound++;
             debugLog(`✅ Answer ${index + 1} highlighted successfully`);
@@ -1517,8 +1519,158 @@ function highlightAllAnswersOnPage(answersArray, questionElement) {
     return totalFound;
 }
 
+// Helper function to extract question number from text
+function extractQuestionNumber(text) {
+    if (!text) return null;
+    
+    // Look for various question number patterns
+    const patterns = [
+        /câu\s*(?:hỏi\s*)?(\d+)/i,
+        /question\s*(\d+)/i,
+        /^\s*(\d+)[\.\)]/,
+        /^(\d+)\s*[\.]/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match) {
+            return parseInt(match[1]);
+        }
+    }
+    return null;
+}
+
+// Helper function to find the container that holds both question and its answers
+function findQuestionContainer(questionElement, pageQuestion) {
+    if (!questionElement || !pageQuestion) return null;
+    
+    const questionNumber = extractQuestionNumber(pageQuestion.text);
+    debugLog('Looking for container for question number:', questionNumber);
+    
+    let container = questionElement;
+    let maxDepth = 5; // Limit depth to avoid going too far up
+    let bestContainer = null;
+    let bestScore = 0;
+    
+    // Look for common question-answer container patterns
+    while (container && container.parentElement && maxDepth > 0) {
+        const parent = container.parentElement;
+        
+        // Check if parent looks like a question container
+        const hasQuestionIndicators = parent.className && 
+            parent.className.match(/(question|cau|item|quiz|test|exercise)/i);
+            
+        // Check if parent has a reasonable size to contain both question and answers
+        const hasReasonableSize = parent.children.length >= 2 && parent.children.length <= 20;
+        
+        // Check if parent contains answer-like elements
+        const hasAnswerElements = parent.querySelectorAll('*').length > 0 && 
+            Array.from(parent.querySelectorAll('*')).some(el => 
+                el.textContent && (
+                    el.className.match(/(answer|option|choice|dap-an)/i) ||
+                    el.textContent.match(/^[abcd][\.\)]/i) ||
+                    el.textContent.match(/^\s*[①②③④⑤]/i)
+                )
+            );
+        
+        // NEW: Check if this container has the same question number
+        let hasMatchingQuestionNumber = false;
+        if (questionNumber) {
+            const containerText = parent.textContent || '';
+            const containerQuestionNumber = extractQuestionNumber(containerText);
+            if (containerQuestionNumber === questionNumber) {
+                hasMatchingQuestionNumber = true;
+            }
+        }
+        
+        // Calculate score for this container
+        let score = 0;
+        if (hasQuestionIndicators) score += 3;
+        if (hasAnswerElements) score += 3;
+        if (hasReasonableSize) score += 2;
+        if (hasMatchingQuestionNumber) score += 5; // High priority for matching question number
+        
+        // NEW: Penalty for containers that span multiple questions
+        const hasMultipleQuestions = questionNumber && parent.textContent && 
+            parent.textContent.match(/câu\s*(?:hỏi\s*)?(\d+)/gi)?.length > 1;
+        if (hasMultipleQuestions) score -= 3;
+        
+        if (score > bestScore) {
+            bestScore = score;
+            bestContainer = parent;
+        }
+        
+        debugLog('Container evaluation:', {
+            tag: parent.tagName,
+            class: parent.className,
+            childCount: parent.children.length,
+            score,
+            hasQuestionIndicators,
+            hasAnswerElements,
+            hasMatchingQuestionNumber,
+            hasMultipleQuestions
+        });
+        
+        container = parent;
+        maxDepth--;
+    }
+    
+    if (bestContainer) {
+        debugLog('Best container selected:', {
+            tag: bestContainer.tagName,
+            class: bestContainer.className,
+            score: bestScore
+        });
+        return bestContainer;
+    }
+    
+    // Fallback: return a tightly scoped container
+    return questionElement.parentElement || questionElement;
+}
+
+// Helper function to check if an element belongs to the current question
+function belongsToCurrentQuestion(element, questionElement, pageQuestion) {
+    if (!pageQuestion || !questionElement) return true; // Fallback to allow
+    
+    const questionNumber = extractQuestionNumber(pageQuestion.text);
+    if (!questionNumber) return true; // Can't determine, allow
+    
+    // Check if element contains a different question number
+    const elementText = element.textContent || '';
+    const elementQuestionNumber = extractQuestionNumber(elementText);
+    
+    if (elementQuestionNumber && elementQuestionNumber !== questionNumber) {
+        debugLog('Element belongs to different question:', {
+            elementQuestionNumber,
+            currentQuestionNumber: questionNumber,
+            elementText: elementText.substring(0, 50)
+        });
+        return false;
+    }
+    
+    // Check if element is within the question container
+    const questionContainer = findQuestionContainer(questionElement, pageQuestion);
+    if (questionContainer && !questionContainer.contains(element)) {
+        debugLog('Element is outside question container');
+        return false;
+    }
+    
+    // Additional check: if element is very far from question element
+    const rect1 = questionElement.getBoundingClientRect();
+    const rect2 = element.getBoundingClientRect();
+    const distance = Math.abs(rect1.top - rect2.top);
+    
+    // If elements are more than 800px apart vertically, they're likely different questions
+    if (distance > 800) {
+        debugLog('Element too far from question:', distance, 'px');
+        return false;
+    }
+    
+    return true;
+}
+
 // Function to highlight answer text on the page
-function highlightAnswerOnPage(answerText, questionElement) {
+function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null) {
     if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
         debugLog('Skipping answer highlight - no answer text or highlighting disabled');
         return;
@@ -1529,72 +1681,124 @@ function highlightAnswerOnPage(answerText, questionElement) {
     debugLog('Original answer:', answerText);
     debugLog('Clean answer:', cleanAnswer);
     debugLog('Answer highlighting enabled:', answerHighlightingEnabled);
+    debugLog('Question context provided:', !!pageQuestion);
     
-    // Search for answer in nearby elements and the whole page
-    const searchContainers = [
-        questionElement.parentElement || document.body, // Near question first
-        questionElement, // Within question element
-        document.body // Whole page as fallback
-    ];
+    // Determine search scope - prioritize question-specific context
+    const searchContainers = [];
+    
+    if (pageQuestion && questionElement) {
+        // Find the question container and its associated answer area
+        const questionContainer = findQuestionContainer(questionElement, pageQuestion);
+        if (questionContainer) {
+            searchContainers.push(questionContainer);
+            debugLog('Using question-specific container for answer search');
+        }
+        
+        // Also search immediate siblings of the question
+        if (questionElement.parentElement) {
+            const siblings = Array.from(questionElement.parentElement.children);
+            const questionIndex = siblings.indexOf(questionElement);
+            
+            // Search in next few elements after the question (where answers usually are)
+            for (let i = questionIndex + 1; i < Math.min(questionIndex + 5, siblings.length); i++) {
+                if (siblings[i] && !isExtensionElement(siblings[i])) {
+                    searchContainers.push(siblings[i]);
+                }
+            }
+        }
+    }
+    
+    // Fallback to broader search if no specific context found
+    if (searchContainers.length === 0) {
+        searchContainers.push(
+            questionElement.parentElement || document.body, // Near question first
+            questionElement // Within question element
+        );
+    }
     
     const candidateElements = new Set(); // Use Set to avoid duplicates
     
+    debugLog('Searching in containers:', searchContainers.length);
+    
     for (const container of searchContainers) {
-        // Get elements near the question
-        if (container === questionElement.parentElement) {
-            const siblings = Array.from(container.children);
-            const questionIndex = siblings.indexOf(questionElement);
-            
-            // Check elements around the question (before and after)
-            for (let i = Math.max(0, questionIndex - 2); i < Math.min(questionIndex + 15, siblings.length); i++) {
-                // Skip extension elements
-                if (!isExtensionElement(siblings[i])) {
-                    candidateElements.add(siblings[i]);
-                    // Also check children of siblings
-                    siblings[i].querySelectorAll('*').forEach(el => {
-                        // Skip script, style, hidden elements and extension elements
-                        if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
-                            !el.hidden && el.textContent.trim().length > 0 && !isExtensionElement(el)) {
-                            candidateElements.add(el);
-                        }
-                    });
+        debugLog('Processing container:', {
+            tag: container.tagName,
+            class: container.className,
+            childCount: container.children?.length || 0
+        });
+        
+        // For question-specific containers, do a more focused search
+        if (pageQuestion && container !== questionElement && container !== questionElement.parentElement) {
+            // This is a question-specific container - search thoroughly but stay within bounds
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.textContent && el.textContent.trim().length > 0 && 
+                    !isExtensionElement(el) && 
+                    !['SCRIPT', 'STYLE'].includes(el.tagName?.toUpperCase()) &&
+                    belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                    candidateElements.add(el);
                 }
+            });
+            
+            // Also add the container itself
+            if (container.textContent && container.textContent.trim().length > 0) {
+                candidateElements.add(container);
             }
-        } else if (container === questionElement) {
-            // Check within the question element itself
+        }
+        // Handle siblings search (existing logic)
+        else if (container === questionElement.parentElement || 
+                (searchContainers.length > 1 && container !== questionElement)) {
+            
+            // For siblings, be more restrictive about distance from question
+            if (container === questionElement.parentElement) {
+                const siblings = Array.from(container.children);
+                const questionIndex = siblings.indexOf(questionElement);
+                
+                // Only check immediate neighbors and a few elements after
+                const searchRange = pageQuestion ? 
+                    { start: questionIndex, end: Math.min(questionIndex + 5, siblings.length) } :
+                    { start: Math.max(0, questionIndex - 2), end: Math.min(questionIndex + 10, siblings.length) };
+                
+                for (let i = searchRange.start; i < searchRange.end; i++) {
+                    if (siblings[i] && !isExtensionElement(siblings[i]) && 
+                        belongsToCurrentQuestion(siblings[i], questionElement, pageQuestion)) {
+                        candidateElements.add(siblings[i]);
+                        // Also check children but limit depth
+                        siblings[i].querySelectorAll('*').forEach(el => {
+                            if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
+                                !el.hidden && el.textContent.trim().length > 0 && !isExtensionElement(el) &&
+                                belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                                candidateElements.add(el);
+                            }
+                        });
+                    }
+                }
+            } else {
+                // For other sibling containers
+                container.querySelectorAll('*').forEach(el => {
+                    if (el.textContent && el.textContent.trim().length > 0 && !isExtensionElement(el) &&
+                        belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                        candidateElements.add(el);
+                    }
+                });
+            }
+        }
+        // Handle question element itself
+        else if (container === questionElement) {
             questionElement.querySelectorAll('*').forEach(el => {
                 if (!isExtensionElement(el)) {
                     candidateElements.add(el);
                 }
             });
-        } else {
-            // Search in common answer container selectors
-            const commonSelectors = [
-                '.answer', '.answers', '.option', '.options', 
-                '.choice', '.choices', '.response', '.responses',
-                '[class*="answer"]', '[class*="option"]', '[class*="choice"]',
-                '[class*="correct"]', '[class*="dap-an"]',
-                'li', 'span', 'div', 'p', 'label'
-            ];
-            
-            commonSelectors.forEach(selector => {
-                try {
-                    container.querySelectorAll(selector).forEach(el => {
-                        // Skip extension elements
-                        if (el.textContent.trim().length > 0 && !isExtensionElement(el)) {
-                            candidateElements.add(el);
-                        }
-                    });
-                } catch (e) {
-                    // Ignore selector errors
-                }
-            });
         }
     }
     
-    // Convert Set back to Array and filter out extension elements
+    // Convert Set back to Array and filter out extension elements and already highlighted elements
     const elementsArray = Array.from(candidateElements).filter(el => 
-        el && el.textContent && el.textContent.trim().length > 2 && !isExtensionElement(el)
+        el && el.textContent && el.textContent.trim().length > 2 && 
+        !isExtensionElement(el) &&
+        !el.classList.contains('tailieu-answer-highlight') &&
+        !el.querySelector('.tailieu-answer-highlight') // Don't search within already highlighted elements
     );
     
     debugLog('Total candidate elements found:', elementsArray.length);
@@ -1631,144 +1835,180 @@ function highlightAnswerOnPage(answerText, questionElement) {
             const patternLower = pattern.toLowerCase().trim();
             if (patternLower.length < 2) continue;
             
-            // Calculate similarity score with better scoring
-            const similarity = calculateAnswerSimilarity(elementText, patternLower);
+            // STRICT MATCHING: Only accept EXACT matches
+            let isExactMatch = false;
+            let matchScore = 0;
             
-            // Boost score for exact matches or elements with answer-like classes
-            let boostedScore = similarity;
-            
-            // MAJOR boost for exact substring matches
+            // Check for exact text match (highest priority)
             if (elementText === patternLower) {
-                boostedScore = 1.0; // Perfect match
-            } else if (elementText.includes(patternLower)) {
-                boostedScore = Math.min(1.0, similarity + 0.15);
-            } else if (patternLower.includes(elementText) && elementText.length > 3) {
-                boostedScore = Math.min(1.0, similarity + 0.1); // Element is part of pattern
+                isExactMatch = true;
+                matchScore = 1.0;
+                debugLog('✅ EXACT text match found:', elementText);
+            }
+            // Check for exact substring match (element text completely within pattern)
+            else if (patternLower.includes(elementText) && elementText.length >= patternLower.length * 0.8) {
+                isExactMatch = true;
+                matchScore = 0.95;
+                debugLog('✅ EXACT substring match found:', elementText, 'in', patternLower);
+            }
+            // Check for exact pattern within element text (pattern completely within element)
+            else if (elementText.includes(patternLower) && patternLower.length >= elementText.length * 0.8) {
+                isExactMatch = true;
+                matchScore = 0.9;
+                debugLog('✅ EXACT pattern match found:', patternLower, 'in', elementText);
+            }
+            // Additional check for normalized exact match (remove punctuation/spaces)
+            else {
+                const normalizedElement = elementText.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+                const normalizedPattern = patternLower.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+                
+                if (normalizedElement === normalizedPattern) {
+                    isExactMatch = true;
+                    matchScore = 0.85;
+                    debugLog('✅ EXACT normalized match found:', normalizedElement);
+                }
             }
             
-            if (candidateElement.className && 
-                candidateElement.className.match(/(answer|correct|option|choice|dap-an)/i)) {
-                boostedScore = Math.min(1.0, boostedScore + 0.08);
-            }
-            
-            // Boost score for longer matching patterns (prefer complete answers)
-            if (pattern.length > 20) {
-                boostedScore = Math.min(1.0, boostedScore + 0.05);
-            }
-            
-            // Lower threshold to catch more potential matches
-            if (boostedScore > 0.5) { // Lowered from 0.6
+            // Only proceed if we have an exact match
+            if (isExactMatch && matchScore > 0.8) {
                 allMatches.push({ 
                     element: candidateElement, 
                     pattern: pattern, 
-                    score: boostedScore,
+                    score: matchScore,
                     elementText: elementText,
                     patternLength: pattern.length,
-                    originalSimilarity: similarity
+                    isExactMatch: true
                 });
                 
-                debugLog('Match found:', {
+                debugLog('✅ EXACT Match found:', {
                     pattern: pattern.substring(0, 30),
                     elementText: elementText.substring(0, 30),
-                    score: boostedScore,
-                    similarity: similarity
+                    score: matchScore,
+                    matchType: 'EXACT'
                 });
             }
         }
     }
     
-    // Sort matches with better logic: prioritize exact matches, then completeness, then score
+    // Sort exact matches by score and completeness
     allMatches.sort((a, b) => {
-        const aIsExact = a.elementText === a.pattern.toLowerCase();
-        const bIsExact = b.elementText === b.pattern.toLowerCase();
-        
-        // Exact matches get highest priority
-        if (aIsExact && !bIsExact) return -1;
-        if (!aIsExact && bIsExact) return 1;
-        
-        // If both are exact or both are not exact, compare scores
-        if (Math.abs(a.score - b.score) > 0.05) {
+        // All matches should be exact at this point, sort by score first
+        if (Math.abs(a.score - b.score) > 0.01) {
             return b.score - a.score;
         }
         
-        // If scores are similar, prefer longer patterns (more complete answers)
-        if (Math.abs(a.patternLength - b.patternLength) > 3) {
-            return b.patternLength - a.patternLength;
-        }
+        // If scores are very similar, prefer perfect text matches
+        const aIsPerfectText = a.elementText === a.pattern.toLowerCase();
+        const bIsPerfectText = b.elementText === b.pattern.toLowerCase();
         
-        // Finally, prefer higher original similarity
-        return b.originalSimilarity - a.originalSimilarity;
+        if (aIsPerfectText && !bIsPerfectText) return -1;
+        if (!aIsPerfectText && bIsPerfectText) return 1;
+        
+        // If both are same type, prefer longer/more complete answers
+        return b.patternLength - a.patternLength;
     });
     
-    // Only highlight the BEST match (avoid multiple highlights)
+    // Only highlight if we found EXACT matches
     if (allMatches.length > 0) {
-        debugLog('Total matches found:', allMatches.length);
-        debugLog('Top matches:', allMatches.slice(0, 3).map(m => ({
+        debugLog('Total EXACT matches found:', allMatches.length);
+        debugLog('Top EXACT matches:', allMatches.slice(0, 3).map(m => ({
             pattern: m.pattern.substring(0, 30),
             score: m.score,
-            elementText: m.elementText.substring(0, 30)
+            elementText: m.elementText.substring(0, 30),
+            isExact: m.isExactMatch
         })));
         
         bestMatch = allMatches[0];
         bestScore = bestMatch.score;
         
-        debugLog('Best match selected:', {
+        debugLog('Best EXACT match selected:', {
             pattern: bestMatch.pattern,
             elementText: bestMatch.elementText,
             score: bestScore,
+            isExactMatch: bestMatch.isExactMatch,
             element: bestMatch.element
         });
         
-        // More relaxed filtering to avoid wrong highlights
+        // Minimal filtering since we already have exact matches
         const elementText = bestMatch.elementText.toLowerCase();
         const answerLower = cleanAnswer.toLowerCase();
         
-        // Skip if the element contains negative indicators
+        // Only essential filters for exact matches
+        // Skip if the element contains negative indicators (safety check)
         const hasNegativeIndicators = /(sai|wrong|incorrect|false|không đúng|không chính xác)/i.test(elementText);
         
-        // Skip if this looks like a generic "all options correct" when we have a specific answer
-        const isGenericAllAnswer = /(tất cả|all|toàn bộ).*(phương án|đáp án|options?).*(đúng|correct)/i.test(elementText);
-        const hasSpecificContent = answerLower.length > 15 && !/(tất cả|all|toàn bộ)/i.test(answerLower); // More lenient
+        debugLog('EXACT match validation - hasNegativeIndicators:', hasNegativeIndicators);
         
-        // More lenient pattern length check
-        const patternTooShort = bestMatch.pattern.length < answerLower.length * 0.2 && answerLower.length > 30; // More lenient
+        // NEW: Check if this answer is already highlighted for another question
+        const isAlreadyHighlightedElsewhere = bestMatch.element.classList.contains('tailieu-answer-highlight') ||
+            bestMatch.element.querySelector('.tailieu-answer-highlight');
         
-        debugLog('Filter checks:', {
+        // CRITICAL: Final check - does this element belong to current question?
+        const belongsToQuestion = belongsToCurrentQuestion(bestMatch.element, questionElement, pageQuestion);
+        
+        debugLog('EXACT match final validation:', {
             hasNegativeIndicators,
-            isGenericAllAnswer,
-            hasSpecificContent,
-            patternTooShort,
-            answerLength: answerLower.length,
-            patternLength: bestMatch.pattern.length
+            isAlreadyHighlightedElsewhere,
+            belongsToQuestion,
+            score: bestScore,
+            isExactMatch: bestMatch.isExactMatch
         });
         
-        if (!hasNegativeIndicators && !(isGenericAllAnswer && hasSpecificContent) && !patternTooShort) {
-            // Before highlighting, check if there are already highlighted answers
+        // Simplified filtering for exact matches - only essential checks
+        const shouldSkip = hasNegativeIndicators || 
+                          isAlreadyHighlightedElsewhere ||
+                          !belongsToQuestion; // CRITICAL: Skip if doesn't belong to current question
+        
+        debugLog('Final validation result - shouldSkip:', shouldSkip);
+        
+        if (!shouldSkip) {
+            // Enhanced check for existing highlights with question context
             const existingHighlights = document.querySelectorAll('.tailieu-answer-highlight');
             let shouldHighlight = true;
             
             debugLog('Existing highlights found:', existingHighlights.length);
             
-            // For multiple answers, be more permissive about highlighting
             if (existingHighlights.length > 0) {
                 // Check if this exact answer is already highlighted
                 let alreadyHighlighted = false;
+                let sameQuestionHighlight = false;
+                
                 existingHighlights.forEach(highlight => {
                     const highlightText = highlight.textContent.toLowerCase().trim();
                     const patternLower = bestMatch.pattern.toLowerCase().trim();
+                    
+                    // Check for text similarity
                     if (highlightText === patternLower || 
                         highlightText.includes(patternLower) || 
                         patternLower.includes(highlightText)) {
                         alreadyHighlighted = true;
+                        
+                        // Check if it's within the same question container
+                        if (pageQuestion && questionElement) {
+                            const questionContainer = findQuestionContainer(questionElement, pageQuestion);
+                            if (questionContainer && questionContainer.contains(highlight)) {
+                                sameQuestionHighlight = true;
+                            }
+                        }
                     }
                 });
                 
                 if (alreadyHighlighted) {
-                    shouldHighlight = false;
-                    debugLog('Skipping highlight - this answer already highlighted');
+                    if (sameQuestionHighlight) {
+                        // Same answer in same question - skip
+                        shouldHighlight = false;
+                        debugLog('Skipping highlight - same answer already highlighted in this question');
+                    } else if (isOutsideQuestionScope) {
+                        // Same answer but outside current question scope - skip to avoid confusion
+                        shouldHighlight = false;
+                        debugLog('Skipping highlight - same answer exists in different question context');
+                    } else {
+                        // Different question context - allow with warning
+                        debugLog('Allowing highlight - different question context but monitoring for conflicts');
+                    }
                 } else {
-                    // Allow multiple different answers to be highlighted
-                    debugLog('Allowing additional answer highlight');
+                    // Different answer - allow
+                    debugLog('Allowing additional answer highlight - different answer');
                 }
             }
             
@@ -1778,78 +2018,37 @@ function highlightAnswerOnPage(answerText, questionElement) {
                 found = true;
             }
         } else {
-            debugLog('Skipped highlighting due to filters - negative:', hasNegativeIndicators, 
-                    'generic:', isGenericAllAnswer, 'specific:', hasSpecificContent, 'short:', patternTooShort);
+            debugLog('Skipped EXACT match due to essential filters:', {
+                negative: hasNegativeIndicators,
+                alreadyHighlighted: isAlreadyHighlightedElsewhere,
+                belongsToQuestion: belongsToCurrentQuestion(bestMatch.element, questionElement, pageQuestion),
+                score: bestScore,
+                isExactMatch: bestMatch.isExactMatch
+            });
         }
     }
     
     if (!found) {
-        debugLog('❌ Answer not found with standard matching');
+        debugLog('❌ No EXACT matches found');
         debugLog('Clean answer:', cleanAnswer);
         debugLog('Total candidates checked:', elementsArray.length);
-        debugLog('Total matches found:', allMatches.length);
+        debugLog('Total EXACT matches found:', allMatches.length);
         
         if (allMatches.length > 0) {
-            debugLog('Best matches that were rejected:');
+            debugLog('EXACT matches that were rejected by filters:');
             allMatches.slice(0, 3).forEach((match, i) => {
-                debugLog(`Match ${i + 1}:`, {
+                debugLog(`Rejected EXACT match ${i + 1}:`, {
                     pattern: match.pattern,
                     score: match.score,
-                    elementText: match.elementText.substring(0, 50)
+                    elementText: match.elementText.substring(0, 50),
+                    isExact: match.isExactMatch
                 });
             });
         }
         
-        // Try VERY simple exact text search as last resort
-        debugLog('Trying simple exact search...');
-        const simpleSearchTerms = [
-            cleanAnswer.trim(),
-            cleanAnswer.toLowerCase().trim(),
-        ];
-        
-        // Add first word if answer has multiple words
-        const words = cleanAnswer.split(' ').filter(w => w.length > 2);
-        if (words.length > 1) {
-            simpleSearchTerms.push(words[0]);
-            if (words.length > 2) {
-                simpleSearchTerms.push(words.slice(0, 2).join(' '));
-            }
-        }
-        
-        debugLog('Simple search terms:', simpleSearchTerms);
-        
-        for (const searchTerm of simpleSearchTerms) {
-            if (searchTerm.length < 3) continue;
-            
-            const matches = elementsArray.filter(el => {
-                const text = el.textContent.toLowerCase().trim();
-                return text === searchTerm.toLowerCase() || 
-                       text.includes(searchTerm.toLowerCase());
-            });
-            
-            debugLog(`Simple search for "${searchTerm}" found ${matches.length} matches`);
-            
-            if (matches.length > 0) {
-                const bestMatch = matches[0];
-                highlightAnswerTextInElement(bestMatch, searchTerm);
-                debugLog('✅ Simple search success:', searchTerm);
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found) {
-            debugLog('❌ All search methods failed for answer:', cleanAnswer);
-            
-            // Final debug - show what elements we actually have
-            debugLog('Sample elements on page:', elementsArray.slice(0, 10).map(el => ({
-                tag: el.tagName,
-                text: el.textContent.trim().substring(0, 30),
-                fullText: el.textContent.trim()
-            })));
-        }
+        debugLog('🔒 STRICT MODE: Only EXACT matches are allowed - no fallback search');
     } else {
-        debugLog('✅ Answer highlighting completed successfully');
+        debugLog('✅ EXACT match highlighting completed successfully');
     }
     
     debugLog('=== ANSWER HIGHLIGHTING END ===');
