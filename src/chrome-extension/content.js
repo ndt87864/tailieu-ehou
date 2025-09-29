@@ -1372,6 +1372,19 @@ function findAllAnswersForQuestion(questionText) {
     return answersArray;
 }
 
+// Find answers that actually exist on the page for a question
+function findValidAnswersOnPage(questionText, questionElement) {
+    const allPotentialAnswers = findAllAnswersForQuestion(questionText);
+    
+    debugLog('🔍 Checking which answers actually exist on page for question:', questionText.substring(0, 50));
+    debugLog('🔍 Potential answers to check:', allPotentialAnswers);
+    
+    // For now, return all potential answers to maintain functionality
+    // We'll filter them during actual highlighting process
+    return allPotentialAnswers;
+}
+
+
 // Highlight matched question and try to find all possible answers
 function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     const element = pageQuestion.element;
@@ -1398,22 +1411,45 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         `;
         element.classList.add('tailieu-highlighted-question');
         
-        // Find ALL possible answers for this question
-        const allAnswersForQuestion = findAllAnswersForQuestion(extensionQuestion.question);
-        debugLog('Found all answers for question:', allAnswersForQuestion);
+        // Get all potential answers and try to highlight them
+        const allPotentialAnswers = findAllAnswersForQuestion(extensionQuestion.question);
+        const actuallyHighlightedAnswers = [];
         
-        // Add answer tooltip showing all possible answers
+        debugLog('Trying to highlight answers:', allPotentialAnswers);
+        
+        // Try to highlight each answer and collect successful ones
+        if (answerHighlightingEnabled && allPotentialAnswers.length > 0) {
+            allPotentialAnswers.forEach((answer, index) => {
+                debugLog(`Attempting to highlight answer ${index + 1}: "${answer}"`);
+                const wasHighlighted = highlightAnswerOnPage(answer, element);
+                if (wasHighlighted) {
+                    actuallyHighlightedAnswers.push(answer);
+                    debugLog(`✅ Successfully highlighted answer ${index + 1}: "${answer}"`);
+                } else {
+                    debugLog(`❌ Could not highlight answer ${index + 1}: "${answer}"`);
+                }
+            });
+        }
+        
+        // Determine what to show in tooltip based on what was actually highlighted
+        const answersToShow = actuallyHighlightedAnswers.length > 0 ? 
+            actuallyHighlightedAnswers : 
+            [extensionQuestion.answer]; // Fallback to primary answer
+        
+        debugLog('Answers to show in tooltip:', answersToShow);
+        
+        // Add answer tooltip showing only successfully highlighted answers
         const tooltip = document.createElement('div');
         tooltip.className = 'tailieu-answer-tooltip';
         
-        // Create tooltip content with all answers
+        // Create tooltip content with actually highlighted answers only
         let tooltipContent = '<strong>Đáp án:</strong><br>';
-        if (allAnswersForQuestion.length > 1) {
-            tooltipContent += allAnswersForQuestion.map((answer, index) => 
+        if (answersToShow.length > 1) {
+            tooltipContent += answersToShow.map((answer, index) => 
                 `${index + 1}. ${answer}`
             ).join('<br>');
         } else {
-            tooltipContent += allAnswersForQuestion[0] || extensionQuestion.answer;
+            tooltipContent += answersToShow[0];
         }
         
         tooltip.innerHTML = `
@@ -1449,11 +1485,6 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         element.addEventListener('mouseleave', () => {
             tooltip.style.display = 'none';
         });
-        
-        // Try to highlight ALL possible answers on the page (only if enabled)
-        if (answerHighlightingEnabled) {
-            highlightAllAnswersOnPage(allAnswersForQuestion, element);
-        }
     }
 }
 
