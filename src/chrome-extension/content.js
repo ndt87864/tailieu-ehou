@@ -723,10 +723,12 @@ async function compareAndHighlightQuestions() {
                 console.log(`  DB:   "${cleanExtQuestion.substring(0, 60)}..."`);
                 console.log(`  Answer: "${extQ.answer?.substring(0, 40)}..."`);
 
-                // Find all possible answers for this question
-                const allAnswers = findAllAnswersForQuestion(extQ.question);
-                if (allAnswers.length > 1) {
-                    console.log(`  🔥 Multiple answers found (${allAnswers.length}):`, allAnswers);
+                // Find ALL correct answers for this question
+                const allCorrectAnswers = findAllCorrectAnswersForQuestion(extQ.question);
+                if (allCorrectAnswers.length > 0) {
+                    console.log(`  ✅ Correct answers found (${allCorrectAnswers.length}):`, allCorrectAnswers);
+                } else {
+                    console.log(`  ❌ No correct answers found for question`);
                 }
 
                 // Highlight the question and try to find/highlight all answers
@@ -736,7 +738,7 @@ async function compareAndHighlightQuestions() {
                     pageQuestion: pageQ.text,
                     extensionQuestion: extQ.question,
                     answer: extQ.answer,
-                    allAnswers: allAnswers, // Store all possible answers
+                    allCorrectAnswers: allCorrectAnswers, // Store all correct answers
                     similarity: calculateEnhancedSimilarity(cleanPageQuestion, cleanExtQuestion),
                     confidence: finalValidation.confidence
                 });
@@ -766,6 +768,12 @@ async function compareAndHighlightQuestions() {
         // Log average confidence
         const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
         console.log(`Average confidence: ${avgConfidence.toFixed(3)}`);
+        
+        // Remove only duplicate highlights (same answer highlighted multiple times)
+        setTimeout(() => {
+            const removedCount = removeDuplicateHighlights();
+            console.log(`✅ Removed ${removedCount} duplicate highlights - unique answers preserved`);
+        }, 500); // Small delay to let all highlighting complete first
     }
     
     // Reset comparison flag and button after completion with small delay for visual feedback
@@ -1346,42 +1354,48 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
-// Find all possible answers for a question from extension questions
-function findAllAnswersForQuestion(questionText) {
+// Find ALL correct answers for a question from extension questions (can be multiple answers for same question)
+function findAllCorrectAnswersForQuestion(questionText) {
     const cleanQuestion = cleanQuestionText(questionText);
-    const allAnswers = new Set(); // Use Set to avoid duplicates
+    const correctAnswers = [];
     
-    debugLog('Finding all answers for question:', cleanQuestion);
+    debugLog('Finding ALL correct answers for question:', cleanQuestion);
     
-    // Search through all extension questions for similar questions
+    // Search through all extension questions for matching questions
     extensionQuestions.forEach(extQuestion => {
         const cleanExtQuestion = cleanQuestionText(extQuestion.question || '');
         
         // Check if questions are similar (same logic as isQuestionSimilar)
         if (isQuestionSimilar(cleanQuestion, cleanExtQuestion)) {
             if (extQuestion.answer && extQuestion.answer.trim()) {
-                allAnswers.add(extQuestion.answer.trim());
-                debugLog('Found matching answer:', extQuestion.answer.trim());
+                const answer = extQuestion.answer.trim();
+                // Only add if not already in the list (avoid duplicates)
+                if (!correctAnswers.includes(answer)) {
+                    correctAnswers.push(answer);
+                    debugLog('Found correct answer:', answer);
+                }
             }
         }
     });
     
-    const answersArray = Array.from(allAnswers);
-    debugLog('Total unique answers found:', answersArray.length);
-    
-    return answersArray;
+    debugLog('Total correct answers found:', correctAnswers.length);
+    return correctAnswers;
+}
+
+// Find the primary CORRECT answer for a question from extension questions (first match)
+function findCorrectAnswerForQuestion(questionText) {
+    const allAnswers = findAllCorrectAnswersForQuestion(questionText);
+    return allAnswers.length > 0 ? allAnswers[0] : null;
 }
 
 // Find answers that actually exist on the page for a question
 function findValidAnswersOnPage(questionText, questionElement) {
-    const allPotentialAnswers = findAllAnswersForQuestion(questionText);
+    const allCorrectAnswers = findAllCorrectAnswersForQuestion(questionText);
     
-    debugLog('🔍 Checking which answers actually exist on page for question:', questionText.substring(0, 50));
-    debugLog('🔍 Potential answers to check:', allPotentialAnswers);
+    debugLog('🔍 Checking if CORRECT answers exist on page for question:', questionText.substring(0, 50));
+    debugLog('🔍 Correct answers to check:', allCorrectAnswers);
     
-    // For now, return all potential answers to maintain functionality
-    // We'll filter them during actual highlighting process
-    return allPotentialAnswers;
+    return allCorrectAnswers;
 }
 
 
@@ -1411,23 +1425,25 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         `;
         element.classList.add('tailieu-highlighted-question');
         
-        // Get all potential answers and try to highlight them
-        const allPotentialAnswers = findAllAnswersForQuestion(extensionQuestion.question);
+        // Get ALL correct answers for this question from database
+        const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
         const actuallyHighlightedAnswers = [];
         
-        debugLog('Trying to highlight answers:', allPotentialAnswers);
+        debugLog('Trying to highlight ALL correct answers:', allCorrectAnswers);
         
-        // Try to highlight each answer and collect successful ones
+        // Try to highlight ALL correct answers from database
         // IMPORTANT: Pass the specific question element and pageQuestion to limit search scope
-        if (answerHighlightingEnabled && allPotentialAnswers.length > 0) {
-            allPotentialAnswers.forEach((answer, index) => {
-                debugLog(`Attempting to highlight answer ${index + 1} for this specific question: "${answer}"`);
-                const wasHighlighted = highlightAnswerOnPage(answer, element, pageQuestion);
-                if (wasHighlighted) {
-                    actuallyHighlightedAnswers.push(answer);
-                    debugLog(`✅ Successfully highlighted answer ${index + 1}: "${answer}"`);
-                } else {
-                    debugLog(`❌ Could not highlight answer ${index + 1}: "${answer}"`);
+        if (answerHighlightingEnabled && allCorrectAnswers.length > 0) {
+            allCorrectAnswers.forEach((correctAnswer, index) => {
+                if (correctAnswer && correctAnswer.trim()) {
+                    debugLog(`Attempting to highlight correct answer ${index + 1}/${allCorrectAnswers.length}: "${correctAnswer}"`);
+                    const wasHighlighted = highlightAnswerOnPage(correctAnswer, element, pageQuestion);
+                    if (wasHighlighted) {
+                        actuallyHighlightedAnswers.push(correctAnswer);
+                        debugLog(`✅ Successfully highlighted correct answer ${index + 1}: "${correctAnswer}"`);
+                    } else {
+                        debugLog(`❌ Could not highlight correct answer ${index + 1}: "${correctAnswer}"`);
+                    }
                 }
             });
         }
@@ -1489,34 +1505,40 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     }
 }
 
-// Function to highlight all possible answers on the page
-function highlightAllAnswersOnPage(answersArray, questionElement, pageQuestion = null) {
-    if (!answersArray || answersArray.length === 0 || !answerHighlightingEnabled) {
-        debugLog('Skipping all answers highlighting - no answers or highlighting disabled');
-        return;
+// Function to highlight ALL correct answers on the page
+function highlightAllCorrectAnswersOnPage(correctAnswers, questionElement, pageQuestion = null) {
+    if (!correctAnswers || correctAnswers.length === 0 || !answerHighlightingEnabled) {
+        debugLog('Skipping answer highlighting - no correct answers or highlighting disabled');
+        return 0;
     }
     
-    debugLog('=== HIGHLIGHTING ALL ANSWERS START ===');
-    debugLog('Total answers to highlight:', answersArray.length);
-    debugLog('Answers:', answersArray);
+    debugLog('=== HIGHLIGHTING ALL CORRECT ANSWERS START ===');
+    debugLog('Correct answers to highlight:', correctAnswers);
     debugLog('Question context provided:', !!pageQuestion);
     
-    let totalFound = 0;
+    let totalHighlighted = 0;
     
-    // Try to highlight each answer with question context
-    answersArray.forEach((answer, index) => {
-        debugLog(`--- Attempting to highlight answer ${index + 1} for specific question: "${answer}" ---`);
-        const found = highlightAnswerOnPage(answer, questionElement, pageQuestion);
-        if (found) {
-            totalFound++;
-            debugLog(`✅ Answer ${index + 1} highlighted successfully`);
-        } else {
-            debugLog(`❌ Answer ${index + 1} not found on page`);
+    // Try to highlight each correct answer with question context
+    correctAnswers.forEach((correctAnswer, index) => {
+        if (correctAnswer && correctAnswer.trim()) {
+            debugLog(`--- Attempting to highlight CORRECT answer ${index + 1}/${correctAnswers.length}: "${correctAnswer}" ---`);
+            const found = highlightAnswerOnPage(correctAnswer, questionElement, pageQuestion);
+            if (found) {
+                totalHighlighted++;
+                debugLog(`✅ Correct answer ${index + 1} highlighted successfully`);
+            } else {
+                debugLog(`❌ Correct answer ${index + 1} not found on page`);
+            }
         }
     });
     
-    debugLog(`=== HIGHLIGHTING ALL ANSWERS COMPLETE: ${totalFound}/${answersArray.length} ===`);
-    return totalFound;
+    debugLog(`=== HIGHLIGHTING ALL CORRECT ANSWERS COMPLETE: ${totalHighlighted}/${correctAnswers.length} SUCCESS ===`);
+    return totalHighlighted;
+}
+
+// Function to highlight ONLY the correct answer on the page (single answer)
+function highlightCorrectAnswerOnPage(correctAnswer, questionElement, pageQuestion = null) {
+    return highlightAllCorrectAnswersOnPage([correctAnswer], questionElement, pageQuestion) > 0;
 }
 
 // Helper function to extract question number from text
@@ -2012,6 +2034,31 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
                 }
             }
             
+            // SIMPLIFIED: Just check if this exact answer is already highlighted anywhere on the page
+            // Don't remove any existing highlights - just avoid duplicates
+            if (shouldHighlight) {
+                const currentAnswerLower = cleanAnswer.toLowerCase().trim();
+                const allExistingHighlights = document.querySelectorAll('.tailieu-answer-highlight');
+                
+                // Check if this exact answer is already highlighted
+                for (const existingHighlight of allExistingHighlights) {
+                    const existingText = existingHighlight.textContent.toLowerCase().trim();
+                    
+                    if (existingText === currentAnswerLower || 
+                        existingText.includes(currentAnswerLower) || 
+                        currentAnswerLower.includes(existingText)) {
+                        
+                        debugLog('This answer is already highlighted somewhere - skipping duplicate:', existingText);
+                        shouldHighlight = false;
+                        break;
+                    }
+                }
+                
+                if (shouldHighlight) {
+                    debugLog('No existing highlight found for this answer - proceeding with highlight');
+                }
+            }
+
             if (shouldHighlight) {
                 highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
                 debugLog('✅ Answer highlighted successfully:', bestMatch.pattern);
@@ -2433,6 +2480,194 @@ function highlightAnswerTextInElement(element, searchText) {
 }
 
 
+
+// Remove duplicate highlights and incorrect highlights (smart cleanup)
+function removeIncorrectAndDuplicateHighlights() {
+    const allHighlights = document.querySelectorAll('.tailieu-answer-highlight');
+    
+    // Get all correct answers from extension questions
+    const allCorrectAnswers = new Set();
+    extensionQuestions.forEach(eq => {
+        if (eq.answer && eq.answer.trim()) {
+            allCorrectAnswers.add(cleanAnswerText(eq.answer).toLowerCase().trim());
+        }
+    });
+    
+    debugLog('Checking highlights against correct answers:', Array.from(allCorrectAnswers));
+    debugLog('Total highlights to check:', allHighlights.length);
+    
+    const seenCorrectTexts = new Set();
+    const toRemove = [];
+    
+    allHighlights.forEach((highlight, index) => {
+        const text = cleanAnswerText(highlight.textContent).toLowerCase().trim();
+        
+        // Check if this highlight matches any correct answer
+        let isCorrectAnswer = false;
+        for (const correctAnswer of allCorrectAnswers) {
+            if (text === correctAnswer || 
+                text.includes(correctAnswer) || 
+                correctAnswer.includes(text)) {
+                isCorrectAnswer = true;
+                break;
+            }
+        }
+        
+        if (isCorrectAnswer) {
+            // This is a correct answer
+            if (seenCorrectTexts.has(text)) {
+                // But it's a duplicate of a correct answer we already saw
+                toRemove.push({highlight, reason: 'duplicate correct answer', text});
+                debugLog(`Found duplicate correct answer highlight ${index + 1}:`, text);
+            } else {
+                // First time seeing this correct answer - keep it
+                seenCorrectTexts.add(text);
+                debugLog(`Keeping correct answer highlight ${index + 1}:`, text);
+            }
+        } else {
+            // This is NOT a correct answer - remove it
+            toRemove.push({highlight, reason: 'incorrect answer', text});
+            debugLog(`Found incorrect answer highlight ${index + 1}:`, text);
+        }
+    });
+    
+    // Remove incorrect and duplicate highlights
+    toRemove.forEach((item, index) => {
+        debugLog(`Removing ${item.reason} ${index + 1}:`, item.text);
+        
+        item.highlight.classList.remove('tailieu-answer-highlight');
+        item.highlight.style.backgroundColor = '';
+        item.highlight.style.color = '';
+        item.highlight.style.fontWeight = '';
+        item.highlight.style.padding = '';
+        item.highlight.style.borderRadius = '';
+        
+        // If it was wrapped in a highlight span, unwrap it
+        if (item.highlight.tagName === 'SPAN' && item.highlight.classList.length === 0) {
+            const parent = item.highlight.parentNode;
+            if (parent) {
+                parent.insertBefore(document.createTextNode(item.highlight.textContent), item.highlight);
+                parent.removeChild(item.highlight);
+            }
+        }
+    });
+    
+    debugLog(`Removed ${toRemove.length} incorrect/duplicate highlights`);
+    return toRemove.length;
+}
+
+// Remove only duplicate highlights (same answer highlighted multiple times) - LEGACY
+function removeDuplicateHighlights() {
+    return removeIncorrectAndDuplicateHighlights();
+}
+
+// Clear only incorrect highlights while keeping correct ones (only when multiple highlights exist per question)
+function clearIncorrectHighlights() {
+    const allHighlightedAnswers = document.querySelectorAll('.tailieu-answer-highlight');
+    const correctAnswers = new Set();
+    
+    // Collect all correct answers from extension questions
+    extensionQuestions.forEach(eq => {
+        if (eq.answer) {
+            correctAnswers.add(cleanAnswerText(eq.answer).toLowerCase());
+        }
+    });
+    
+    debugLog('Checking highlighted answers against correct answers:', Array.from(correctAnswers));
+    
+    // Group highlights by question container to check per-question basis
+    const questionGroups = new Map();
+    
+    allHighlightedAnswers.forEach(highlightedElement => {
+        // Find the question container for this highlight
+        let questionContainer = highlightedElement;
+        let depth = 0;
+        const maxDepth = 10;
+        
+        // Travel up to find question container
+        while (questionContainer && questionContainer.parentElement && depth < maxDepth) {
+            const parent = questionContainer.parentElement;
+            
+            // Check if parent looks like a question container
+            if (parent.className && parent.className.match(/(question|cau|item|quiz|test|exercise)/i)) {
+                questionContainer = parent;
+                break;
+            }
+            
+            // Check if parent has multiple answer-like elements (indicating a question container)
+            const answerElements = parent.querySelectorAll('.tailieu-answer-highlight');
+            if (answerElements.length > 1) {
+                questionContainer = parent;
+                break;
+            }
+            
+            questionContainer = parent;
+            depth++;
+        }
+        
+        // Use container as key (or the element itself if no container found)
+        const containerKey = questionContainer || highlightedElement;
+        if (!questionGroups.has(containerKey)) {
+            questionGroups.set(containerKey, []);
+        }
+        questionGroups.get(containerKey).push(highlightedElement);
+    });
+    
+    debugLog('Found question groups:', questionGroups.size);
+    
+    // Process each question group
+    questionGroups.forEach((highlights, container) => {
+        debugLog(`Processing question container with ${highlights.length} highlights`);
+        
+        // ONLY process if there are multiple highlights in the same question
+        if (highlights.length <= 1) {
+            debugLog('Skipping - only 1 highlight in this question, keeping it');
+            return; // Skip single highlights - they are likely correct
+        }
+        
+        debugLog(`Found ${highlights.length} highlights in same question - checking for incorrect ones`);
+        
+        // Check each highlight in this question group
+        highlights.forEach((highlightedElement, index) => {
+            const highlightText = cleanAnswerText(highlightedElement.textContent).toLowerCase();
+            
+            // Check if this highlight matches any correct answer
+            let isCorrect = false;
+            for (const correctAnswer of correctAnswers) {
+                if (highlightText === correctAnswer || 
+                    highlightText.includes(correctAnswer) || 
+                    correctAnswer.includes(highlightText)) {
+                    isCorrect = true;
+                    break;
+                }
+            }
+            
+            if (!isCorrect) {
+                debugLog(`Removing incorrect highlight ${index + 1} from multi-highlight question:`, highlightText);
+                
+                // Remove highlight styling
+                highlightedElement.classList.remove('tailieu-answer-highlight');
+                highlightedElement.style.backgroundColor = '';
+                highlightedElement.style.color = '';
+                highlightedElement.style.fontWeight = '';
+                highlightedElement.style.padding = '';
+                highlightedElement.style.borderRadius = '';
+                
+                // If it was wrapped in a highlight span, unwrap it
+                if (highlightedElement.tagName === 'SPAN' && 
+                    highlightedElement.classList.length === 0) {
+                    const parent = highlightedElement.parentNode;
+                    if (parent) {
+                        parent.insertBefore(document.createTextNode(highlightedElement.textContent), highlightedElement);
+                        parent.removeChild(highlightedElement);
+                    }
+                }
+            } else {
+                debugLog(`Keeping correct highlight ${index + 1} in multi-highlight question:`, highlightText);
+            }
+        });
+    });
+}
 
 // Clear all highlights
 function clearAllHighlights() {
