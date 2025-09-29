@@ -840,6 +840,9 @@ function escapeRegExp(string) {
 
 // Highlight text content within an element without affecting HTML structure
 function highlightTextInElement(element, searchText) {
+    // Don't highlight within extension elements  
+    if (isExtensionElement(element)) return;
+    
     const walker = document.createTreeWalker(
         element,
         NodeFilter.SHOW_TEXT,
@@ -852,7 +855,10 @@ function highlightTextInElement(element, searchText) {
     
     // Collect all text nodes
     while (node = walker.nextNode()) {
-        textNodes.push(node);
+        // Skip text nodes within extension elements
+        if (!isExtensionElement(node.parentNode)) {
+            textNodes.push(node);
+        }
     }
     
     // Search for the text in text nodes - be more precise
@@ -1047,19 +1053,26 @@ function highlightAnswerOnPage(answerText, questionElement) {
             
             // Check elements around the question (before and after)
             for (let i = Math.max(0, questionIndex - 2); i < Math.min(questionIndex + 15, siblings.length); i++) {
-                candidateElements.add(siblings[i]);
-                // Also check children of siblings
-                siblings[i].querySelectorAll('*').forEach(el => {
-                    // Skip script, style, and hidden elements
-                    if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
-                        !el.hidden && el.textContent.trim().length > 0) {
-                        candidateElements.add(el);
-                    }
-                });
+                // Skip extension elements
+                if (!isExtensionElement(siblings[i])) {
+                    candidateElements.add(siblings[i]);
+                    // Also check children of siblings
+                    siblings[i].querySelectorAll('*').forEach(el => {
+                        // Skip script, style, hidden elements and extension elements
+                        if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
+                            !el.hidden && el.textContent.trim().length > 0 && !isExtensionElement(el)) {
+                            candidateElements.add(el);
+                        }
+                    });
+                }
             }
         } else if (container === questionElement) {
             // Check within the question element itself
-            questionElement.querySelectorAll('*').forEach(el => candidateElements.add(el));
+            questionElement.querySelectorAll('*').forEach(el => {
+                if (!isExtensionElement(el)) {
+                    candidateElements.add(el);
+                }
+            });
         } else {
             // Search in common answer container selectors
             const commonSelectors = [
@@ -1073,7 +1086,8 @@ function highlightAnswerOnPage(answerText, questionElement) {
             commonSelectors.forEach(selector => {
                 try {
                     container.querySelectorAll(selector).forEach(el => {
-                        if (el.textContent.trim().length > 0) {
+                        // Skip extension elements
+                        if (el.textContent.trim().length > 0 && !isExtensionElement(el)) {
                             candidateElements.add(el);
                         }
                     });
@@ -1084,9 +1098,9 @@ function highlightAnswerOnPage(answerText, questionElement) {
         }
     }
     
-    // Convert Set back to Array and filter
+    // Convert Set back to Array and filter out extension elements
     const elementsArray = Array.from(candidateElements).filter(el => 
-        el && el.textContent && el.textContent.trim().length > 2
+        el && el.textContent && el.textContent.trim().length > 2 && !isExtensionElement(el)
     );
     
     // Look for various answer patterns
@@ -1099,6 +1113,9 @@ function highlightAnswerOnPage(answerText, questionElement) {
     // Search in candidate elements
     for (const candidateElement of elementsArray) {
         if (found && bestScore >= 0.95) break; // Stop if we found a very good match
+        
+        // Double check to skip extension elements
+        if (isExtensionElement(candidateElement)) continue;
         
         const elementText = candidateElement.textContent?.toLowerCase().trim() || '';
         if (elementText.length < 2) continue; // Skip empty or very short elements
@@ -1162,11 +1179,74 @@ function highlightAnswerOnPage(answerText, questionElement) {
     return found;
 }
 
+// Helper function to check if element belongs to the extension
+function isExtensionElement(element) {
+    if (!element) return false;
+    
+    // Check if element itself has extension classes or IDs
+    if (element.id && (element.id.includes('tailieu') || element.id.includes('extension'))) return true;
+    if (element.className && element.className.includes && 
+        (element.className.includes('tailieu') || element.className.includes('extension'))) return true;
+    
+    // Check for specific extension selectors
+    const extensionSelectors = [
+        '#tailieu-questions-popup',
+        '#tailieu-floating-btn', 
+        '#tailieu-compare-now',
+        '.tailieu-answer-tooltip',
+        '.tailieu-highlighted-question',
+        '.tailieu-answer-highlight',
+        '.tailieu-text-highlight',
+        '[class*="tailieu"]',
+        '[id*="tailieu"]'
+    ];
+    
+    for (const selector of extensionSelectors) {
+        try {
+            if (element.matches && element.matches(selector)) return true;
+        } catch (e) {
+            // Ignore selector errors
+        }
+    }
+    
+    // Check parent elements up to a reasonable depth
+    let parent = element.parentElement;
+    let depth = 0;
+    while (parent && depth < 8) {
+        // Check parent IDs and classes
+        if (parent.id && (parent.id.includes('tailieu') || parent.id.includes('extension'))) return true;
+        if (parent.className && parent.className.includes && 
+            (parent.className.includes('tailieu') || parent.className.includes('extension'))) return true;
+        
+        // Check for common extension container attributes or high z-index
+        if (parent.hasAttribute('data-extension') || 
+            parent.hasAttribute('data-tailieu') ||
+            (parent.style.zIndex && parseInt(parent.style.zIndex) > 9999)) return true;
+            
+        // Check if parent matches extension selectors
+        for (const selector of extensionSelectors) {
+            try {
+                if (parent.matches && parent.matches(selector)) return true;
+            } catch (e) {
+                // Ignore selector errors
+            }
+        }
+            
+        parent = parent.parentElement;
+        depth++;
+    }
+    
+    return false;
+}
+
 // Helper function for partial answer matching
 function tryHighlightPartialAnswer(pattern, elementsArray) {
     const patternLower = pattern.toLowerCase();
     
     for (const element of elementsArray) {
+        // Skip extension elements
+        if (isExtensionElement(element)) continue;
+        
         const elementText = element.textContent?.toLowerCase().trim() || '';
         if (elementText.includes(patternLower) && patternLower.length > 3) {
             highlightAnswerTextInElement(element, pattern);
@@ -1291,6 +1371,9 @@ function cleanAnswerText(text) {
 
 // Highlight answer text within an element
 function highlightAnswerTextInElement(element, searchText) {
+    // Don't highlight within extension elements
+    if (isExtensionElement(element)) return;
+    
     const walker = document.createTreeWalker(
         element,
         NodeFilter.SHOW_TEXT,
@@ -1303,7 +1386,10 @@ function highlightAnswerTextInElement(element, searchText) {
     
     // Collect all text nodes
     while (node = walker.nextNode()) {
-        textNodes.push(node);
+        // Skip text nodes within extension elements
+        if (!isExtensionElement(node.parentNode)) {
+            textNodes.push(node);
+        }
     }
     
     // Search for the text in text nodes
@@ -1362,8 +1448,10 @@ function highlightAnswerTextInElement(element, searchText) {
 
 // Clear all highlights
 function clearAllHighlights() {
-    // Remove question highlights - restore original HTML
+    // Remove question highlights - restore original HTML (but skip extension elements)
     document.querySelectorAll('.tailieu-highlighted-question').forEach(element => {
+        if (isExtensionElement(element)) return; // Skip extension elements
+        
         // Remove inline styles added to the container
         element.style.borderLeft = '';
         element.style.paddingLeft = '';
@@ -1378,7 +1466,9 @@ function clearAllHighlights() {
             // Fallback: remove highlighting spans
             const highlightedSpans = element.querySelectorAll('.tailieu-text-highlight');
             highlightedSpans.forEach(span => {
-                span.outerHTML = span.textContent;
+                if (!isExtensionElement(span)) {
+                    span.outerHTML = span.textContent;
+                }
             });
         }
         
@@ -1386,17 +1476,25 @@ function clearAllHighlights() {
         
         // Remove tooltips (they should be restored with original HTML, but just in case)
         const tooltips = element.querySelectorAll('.tailieu-answer-tooltip');
-        tooltips.forEach(tooltip => tooltip.remove());
+        tooltips.forEach(tooltip => {
+            if (!isExtensionElement(tooltip)) {
+                tooltip.remove();
+            }
+        });
     });
     
-    // Remove answer highlights throughout the page
+    // Remove answer highlights throughout the page (but skip extension elements)
     document.querySelectorAll('.tailieu-answer-highlight').forEach(span => {
+        if (isExtensionElement(span)) return; // Skip extension elements
+        
         const parent = span.parentNode;
-        parent.replaceChild(document.createTextNode(span.textContent), span);
-        parent.normalize(); // Merge adjacent text nodes
+        if (parent && !isExtensionElement(parent)) {
+            parent.replaceChild(document.createTextNode(span.textContent), span);
+            parent.normalize(); // Merge adjacent text nodes
+        }
     });
     
-    console.log('All highlights cleared');
+    console.log('All highlights cleared (excluding extension elements)');
 }
 
 // Show cached questions indicator
