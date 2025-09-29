@@ -8,6 +8,7 @@ if (window.tailieuExtensionLoaded) {
 
 // Store questions from extension for comparison
 let extensionQuestions = [];
+let answerHighlightingEnabled = true; // New setting
 
 // Cache key for questions
 const QUESTIONS_CACHE_KEY = 'tailieu_questions';
@@ -369,6 +370,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ error: error.message });
         }
         return true;
+    }
+    
+    if (request.action === 'setAnswerHighlighting') {
+        console.log('Setting answer highlighting:', request.enabled);
+        answerHighlightingEnabled = request.enabled;
+        sendResponse({ success: true });
+        return;
     }
 });
 
@@ -867,7 +875,265 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         element.addEventListener('mouseleave', () => {
             tooltip.style.display = 'none';
         });
+        
+        // Try to highlight the answer on the page (only if enabled)
+        if (answerHighlightingEnabled) {
+            highlightAnswerOnPage(extensionQuestion.answer, element);
+        }
     }
+}
+
+// Function to highlight answer text on the page
+function highlightAnswerOnPage(answerText, questionElement) {
+    if (!answerText || answerText.trim() === '') return;
+    
+    const cleanAnswer = cleanAnswerText(answerText);
+    debugLog('Looking for answer on page:', cleanAnswer);
+    
+    // Search for answer in nearby elements and the whole page
+    const searchContainers = [
+        questionElement.parentElement || document.body, // Near question
+        document.body // Whole page as fallback
+    ];
+    
+    const candidateElements = new Set(); // Use Set to avoid duplicates
+    
+    for (const container of searchContainers) {
+        // Get elements near the question
+        if (container === questionElement.parentElement) {
+            const siblings = Array.from(container.children);
+            const questionIndex = siblings.indexOf(questionElement);
+            
+            // Check next few elements after the question
+            for (let i = questionIndex + 1; i < Math.min(questionIndex + 15, siblings.length); i++) {
+                candidateElements.add(siblings[i]);
+                // Also check children of siblings
+                siblings[i].querySelectorAll('*').forEach(el => candidateElements.add(el));
+            }
+            
+            // Check within the question element itself
+            questionElement.querySelectorAll('*').forEach(el => candidateElements.add(el));
+        } else {
+            // Search in common answer container selectors
+            const commonSelectors = [
+                '.answer', '.answers', '.option', '.options', 
+                '.choice', '.choices', '.response', '.responses',
+                '[class*="answer"]', '[class*="option"]', '[class*="choice"]',
+                'li', 'span', 'div', 'p'
+            ];
+            
+            commonSelectors.forEach(selector => {
+                try {
+                    container.querySelectorAll(selector).forEach(el => candidateElements.add(el));
+                } catch (e) {
+                    // Ignore selector errors
+                }
+            });
+        }
+    }
+    
+    // Convert Set back to Array
+    const elementsArray = Array.from(candidateElements);
+    
+    // Look for various answer patterns
+    const answerPatterns = generateAnswerPatterns(cleanAnswer);
+    
+    let found = false;
+    let bestMatch = null;
+    let bestScore = 0;
+    
+    // Search in candidate elements
+    for (const candidateElement of elementsArray) {
+        if (found && bestScore >= 0.9) break; // Stop if we found a very good match
+        
+        const elementText = candidateElement.textContent?.toLowerCase().trim() || '';
+        if (elementText.length < 2) continue; // Skip empty or very short elements
+        
+        for (const pattern of answerPatterns) {
+            const patternLower = pattern.toLowerCase().trim();
+            if (patternLower.length < 2) continue;
+            
+            // Calculate similarity score
+            const similarity = calculateAnswerSimilarity(elementText, patternLower);
+            
+            if (similarity > 0.7 && similarity > bestScore) { // Lowered threshold for better matching
+                bestMatch = { element: candidateElement, pattern: pattern, score: similarity };
+                bestScore = similarity;
+                
+                if (similarity >= 0.9) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    
+    // Highlight the best match if found
+    if (bestMatch && bestScore > 0.7) {
+        highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
+        debugLog('Answer highlighted:', bestMatch.pattern, 'in element:', bestMatch.element, 'score:', bestScore);
+        found = true;
+    }
+    
+    if (!found) {
+        debugLog('Answer not found on page:', cleanAnswer);
+    }
+    
+    return found;
+}
+
+// Generate various answer patterns to search for
+function generateAnswerPatterns(cleanAnswer) {
+    const patterns = new Set();
+    
+    // Add the clean answer
+    patterns.add(cleanAnswer);
+    
+    // Add with common prefixes
+    const prefixes = ['A.', 'B.', 'C.', 'D.', 'a)', 'b)', 'c)', 'd)', '1.', '2.', '3.', '4.'];
+    prefixes.forEach(prefix => {
+        patterns.add(`${prefix} ${cleanAnswer}`);
+        patterns.add(`${prefix}${cleanAnswer}`); // Without space
+    });
+    
+    // Add with Vietnamese answer markers
+    const vietnameseMarkers = ['Đáp án:', 'Trả lời:', 'Kết quả:', 'Phương án:'];
+    vietnameseMarkers.forEach(marker => {
+        patterns.add(`${marker} ${cleanAnswer}`);
+        patterns.add(`${marker}${cleanAnswer}`); // Without space
+    });
+    
+    // Add variations of the answer
+    const words = cleanAnswer.split(' ');
+    if (words.length > 1) {
+        // Try with only the most important words (skip common words)
+        const importantWords = words.filter(word => 
+            word.length > 2 && 
+            !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến'].includes(word.toLowerCase())
+        );
+        if (importantWords.length > 0) {
+            patterns.add(importantWords.join(' '));
+        }
+    }
+    
+    // Add without special characters
+    const cleanedAnswer = cleanAnswer.replace(/[^\w\sÀ-ỹ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanedAnswer !== cleanAnswer) {
+        patterns.add(cleanedAnswer);
+    }
+    
+    return Array.from(patterns).filter(p => p.trim().length > 1);
+}
+
+// Calculate similarity between element text and answer pattern
+function calculateAnswerSimilarity(elementText, pattern) {
+    // Direct substring match gets high score
+    if (elementText.includes(pattern)) {
+        const ratio = pattern.length / elementText.length;
+        return Math.min(0.95, 0.8 + ratio * 0.15); // Bonus for exact match
+    }
+    
+    // Check for word-based similarity
+    const elementWords = elementText.toLowerCase().split(/\s+/);
+    const patternWords = pattern.toLowerCase().split(/\s+/);
+    
+    let matchedWords = 0;
+    patternWords.forEach(patternWord => {
+        if (elementWords.some(elementWord => 
+            elementWord.includes(patternWord) || 
+            patternWord.includes(elementWord) ||
+            levenshteinDistance(elementWord, patternWord) <= Math.max(1, Math.floor(patternWord.length * 0.2))
+        )) {
+            matchedWords++;
+        }
+    });
+    
+    const wordSimilarity = matchedWords / patternWords.length;
+    
+    // Use Levenshtein distance for overall similarity
+    const maxLen = Math.max(elementText.length, pattern.length);
+    const levenSimilarity = maxLen > 0 ? 1 - (levenshteinDistance(elementText, pattern) / maxLen) : 0;
+    
+    // Combine both similarities
+    return Math.max(wordSimilarity * 0.7 + levenSimilarity * 0.3, levenSimilarity);
+}
+
+// Clean answer text for better matching
+function cleanAnswerText(text) {
+    return text
+        .replace(/^[A-Da-d][\.\)]\s*/, '') // Remove A. B. C. D. prefixes
+        .replace(/^\d+[\.\)]\s*/, '') // Remove number prefixes
+        .replace(/^(Đáp án|Trả lời|Kết quả):\s*/gi, '') // Remove Vietnamese answer markers
+        .trim();
+}
+
+// Highlight answer text within an element
+function highlightAnswerTextInElement(element, searchText) {
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+    
+    const textNodes = [];
+    let node;
+    
+    // Collect all text nodes
+    while (node = walker.nextNode()) {
+        textNodes.push(node);
+    }
+    
+    // Search for the text in text nodes
+    const searchLower = searchText.toLowerCase();
+    
+    textNodes.forEach(textNode => {
+        const text = textNode.textContent;
+        const textLower = text.toLowerCase();
+        
+        // Check if this text node contains the search text
+        const index = textLower.indexOf(searchLower);
+        if (index !== -1) {
+            const parent = textNode.parentNode;
+            
+            // Skip if already highlighted
+            if (parent.classList.contains('tailieu-answer-highlight')) return;
+            
+            // Create highlighted version
+            const beforeText = text.substring(0, index);
+            const matchedText = text.substring(index, index + searchText.length);
+            const afterText = text.substring(index + searchText.length);
+            
+            // Create new nodes
+            const fragment = document.createDocumentFragment();
+            
+            if (beforeText) {
+                fragment.appendChild(document.createTextNode(beforeText));
+            }
+            
+            // Create highlighted span for answer
+            const highlightSpan = document.createElement('span');
+            highlightSpan.style.cssText = `
+                background: linear-gradient(135deg, #4CAF50, #8BC34A) !important;
+                color: white !important;
+                border-radius: 4px !important;
+                padding: 3px 6px !important;
+                font-weight: bold !important;
+                box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4) !important;
+                border: 2px solid #2E7D32 !important;
+            `;
+            highlightSpan.className = 'tailieu-answer-highlight';
+            highlightSpan.textContent = matchedText;
+            fragment.appendChild(highlightSpan);
+            
+            if (afterText) {
+                fragment.appendChild(document.createTextNode(afterText));
+            }
+            
+            // Replace the original text node
+            parent.replaceChild(fragment, textNode);
+        }
+    });
 }
 
 
@@ -899,6 +1165,13 @@ function clearAllHighlights() {
         // Remove tooltips (they should be restored with original HTML, but just in case)
         const tooltips = element.querySelectorAll('.tailieu-answer-tooltip');
         tooltips.forEach(tooltip => tooltip.remove());
+    });
+    
+    // Remove answer highlights throughout the page
+    document.querySelectorAll('.tailieu-answer-highlight').forEach(span => {
+        const parent = span.parentNode;
+        parent.replaceChild(document.createTextNode(span.textContent), span);
+        parent.normalize(); // Merge adjacent text nodes
     });
     
     console.log('All highlights cleared');

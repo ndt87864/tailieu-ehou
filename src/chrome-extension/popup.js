@@ -31,7 +31,7 @@ getApiBaseUrl().then(url => {
 });
 
 // DOM Elements
-let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection;
+let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox;
 
 // Data storage
 let categories = [];
@@ -39,6 +39,7 @@ let documents = [];
 let selectedDocuments = []; // Array of selected document IDs
 let filteredDocuments = []; // Filtered documents for search
 let questions = [];
+let highlightAnswersEnabled = true; // New setting for answer highlighting
 
 // Cache keys for persistent storage
 const CACHE_KEYS = {
@@ -47,7 +48,8 @@ const CACHE_KEYS = {
     QUESTIONS: 'tailieu_questions',
     SELECTED_CATEGORY: 'tailieu_selected_category',
     SELECTED_DOCUMENTS: 'tailieu_selected_documents', // Changed from SELECTED_DOCUMENT
-    LAST_SESSION: 'tailieu_last_session'
+    LAST_SESSION: 'tailieu_last_session',
+    HIGHLIGHT_ANSWERS: 'tailieu_highlight_answers' // New cache key
 };
 
 // Initialize when DOM is loaded
@@ -90,11 +92,13 @@ function initializeElements() {
             error = document.getElementById('error');
             clearCacheBtn = document.getElementById('clearCacheBtn');
             cacheSection = document.getElementById('cacheSection');
+            highlightAnswersCheckbox = document.getElementById('highlightAnswers');
             
             // Kiểm tra tất cả elements có tồn tại không
             const elements = {
                 categorySelect, documentSearchInput, documentList, selectAllBtn,
-                clearAllBtn, selectedCountSpan, questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection
+                clearAllBtn, selectedCountSpan, questionsSection, questionsList, 
+                loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox
             };
             
             const missingElements = Object.keys(elements).filter(key => !elements[key]);
@@ -125,6 +129,9 @@ function setupEventListeners() {
     
     // Clear cache button
     clearCacheBtn.addEventListener('click', clearAllCache);
+    
+    // Answer highlight checkbox
+    highlightAnswersCheckbox.addEventListener('change', onHighlightAnswersChange);
     
     // Document list will be populated dynamically with event listeners
 }
@@ -180,6 +187,14 @@ async function restoreFromCache() {
             
             // Send to content script immediately
             sendQuestionsToContentScript(questions);
+        }
+
+        // Restore answer highlighting setting
+        const highlightAnswersSetting = await getFromCache(CACHE_KEYS.HIGHLIGHT_ANSWERS);
+        if (highlightAnswersSetting !== null && highlightAnswersCheckbox) {
+            highlightAnswersEnabled = highlightAnswersSetting;
+            highlightAnswersCheckbox.checked = highlightAnswersEnabled;
+            console.log('Answer highlighting setting restored:', highlightAnswersEnabled);
         }
 
         // Only show cache section if we have useful cache (questions + selected documents)
@@ -268,6 +283,14 @@ async function sendQuestionsToContentScript(questionsData) {
                     setTimeout(() => reject(new Error('Send questions timeout')), 3000)
                 )
             ]);
+            
+            // Also send the answer highlighting setting
+            chrome.tabs.sendMessage(activeTab.id, {
+                action: 'setAnswerHighlighting',
+                enabled: highlightAnswersEnabled
+            }).catch(error => {
+                console.log('Could not send answer highlighting setting:', error);
+            });
             
             console.log('Questions sent to content script successfully');
         } catch (messageError) {
@@ -1673,6 +1696,36 @@ async function updateQuestionsPopup(questions) {
     } catch (error) {
         console.log('Error in updateQuestionsPopup:', error.message);
         // Don't throw error to prevent breaking the popup functionality
+    }
+}
+
+// Handle answer highlighting checkbox change
+async function onHighlightAnswersChange() {
+    try {
+        highlightAnswersEnabled = highlightAnswersCheckbox.checked;
+        
+        // Save to cache
+        await saveToCache(CACHE_KEYS.HIGHLIGHT_ANSWERS, highlightAnswersEnabled);
+        
+        // Send setting to content script
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) {
+            chrome.tabs.sendMessage(tab.id, {
+                action: 'setAnswerHighlighting',
+                enabled: highlightAnswersEnabled
+            }).catch(error => {
+                console.warn('Could not send answer highlighting setting to content script:', error);
+            });
+        }
+        
+        console.log('Answer highlighting setting changed:', highlightAnswersEnabled);
+        
+        // Show feedback
+        const feedback = highlightAnswersEnabled ? 'Đã bật tô vàng đáp án' : 'Đã tắt tô vàng đáp án';
+        showSuccessMessage(feedback);
+        
+    } catch (error) {
+        console.error('Error handling answer highlighting change:', error);
     }
 }
 

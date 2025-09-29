@@ -38,6 +38,21 @@
     }
 }
 
+@keyframes answerPulse {
+    0% {
+        box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.6);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4);
+        transform: scale(1);
+    }
+}
+
 /* Additional highlight styles */
 .tailieu-highlight {
     background-color: #ffeb3b !important;
@@ -48,6 +63,25 @@
 
 .tailieu-highlight:hover {
     background-color: #ffc107 !important;
+}
+
+/* Answer highlight styles */
+.tailieu-answer-highlight {
+    background: linear-gradient(135deg, #4CAF50, #8BC34A) !important;
+    color: white !important;
+    border-radius: 4px !important;
+    padding: 3px 6px !important;
+    font-weight: bold !important;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4) !important;
+    border: 2px solid #2E7D32 !important;
+    animation: answerPulse 2s ease-in-out !important;
+}
+
+.tailieu-answer-highlight:hover {
+    background: linear-gradient(135deg, #45a049, #7CB342) !important;
+    box-shadow: 0 3px 6px rgba(76, 175, 80, 0.6) !important;
+    transform: scale(1.02) !important;
+    transition: all 0.2s ease !important;
 }
 
 /* Styles for any injected UI elements */
