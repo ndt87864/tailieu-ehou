@@ -17,7 +17,7 @@ const QUESTIONS_CACHE_KEY = 'tailieu_questions';
 let isComparing = false;
 let lastCompareTime = 0;
 const COMPARE_DEBOUNCE_MS = 2000; // 2 seconds
-let debugMode = false; // Set to true for verbose logging
+let debugMode = true; // Enable debug mode for troubleshooting
 
 // Load cached questions when page loads
 loadCachedQuestions();
@@ -432,8 +432,9 @@ async function saveCachedQuestions() {
 function extractQuestionsFromPage() {
     const questions = [];
     
-    // Enhanced patterns for Vietnamese questions
+    // Enhanced patterns for Vietnamese questions - focus on content, not labels
     const questionPatterns = [
+        /Câu\s*\d+[:\.\)\s]/gi,
         /Bài\s*\d+[:\.\)\s]/gi,
         /Question\s*\d+[:\.\)\s]/gi,
         /\d+[\.\)]\s*/g,
@@ -442,11 +443,16 @@ function extractQuestionsFromPage() {
         /.+\s+(là|gì|nào|thế nào|như thế nào|sao|tại sao|vì sao)\s*[?？]?\s*$/gi // Vietnamese question words
     ];
     
-    // Look for question-like elements with enhanced selectors
+    // Look for question-like elements with enhanced selectors, prioritize content over labels
     const questionSelectors = [
-        'div', 'p', 'span', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-        '.question', '.question-text', '.question-item', 
-        '[class*="question"]', '[class*="cau"]', '[class*="bai"]'
+        '.question-text', '.question-content', '.question-item', 
+        '[class*="question"]:not([class*="number"]):not([class*="label"])', 
+        '[class*="cau"]:not([class*="so"]):not([class*="stt"])', 
+        '[class*="bai"]:not([class*="so"]):not([class*="stt"])',
+        'div:not([class*="number"]):not([class*="label"])', 
+        'p:not([class*="number"]):not([class*="label"])', 
+        'span:not([class*="number"]):not([class*="label"])', 
+        'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
     ];
     
     const questionElements = document.querySelectorAll(questionSelectors.join(', '));
@@ -459,60 +465,103 @@ function extractQuestionsFromPage() {
         // Skip if too short, too long, or just whitespace
         if (text.length < 5 || text.length > 1000 || !text.match(/[a-zA-ZÀ-ỹ]/)) return;
         
+        // Skip elements that are likely just question numbers or labels
+        if (/^(Câu|Bài|Question)\s*\d+\s*[:\.\)]*\s*$/.test(text)) return;
+        if (/^[A-D][\.\)]\s*$/.test(text)) return;
+        if (/^\d+\s*[:\.\)]*\s*$/.test(text)) return;
+        
         // Check if text looks like a question using multiple criteria
         let isQuestion = false;
         let questionReason = '';
+        let cleanText = text;
         
-        // Pattern matching
-        if (questionPatterns.some(pattern => pattern.test(text))) {
+        // Extract main content, removing prefixes
+        const prefixMatch = text.match(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i);
+        if (prefixMatch) {
+            cleanText = text.replace(prefixMatch[0], '').trim();
+            if (cleanText.length > 10) {
+                isQuestion = true;
+                questionReason = 'has question prefix';
+            }
+        }
+        
+        // Pattern matching on clean text
+        if (!isQuestion && questionPatterns.some(pattern => pattern.test(cleanText))) {
             isQuestion = true;
             questionReason = 'pattern match';
         }
         
-        // Class name hints
-        if (element.className && element.className.match(/(question|cau|bai)/i)) {
-            isQuestion = true;
-            questionReason = 'class name';
+        // Class name hints - prefer content classes
+        if (!isQuestion && element.className) {
+            const className = element.className.toLowerCase();
+            if (className.match(/(question-text|question-content|question-item)/)) {
+                isQuestion = true;
+                questionReason = 'content class name';
+            } else if (className.match(/(question|cau|bai)/) && !className.match(/(number|label|so|stt)/)) {
+                isQuestion = true;
+                questionReason = 'general class name';
+            }
         }
         
         // Parent element hints
-        const parent = element.closest('.question, .question-item, [class*="question"]');
-        if (parent) {
-            isQuestion = true;
-            questionReason = 'parent container';
+        if (!isQuestion) {
+            const parent = element.closest('.question-text, .question-content, .question-item, [class*="question"]');
+            if (parent && parent !== element) {
+                isQuestion = true;
+                questionReason = 'parent container';
+            }
         }
         
         // Content-based detection for questions
-        const questionWords = ['là gì', 'là ai', 'như thế nào', 'thế nào', 'tại sao', 'vì sao', 'khi nào', 'ở đâu', 'bao nhiêu'];
-        if (questionWords.some(word => text.toLowerCase().includes(word))) {
-            isQuestion = true;
-            questionReason = 'question words';
+        if (!isQuestion) {
+            const questionWords = ['là gì', 'là ai', 'như thế nào', 'thế nào', 'tại sao', 'vì sao', 'khi nào', 'ở đâu', 'bao nhiêu', 'có phải', 'có đúng'];
+            if (questionWords.some(word => cleanText.toLowerCase().includes(word))) {
+                isQuestion = true;
+                questionReason = 'question words';
+            }
         }
         
         // Question mark detection
-        if (text.includes('?') || text.includes('？')) {
+        if (!isQuestion && (cleanText.includes('?') || cleanText.includes('？'))) {
             isQuestion = true;
             questionReason = 'question mark';
         }
         
-        // Length and structure-based detection
-        if (text.length > 20 && text.length < 300 && /^[A-ZÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴ]/.test(text)) {
-            const sentences = text.split(/[.!?]/);
-            if (sentences.length <= 3) {  // Likely a question if not too many sentences
-                isQuestion = true;
-                questionReason = 'structure analysis';
+        // Structure-based detection - better filtering
+        if (!isQuestion && cleanText.length > 15 && cleanText.length < 500) {
+            // Check if starts with capital letter and has question-like structure
+            if (/^[A-ZÀÁẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴ]/.test(cleanText)) {
+                const sentences = cleanText.split(/[.!?]/);
+                if (sentences.length <= 2 && cleanText.split(' ').length >= 4) {
+                    isQuestion = true;
+                    questionReason = 'structure analysis';
+                }
             }
         }
         
-        if (isQuestion) {
+        // Additional Vietnamese question patterns
+        if (!isQuestion) {
+            const vietnamesePatterns = [
+                /\b(có|được|cần|phải|nên|là|gì|nào|đâu|sao|ai|khi|lúc|bao|thế|như|vì|tại)\b.*\?/gi,
+                /.*(ưu điểm|nhược điểm|lợi ích|tác dụng|vai trò|chức năng|đặc điểm).*/gi,
+                /.*(tình đến năm|khi đăng ký|theo|dựa vào|căn cứ).*/gi
+            ];
+            if (vietnamesePatterns.some(pattern => pattern.test(cleanText))) {
+                isQuestion = true;
+                questionReason = 'Vietnamese question pattern';
+            }
+        }
+
+        if (isQuestion && cleanText.length > 5) {
             questions.push({
                 element: element,
-                text: text,
-                originalText: text,
+                text: cleanText,  // Use clean text for matching
+                originalText: text,  // Keep full text for context
                 index: index,
                 reason: questionReason
             });
             
+            debugLog(`Question found (${questionReason}): "${cleanText.substring(0, 50)}..."`);
         }
     });
     
@@ -524,7 +573,7 @@ function extractQuestionsFromPage() {
         console.log('Found test page questions:', testQuestions.length);
         testQuestions.forEach((element, index) => {
             const text = element.textContent.trim();
-            if (text && !questions.find(q => q.text === text)) {
+            if (text && !questions.find(q => q.text === text || q.originalText === text)) {
                 questions.push({
                     element: element,
                     text: text,
@@ -573,17 +622,37 @@ async function compareAndHighlightQuestions() {
     console.log('Extension questions:', extensionQuestions.length);
     console.log('Page questions found:', pageQuestions.length);
     
-    const totalComparisons = pageQuestions.length;
+    // Debug: Log sample questions
+    if (debugMode && extensionQuestions.length > 0) {
+        console.log('Extension questions sample:', extensionQuestions.slice(0, 2).map(q => 
+            `"${q.question?.substring(0, 50)}..." -> "${q.answer?.substring(0, 30)}..."`
+        ));
+    }
+    if (debugMode && pageQuestions.length > 0) {
+        console.log('Page questions sample:', pageQuestions.slice(0, 2).map(q => 
+            `"${q.text?.substring(0, 50)}..." (${q.reason})`
+        ));
+    }
+    
+    const totalComparisons = pageQuestions.length * extensionQuestions.length;
+    let comparisons = 0;
     
     for (let pageIndex = 0; pageIndex < pageQuestions.length; pageIndex++) {
         const pageQ = pageQuestions[pageIndex];
         const cleanPageQuestion = cleanQuestionText(pageQ.text);
+        let matched_for_this_page = false;
         
-        extensionQuestions.forEach((extQ, extIndex) => {
+        for (let extIndex = 0; extIndex < extensionQuestions.length && !matched_for_this_page; extIndex++) {
+            const extQ = extensionQuestions[extIndex];
             const cleanExtQuestion = cleanQuestionText(extQ.question);
+            comparisons++;
             
             // Check for similarity (exact match or high similarity)
             if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
+                console.log(`✓ MATCH #${matched.length + 1}:`);
+                console.log(`  Page: "${cleanPageQuestion.substring(0, 60)}..."`);
+                console.log(`  DB:   "${cleanExtQuestion.substring(0, 60)}..."`);
+                console.log(`  Answer: "${extQ.answer?.substring(0, 40)}..."`);
                 
                 // Highlight the question and try to find/highlight the answer
                 highlightMatchedQuestion(pageQ, extQ);
@@ -591,15 +660,33 @@ async function compareAndHighlightQuestions() {
                 matched.push({
                     pageQuestion: pageQ.text,
                     extensionQuestion: extQ.question,
-                    answer: extQ.answer
+                    answer: extQ.answer,
+                    similarity: calculateSimilarity(cleanPageQuestion, cleanExtQuestion)
                 });
+                
+                matched_for_this_page = true; // Stop searching for this page question
             }
-        });
-        
-        // Small delay every 5 items to allow UI updates
-        if ((pageIndex + 1) % 5 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 10));
         }
+        
+        // Show progress for long lists
+        if (totalComparisons > 100 && pageIndex % 10 === 0) {
+            debugLog(`Progress: ${pageIndex}/${pageQuestions.length} page questions processed`);
+        }
+        
+        // Small delay every 10 items to allow UI updates
+        if ((pageIndex + 1) % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+    }
+    
+    console.log('=== COMPARISON COMPLETE ===');
+    console.log(`Total comparisons made: ${comparisons}`);
+    console.log(`Matches found: ${matched.length}/${pageQuestions.length}`);
+    
+    if (matched.length > 0) {
+        console.log('Summary of matches:', matched.map((m, i) => 
+            `${i+1}. "${m.pageQuestion.substring(0, 40)}..." (sim: ${m.similarity?.toFixed(2)})`
+        ));
     }
     
     // Reset comparison flag and button after completion with small delay for visual feedback
@@ -684,23 +771,55 @@ function resetCompareButton(matchedCount) {
 
 // Check if two questions are similar
 function isQuestionSimilar(q1, q2) {
-    // Exact match
+    // Exact match first
     if (q1 === q2) return true;
     
-    // Remove punctuation and check again
-    const clean1 = q1.replace(/[^\w\s]/g, '').trim();
-    const clean2 = q2.replace(/[^\w\s]/g, '').trim();
+    // Clean both questions for better comparison
+    const clean1 = cleanQuestionText(q1).toLowerCase();
+    const clean2 = cleanQuestionText(q2).toLowerCase();
     
     if (clean1 === clean2) return true;
     
-    // Check if one contains the other (for partial matches)
+    // If one is much shorter than the other, unlikely to be similar
+    const minLen = Math.min(clean1.length, clean2.length);
+    const maxLen = Math.max(clean1.length, clean2.length);
+    if (minLen < maxLen * 0.5) return false;
+    
+    // Check substring matches (one contains the other with high percentage)
     if (clean1.length > 20 && clean2.length > 20) {
-        return clean1.includes(clean2) || clean2.includes(clean1);
+        if (clean1.includes(clean2) && clean2.length / clean1.length > 0.7) return true;
+        if (clean2.includes(clean1) && clean1.length / clean2.length > 0.7) return true;
     }
     
-    // Calculate similarity score
+    // Calculate similarity using Levenshtein distance
     const similarity = calculateSimilarity(clean1, clean2);
-    return similarity > 0.8; // 80% similarity threshold
+    
+    // Use dynamic threshold based on question length
+    let threshold = 0.8; // Default threshold
+    if (minLen < 50) threshold = 0.85;  // Shorter questions need higher similarity
+    if (minLen > 100) threshold = 0.75; // Longer questions can have lower threshold
+    
+    // Additional check for key words matching
+    const words1 = clean1.split(/\s+/).filter(w => w.length > 3);
+    const words2 = clean2.split(/\s+/).filter(w => w.length > 3);
+    
+    if (words1.length > 0 && words2.length > 0) {
+        const commonWords = words1.filter(w => words2.includes(w)).length;
+        const wordSimilarity = (commonWords * 2) / (words1.length + words2.length);
+        
+        // If word similarity is high, lower the threshold
+        if (wordSimilarity > 0.6) {
+            threshold = Math.max(0.65, threshold - 0.1);
+        }
+    }
+    
+    const result = similarity >= threshold;
+    
+    if (result) {
+        debugLog(`Question match found (${similarity.toFixed(3)}):`, clean1.substring(0, 50), '<=>', clean2.substring(0, 50));
+    }
+    
+    return result;
 }
 
 // Calculate similarity between two strings
@@ -736,7 +855,7 @@ function highlightTextInElement(element, searchText) {
         textNodes.push(node);
     }
     
-    // Search for the text in text nodes
+    // Search for the text in text nodes - be more precise
     const searchLower = searchText.toLowerCase();
     
     textNodes.forEach(textNode => {
@@ -744,14 +863,35 @@ function highlightTextInElement(element, searchText) {
         const textLower = text.toLowerCase();
         
         // Check if this text node contains the search text
-        const index = textLower.indexOf(searchLower);
+        let bestMatch = { index: -1, length: 0 };
+        
+        // Try exact match first
+        let index = textLower.indexOf(searchLower);
         if (index !== -1) {
+            bestMatch = { index: index, length: searchText.length };
+        } else {
+            // Try partial matches for longer texts
+            if (searchText.length > 20) {
+                const words = searchText.split(' ').filter(w => w.length > 3);
+                for (const word of words) {
+                    const wordIndex = textLower.indexOf(word.toLowerCase());
+                    if (wordIndex !== -1 && word.length > bestMatch.length) {
+                        bestMatch = { index: wordIndex, length: word.length };
+                    }
+                }
+            }
+        }
+        
+        if (bestMatch.index !== -1) {
             const parent = textNode.parentNode;
             
+            // Skip if parent already has highlighting
+            if (parent.classList.contains('tailieu-text-highlight')) return;
+            
             // Create highlighted version
-            const beforeText = text.substring(0, index);
-            const matchedText = text.substring(index, index + searchText.length);
-            const afterText = text.substring(index + searchText.length);
+            const beforeText = text.substring(0, bestMatch.index);
+            const matchedText = text.substring(bestMatch.index, bestMatch.index + bestMatch.length);
+            const afterText = text.substring(bestMatch.index + bestMatch.length);
             
             // Create new nodes
             const fragment = document.createDocumentFragment();
@@ -760,14 +900,14 @@ function highlightTextInElement(element, searchText) {
                 fragment.appendChild(document.createTextNode(beforeText));
             }
             
-            // Create highlighted span
+            // Create highlighted span - make it more subtle for questions
             const highlightSpan = document.createElement('span');
             highlightSpan.style.cssText = `
                 background: linear-gradient(135deg, #ffd700, #ffed4e) !important;
                 border-radius: 3px !important;
-                padding: 2px 4px !important;
+                padding: 1px 3px !important;
                 font-weight: bold !important;
-                box-shadow: 0 1px 3px rgba(255,107,53,0.3) !important;
+                box-shadow: 0 1px 2px rgba(255,107,53,0.2) !important;
             `;
             highlightSpan.className = 'tailieu-text-highlight';
             highlightSpan.textContent = matchedText;
@@ -885,14 +1025,15 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
 
 // Function to highlight answer text on the page
 function highlightAnswerOnPage(answerText, questionElement) {
-    if (!answerText || answerText.trim() === '') return;
+    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) return;
     
     const cleanAnswer = cleanAnswerText(answerText);
     debugLog('Looking for answer on page:', cleanAnswer);
     
     // Search for answer in nearby elements and the whole page
     const searchContainers = [
-        questionElement.parentElement || document.body, // Near question
+        questionElement.parentElement || document.body, // Near question first
+        questionElement, // Within question element
         document.body // Whole page as fallback
     ];
     
@@ -904,13 +1045,19 @@ function highlightAnswerOnPage(answerText, questionElement) {
             const siblings = Array.from(container.children);
             const questionIndex = siblings.indexOf(questionElement);
             
-            // Check next few elements after the question
-            for (let i = questionIndex + 1; i < Math.min(questionIndex + 15, siblings.length); i++) {
+            // Check elements around the question (before and after)
+            for (let i = Math.max(0, questionIndex - 2); i < Math.min(questionIndex + 15, siblings.length); i++) {
                 candidateElements.add(siblings[i]);
                 // Also check children of siblings
-                siblings[i].querySelectorAll('*').forEach(el => candidateElements.add(el));
+                siblings[i].querySelectorAll('*').forEach(el => {
+                    // Skip script, style, and hidden elements
+                    if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
+                        !el.hidden && el.textContent.trim().length > 0) {
+                        candidateElements.add(el);
+                    }
+                });
             }
-            
+        } else if (container === questionElement) {
             // Check within the question element itself
             questionElement.querySelectorAll('*').forEach(el => candidateElements.add(el));
         } else {
@@ -919,12 +1066,17 @@ function highlightAnswerOnPage(answerText, questionElement) {
                 '.answer', '.answers', '.option', '.options', 
                 '.choice', '.choices', '.response', '.responses',
                 '[class*="answer"]', '[class*="option"]', '[class*="choice"]',
-                'li', 'span', 'div', 'p'
+                '[class*="correct"]', '[class*="dap-an"]',
+                'li', 'span', 'div', 'p', 'label'
             ];
             
             commonSelectors.forEach(selector => {
                 try {
-                    container.querySelectorAll(selector).forEach(el => candidateElements.add(el));
+                    container.querySelectorAll(selector).forEach(el => {
+                        if (el.textContent.trim().length > 0) {
+                            candidateElements.add(el);
+                        }
+                    });
                 } catch (e) {
                     // Ignore selector errors
                 }
@@ -932,8 +1084,10 @@ function highlightAnswerOnPage(answerText, questionElement) {
         }
     }
     
-    // Convert Set back to Array
-    const elementsArray = Array.from(candidateElements);
+    // Convert Set back to Array and filter
+    const elementsArray = Array.from(candidateElements).filter(el => 
+        el && el.textContent && el.textContent.trim().length > 2
+    );
     
     // Look for various answer patterns
     const answerPatterns = generateAnswerPatterns(cleanAnswer);
@@ -944,23 +1098,37 @@ function highlightAnswerOnPage(answerText, questionElement) {
     
     // Search in candidate elements
     for (const candidateElement of elementsArray) {
-        if (found && bestScore >= 0.9) break; // Stop if we found a very good match
+        if (found && bestScore >= 0.95) break; // Stop if we found a very good match
         
         const elementText = candidateElement.textContent?.toLowerCase().trim() || '';
         if (elementText.length < 2) continue; // Skip empty or very short elements
+        
+        // Skip if element is already highlighted
+        if (candidateElement.classList.contains('tailieu-answer-highlight')) continue;
         
         for (const pattern of answerPatterns) {
             const patternLower = pattern.toLowerCase().trim();
             if (patternLower.length < 2) continue;
             
-            // Calculate similarity score
+            // Calculate similarity score with better scoring
             const similarity = calculateAnswerSimilarity(elementText, patternLower);
             
-            if (similarity > 0.7 && similarity > bestScore) { // Lowered threshold for better matching
-                bestMatch = { element: candidateElement, pattern: pattern, score: similarity };
-                bestScore = similarity;
+            // Boost score for exact matches or elements with answer-like classes
+            let boostedScore = similarity;
+            if (elementText === patternLower || elementText.includes(patternLower)) {
+                boostedScore = Math.min(1.0, similarity + 0.1);
+            }
+            
+            if (candidateElement.className && 
+                candidateElement.className.match(/(answer|correct|option|choice|dap-an)/i)) {
+                boostedScore = Math.min(1.0, boostedScore + 0.05);
+            }
+            
+            if (boostedScore > 0.6 && boostedScore > bestScore) { // Lowered threshold for better matching
+                bestMatch = { element: candidateElement, pattern: pattern, score: boostedScore };
+                bestScore = boostedScore;
                 
-                if (similarity >= 0.9) {
+                if (boostedScore >= 0.9) {
                     found = true;
                     break;
                 }
@@ -969,17 +1137,44 @@ function highlightAnswerOnPage(answerText, questionElement) {
     }
     
     // Highlight the best match if found
-    if (bestMatch && bestScore > 0.7) {
+    if (bestMatch && bestScore > 0.6) {
         highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
         debugLog('Answer highlighted:', bestMatch.pattern, 'in element:', bestMatch.element, 'score:', bestScore);
         found = true;
     }
     
     if (!found) {
-        debugLog('Answer not found on page:', cleanAnswer);
+        debugLog('Answer not found on page for:', cleanAnswer);
+        
+        // Try more aggressive search if no answer found
+        const aggressivePatterns = [
+            cleanAnswer.split(' ').slice(0, 3).join(' '), // First 3 words
+            cleanAnswer.split(' ').slice(-3).join(' '), // Last 3 words
+            cleanAnswer.replace(/[^\w\sÀ-ỹ]/g, '').trim() // Remove special chars
+        ].filter(p => p.length > 3);
+        
+        for (const pattern of aggressivePatterns) {
+            const found = tryHighlightPartialAnswer(pattern, elementsArray);
+            if (found) break;
+        }
     }
     
     return found;
+}
+
+// Helper function for partial answer matching
+function tryHighlightPartialAnswer(pattern, elementsArray) {
+    const patternLower = pattern.toLowerCase();
+    
+    for (const element of elementsArray) {
+        const elementText = element.textContent?.toLowerCase().trim() || '';
+        if (elementText.includes(patternLower) && patternLower.length > 3) {
+            highlightAnswerTextInElement(element, pattern);
+            debugLog('Partial answer highlighted:', pattern);
+            return true;
+        }
+    }
+    return false;
 }
 
 // Generate various answer patterns to search for
@@ -990,39 +1185,66 @@ function generateAnswerPatterns(cleanAnswer) {
     patterns.add(cleanAnswer);
     
     // Add with common prefixes
-    const prefixes = ['A.', 'B.', 'C.', 'D.', 'a)', 'b)', 'c)', 'd)', '1.', '2.', '3.', '4.'];
+    const prefixes = ['A.', 'B.', 'C.', 'D.', 'a)', 'b)', 'c)', 'd)', '1.', '2.', '3.', '4.', 'A)', 'B)', 'C)', 'D)'];
     prefixes.forEach(prefix => {
         patterns.add(`${prefix} ${cleanAnswer}`);
         patterns.add(`${prefix}${cleanAnswer}`); // Without space
     });
     
     // Add with Vietnamese answer markers
-    const vietnameseMarkers = ['Đáp án:', 'Trả lời:', 'Kết quả:', 'Phương án:'];
+    const vietnameseMarkers = ['Đáp án:', 'Trả lời:', 'Kết quả:', 'Phương án:', 'Chọn:', 'Lựa chọn:'];
     vietnameseMarkers.forEach(marker => {
         patterns.add(`${marker} ${cleanAnswer}`);
         patterns.add(`${marker}${cleanAnswer}`); // Without space
     });
     
-    // Add variations of the answer
-    const words = cleanAnswer.split(' ');
+    // Add variations of the answer without common words
+    const words = cleanAnswer.split(' ').filter(word => word.length > 0);
     if (words.length > 1) {
         // Try with only the most important words (skip common words)
         const importantWords = words.filter(word => 
             word.length > 2 && 
-            !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến'].includes(word.toLowerCase())
+            !['là', 'của', 'được', 'có', 'và', 'hoặc', 'với', 'cho', 'từ', 'đến', 
+              'trong', 'trên', 'dưới', 'về', 'theo', 'như', 'khi', 'nếu', 'nhưng',
+              'để', 'đã', 'sẽ', 'đang', 'các', 'những', 'một', 'hai', 'ba'].includes(word.toLowerCase())
         );
-        if (importantWords.length > 0) {
+        if (importantWords.length > 0 && importantWords.length < words.length) {
             patterns.add(importantWords.join(' '));
+        }
+        
+        // Try first and last parts
+        if (words.length > 3) {
+            patterns.add(words.slice(0, Math.ceil(words.length / 2)).join(' '));
+            patterns.add(words.slice(Math.floor(words.length / 2)).join(' '));
         }
     }
     
-    // Add without special characters
+    // Add without special characters and extra spaces
     const cleanedAnswer = cleanAnswer.replace(/[^\w\sÀ-ỹ]/g, ' ').replace(/\s+/g, ' ').trim();
     if (cleanedAnswer !== cleanAnswer) {
         patterns.add(cleanedAnswer);
     }
     
-    return Array.from(patterns).filter(p => p.trim().length > 1);
+    // Add shorter versions for long answers
+    if (cleanAnswer.length > 50) {
+        // First 30 characters
+        patterns.add(cleanAnswer.substring(0, 30).trim());
+        // Last 30 characters
+        patterns.add(cleanAnswer.substring(cleanAnswer.length - 30).trim());
+    }
+    
+    // Filter out very short patterns and return as array
+    return Array.from(patterns).filter(p => p.trim().length > 2);
+}
+
+// Clean answer text for better matching
+function cleanAnswerText(text) {
+    return text
+        .replace(/^[A-Da-d][\.\)]\s*/, '') // Remove A. B. C. D. prefixes
+        .replace(/^\d+[\.\)]\s*/, '') // Remove number prefixes
+        .replace(/^(Đáp án|Trả lời|Kết quả|Phương án|Chọn|Lựa chọn):\s*/gi, '') // Remove Vietnamese answer markers
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
 }
 
 // Calculate similarity between element text and answer pattern
