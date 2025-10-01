@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Tailieu Questions Extension",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Extension để hiển thị câu hỏi và đáp án từ Tailieu API",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "declarativeNetRequest",
+    "webRequest"
   ],
   "host_permissions": [
     "http://localhost:5174/*",
     "https://tailieuehou.id.vn/*",
     "https://*.firebaseapp.com/*",
-    "https://*.web.app/*"
+    "https://*.web.app/*",
+    "https://*.ehou.edu.vn/*",
+    "https://dic.tienganh123.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -22,7 +26,29 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["styles.css"]
+      "css": ["styles.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: https:; connect-src 'self' https:;"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ruleset_1",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png", "styles.css"],
+      "matches": ["<all_urls>"]
     }
   ],
   "icons": {
