@@ -797,26 +797,35 @@ const QuestionManagement = () => {
 
   const handleApplyFilter = async () => {
     // Support both single and multiple categories/documents
-    const categoriesToFilter = Array.isArray(filterCategory) ? filterCategory : (filterCategory ? [filterCategory] : []);
-    const documentsToFilter = Array.isArray(filterDocument) ? filterDocument : (filterDocument ? [filterDocument] : []);
-    
-    if (categoriesToFilter.length === 0 || documentsToFilter.length === 0) return;
-    
+    const categoriesToFilter = Array.isArray(filterCategory)
+      ? filterCategory
+      : filterCategory
+      ? [filterCategory]
+      : [];
+    const documentsToFilter = Array.isArray(filterDocument)
+      ? filterDocument
+      : filterDocument
+      ? [filterDocument]
+      : [];
+
+    if (categoriesToFilter.length === 0 || documentsToFilter.length === 0)
+      return;
+
     try {
       setLoading(true);
-      
+
       // Get questions from all selected documents
       let allQuestionsData = [];
       let allDocumentDetails = [];
-      
+
       for (const docId of documentsToFilter) {
         try {
           const questionsData = await getQuestionsByDocument(docId);
-          
+
           // Find which category this document belongs to
           let documentDetails = null;
           let documentCategoryId = null;
-          
+
           for (const categoryId of categoriesToFilter) {
             if (categoryDocuments[categoryId]) {
               documentDetails = categoryDocuments[categoryId].find(
@@ -828,7 +837,7 @@ const QuestionManagement = () => {
               }
             }
           }
-          
+
           if (!documentDetails) {
             // Fallback if document not found in selected categories
             documentDetails = {
@@ -838,39 +847,46 @@ const QuestionManagement = () => {
             };
             documentCategoryId = categoriesToFilter[0];
           }
-          
+
           allDocumentDetails.push(documentDetails);
-          
+
           // Add document info to each question
           const questionsWithDocInfo = questionsData.map((question) => ({
             ...question,
             documentTitle: documentDetails.title || "",
             documentId: documentDetails.id || "",
             categoryId: documentCategoryId || "",
-            categoryTitle: allCategories.find(cat => cat.id === documentCategoryId)?.title || "",
-            categoryLogo: allCategories.find(cat => cat.id === documentCategoryId)?.logo || null,
+            categoryTitle:
+              allCategories.find((cat) => cat.id === documentCategoryId)
+                ?.title || "",
+            categoryLogo:
+              allCategories.find((cat) => cat.id === documentCategoryId)
+                ?.logo || null,
             url_question: question.url_question || "",
             url_answer: question.url_answer || "",
           }));
-          
+
           allQuestionsData = [...allQuestionsData, ...questionsWithDocInfo];
         } catch (docError) {
-          console.error(`Error loading questions for document ${docId}:`, docError);
+          console.error(
+            `Error loading questions for document ${docId}:`,
+            docError
+          );
         }
       }
-      
+
       setQuestions(allQuestionsData || []);
-      
+
       // Set the first document and category as primary selection for compatibility
       if (documentsToFilter.length > 0) {
         setSelectedDocumentFilter(documentsToFilter[0]);
         setSelectedDocument(documentsToFilter[0]);
       }
-      
+
       if (categoriesToFilter.length > 0) {
         setSelectedCategory(categoriesToFilter[0]);
       }
-      
+
       setDocuments(allDocumentDetails);
       setShowFilterModal(false);
       setLoading(false);

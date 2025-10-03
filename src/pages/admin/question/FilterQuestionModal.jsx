@@ -10,6 +10,7 @@ const FilterQuestionModal = ({
   allCategories,
   categoryDocuments,
   handleApplyFilter,
+  handleRemoveDuplicates,
   setShowFilterModal,
 }) => {
   const [categorySearch, setCategorySearch] = useState("");
@@ -19,7 +20,7 @@ const FilterQuestionModal = ({
   const [selectedCategoryTitle, setSelectedCategoryTitle] = useState("");
   const categoryInputRef = useRef(null);
   const categoryDropdownRef = useRef(null);
-  
+
   const [documentSearch, setDocumentSearch] = useState("");
   const [showDocumentDropdown, setShowDocumentDropdown] = useState(false);
   const [filteredDocuments, setFilteredDocuments] = useState([]);
@@ -44,12 +45,12 @@ const FilterQuestionModal = ({
   useEffect(() => {
     // Get documents from all selected categories
     let allDocuments = [];
-    selectedCategories.forEach(categoryId => {
+    selectedCategories.forEach((categoryId) => {
       if (categoryDocuments[categoryId]) {
         allDocuments = [...allDocuments, ...categoryDocuments[categoryId]];
       }
     });
-    
+
     if (documentSearch.trim()) {
       const filtered = allDocuments.filter((doc) =>
         doc.title.toLowerCase().includes(documentSearch.toLowerCase())
@@ -68,7 +69,7 @@ const FilterQuestionModal = ({
     } else if (Array.isArray(filterCategory)) {
       setSelectedCategories(filterCategory);
     }
-    
+
     // Update category display title
     if (selectedCategories.length === 0) {
       setSelectedCategoryTitle("");
@@ -90,7 +91,7 @@ const FilterQuestionModal = ({
     } else if (Array.isArray(filterDocument)) {
       setSelectedDocuments(filterDocument);
     }
-    
+
     // Update display title
     if (selectedDocuments.length === 0) {
       setSelectedDocumentTitle("");
@@ -109,7 +110,12 @@ const FilterQuestionModal = ({
     } else {
       setSelectedDocumentTitle(`${selectedDocuments.length} tài liệu đã chọn`);
     }
-  }, [filterDocument, selectedCategories, categoryDocuments, selectedDocuments.length]);
+  }, [
+    filterDocument,
+    selectedCategories,
+    categoryDocuments,
+    selectedDocuments.length,
+  ]);
 
   // Handle category search input focus
   const handleCategorySearchFocus = () => {
@@ -155,17 +161,19 @@ const FilterQuestionModal = ({
     if (isChecked) {
       newSelectedCategories = [...selectedCategories, categoryId];
     } else {
-      newSelectedCategories = selectedCategories.filter(id => id !== categoryId);
+      newSelectedCategories = selectedCategories.filter(
+        (id) => id !== categoryId
+      );
     }
-    
+
     setSelectedCategories(newSelectedCategories);
     setFilterCategory(newSelectedCategories);
-    
+
     // Reset documents when categories change
     setSelectedDocuments([]);
     setFilterDocument([]);
     setSelectedDocumentTitle("");
-    
+
     // Update display title
     if (newSelectedCategories.length === 0) {
       setSelectedCategoryTitle("");
@@ -175,18 +183,24 @@ const FilterQuestionModal = ({
       );
       setSelectedCategoryTitle(selectedCat ? selectedCat.title : "");
     } else {
-      setSelectedCategoryTitle(`${newSelectedCategories.length} danh mục đã chọn`);
+      setSelectedCategoryTitle(
+        `${newSelectedCategories.length} danh mục đã chọn`
+      );
     }
   };
 
   // Handle select all / deselect all categories
   const handleSelectAllCategories = () => {
-    const allCatIds = filteredCategories.map(cat => cat.id);
-    const allSelected = allCatIds.every(id => selectedCategories.includes(id));
-    
+    const allCatIds = filteredCategories.map((cat) => cat.id);
+    const allSelected = allCatIds.every((id) =>
+      selectedCategories.includes(id)
+    );
+
     if (allSelected) {
       // Deselect all
-      const newSelected = selectedCategories.filter(id => !allCatIds.includes(id));
+      const newSelected = selectedCategories.filter(
+        (id) => !allCatIds.includes(id)
+      );
       setSelectedCategories(newSelected);
       setFilterCategory(newSelected);
     } else {
@@ -195,7 +209,7 @@ const FilterQuestionModal = ({
       setSelectedCategories(newSelected);
       setFilterCategory(newSelected);
     }
-    
+
     // Reset documents when categories change
     setSelectedDocuments([]);
     setFilterDocument([]);
@@ -208,12 +222,12 @@ const FilterQuestionModal = ({
     if (isChecked) {
       newSelectedDocuments = [...selectedDocuments, docId];
     } else {
-      newSelectedDocuments = selectedDocuments.filter(id => id !== docId);
+      newSelectedDocuments = selectedDocuments.filter((id) => id !== docId);
     }
-    
+
     setSelectedDocuments(newSelectedDocuments);
     setFilterDocument(newSelectedDocuments);
-    
+
     // Update display title
     if (newSelectedDocuments.length === 0) {
       setSelectedDocumentTitle("");
@@ -230,18 +244,22 @@ const FilterQuestionModal = ({
       }
       setSelectedDocumentTitle(selectedDoc ? selectedDoc.title : "");
     } else {
-      setSelectedDocumentTitle(`${newSelectedDocuments.length} tài liệu đã chọn`);
+      setSelectedDocumentTitle(
+        `${newSelectedDocuments.length} tài liệu đã chọn`
+      );
     }
   };
 
   // Handle select all / deselect all
   const handleSelectAllDocuments = () => {
-    const allDocIds = filteredDocuments.map(doc => doc.id);
-    const allSelected = allDocIds.every(id => selectedDocuments.includes(id));
-    
+    const allDocIds = filteredDocuments.map((doc) => doc.id);
+    const allSelected = allDocIds.every((id) => selectedDocuments.includes(id));
+
     if (allSelected) {
       // Deselect all
-      const newSelected = selectedDocuments.filter(id => !allDocIds.includes(id));
+      const newSelected = selectedDocuments.filter(
+        (id) => !allDocIds.includes(id)
+      );
       setSelectedDocuments(newSelected);
       setFilterDocument(newSelected);
     } else {
@@ -262,7 +280,10 @@ const FilterQuestionModal = ({
   // Handle click outside to close dropdowns
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target)
+      ) {
         setShowCategoryDropdown(false);
         setCategorySearch("");
       }
@@ -425,18 +446,21 @@ const FilterQuestionModal = ({
                             <input
                               type="checkbox"
                               className="mr-3 rounded"
-                              checked={filteredCategories.every(cat => selectedCategories.includes(cat.id))}
+                              checked={filteredCategories.every((cat) =>
+                                selectedCategories.includes(cat.id)
+                              )}
                               onChange={() => {}} // Handled by parent click
                             />
                             <div className="text-sm font-medium">
-                              {filteredCategories.every(cat => selectedCategories.includes(cat.id)) 
-                                ? "Bỏ chọn tất cả" 
-                                : "Chọn tất cả"
-                              }
+                              {filteredCategories.every((cat) =>
+                                selectedCategories.includes(cat.id)
+                              )
+                                ? "Bỏ chọn tất cả"
+                                : "Chọn tất cả"}
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Category list with checkboxes */}
                         {filteredCategories.map((category) => (
                           <div
@@ -452,21 +476,31 @@ const FilterQuestionModal = ({
                             }`}
                             onClick={(e) => {
                               e.preventDefault();
-                              handleCategoryCheckboxChange(category.id, !selectedCategories.includes(category.id));
+                              handleCategoryCheckboxChange(
+                                category.id,
+                                !selectedCategories.includes(category.id)
+                              );
                             }}
                           >
                             <div className="flex items-start">
                               <input
                                 type="checkbox"
                                 className="mr-3 mt-0.5 rounded"
-                                checked={selectedCategories.includes(category.id)}
+                                checked={selectedCategories.includes(
+                                  category.id
+                                )}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  handleCategoryCheckboxChange(category.id, e.target.checked);
+                                  handleCategoryCheckboxChange(
+                                    category.id,
+                                    e.target.checked
+                                  );
                                 }}
                               />
                               <div className="flex-1">
-                                <div className="text-sm font-medium">{category.title}</div>
+                                <div className="text-sm font-medium">
+                                  {category.title}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -584,18 +618,21 @@ const FilterQuestionModal = ({
                             <input
                               type="checkbox"
                               className="mr-3 rounded"
-                              checked={filteredDocuments.every(doc => selectedDocuments.includes(doc.id))}
+                              checked={filteredDocuments.every((doc) =>
+                                selectedDocuments.includes(doc.id)
+                              )}
                               onChange={() => {}} // Handled by parent click
                             />
                             <div className="text-sm font-medium">
-                              {filteredDocuments.every(doc => selectedDocuments.includes(doc.id)) 
-                                ? "Bỏ chọn tất cả" 
-                                : "Chọn tất cả"
-                              }
+                              {filteredDocuments.every((doc) =>
+                                selectedDocuments.includes(doc.id)
+                              )
+                                ? "Bỏ chọn tất cả"
+                                : "Chọn tất cả"}
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Document list with checkboxes */}
                         {filteredDocuments.map((doc) => (
                           <div
@@ -611,7 +648,10 @@ const FilterQuestionModal = ({
                             }`}
                             onClick={(e) => {
                               e.preventDefault();
-                              handleDocumentCheckboxChange(doc.id, !selectedDocuments.includes(doc.id));
+                              handleDocumentCheckboxChange(
+                                doc.id,
+                                !selectedDocuments.includes(doc.id)
+                              );
                             }}
                           >
                             <div className="flex items-start">
@@ -621,15 +661,22 @@ const FilterQuestionModal = ({
                                 checked={selectedDocuments.includes(doc.id)}
                                 onChange={(e) => {
                                   e.stopPropagation();
-                                  handleDocumentCheckboxChange(doc.id, e.target.checked);
+                                  handleDocumentCheckboxChange(
+                                    doc.id,
+                                    e.target.checked
+                                  );
                                 }}
                               />
                               <div className="flex-1">
-                                <div className="text-sm font-medium">{doc.title}</div>
+                                <div className="text-sm font-medium">
+                                  {doc.title}
+                                </div>
                                 {doc.description && (
                                   <div
                                     className={`text-xs ${
-                                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                                      isDarkMode
+                                        ? "text-gray-400"
+                                        : "text-gray-500"
                                     }`}
                                   >
                                     {doc.description}
@@ -681,12 +728,16 @@ const FilterQuestionModal = ({
                     ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-500 hover:bg-blue-600 text-white"
                 } transition-colors ${
-                  selectedCategories.length === 0 || selectedDocuments.length === 0
+                  selectedCategories.length === 0 ||
+                  selectedDocuments.length === 0
                     ? "opacity-50 cursor-not-allowed"
                     : ""
                 }`}
                 onClick={handleApplyFilter}
-                disabled={selectedCategories.length === 0 || selectedDocuments.length === 0}
+                disabled={
+                  selectedCategories.length === 0 ||
+                  selectedDocuments.length === 0
+                }
               >
                 Áp dụng ({selectedDocuments.length})
               </button>
