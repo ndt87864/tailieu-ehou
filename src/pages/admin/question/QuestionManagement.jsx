@@ -78,8 +78,8 @@ const QuestionManagement = () => {
   const [deleteSuccess, setDeleteSuccess] = useState("");
 
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filterCategory, setFilterCategory] = useState(null);
-  const [filterDocument, setFilterDocument] = useState(null);
+  const [filterCategory, setFilterCategory] = useState([]);
+  const [filterDocument, setFilterDocument] = useState([]);
   const [allCategories, setAllCategories] = useState([]);
   const [categoryDocuments, setCategoryDocuments] = useState({});
 
@@ -214,8 +214,8 @@ const QuestionManagement = () => {
           setSidebarDocuments(formattedDocuments);
           setQuestions(questionsWithInfo || []);
           setDocuments([firstDocument]);
-          setFilterCategory(firstCategory.id);
-          setFilterDocument(firstDocument.id);
+          setFilterCategory([firstCategory.id]);
+          setFilterDocument([firstDocument.id]);
         } catch (questionsError) {
           console.error("Error loading questions:", questionsError);
           setError(
@@ -796,46 +796,82 @@ const QuestionManagement = () => {
   const filteredQuestions = getFilteredQuestions();
 
   const handleApplyFilter = async () => {
-    if (!filterCategory || !filterDocument) return;
+    // Support both single and multiple categories/documents
+    const categoriesToFilter = Array.isArray(filterCategory) ? filterCategory : (filterCategory ? [filterCategory] : []);
+    const documentsToFilter = Array.isArray(filterDocument) ? filterDocument : (filterDocument ? [filterDocument] : []);
+    
+    if (categoriesToFilter.length === 0 || documentsToFilter.length === 0) return;
+    
     try {
       setLoading(true);
-      const questionsData = await getQuestionsByDocument(filterDocument);
-      let documentDetails = null;
-      if (categoryDocuments[filterCategory]) {
-        documentDetails = categoryDocuments[filterCategory].find(
-          (doc) => doc.id === filterDocument
-        );
+      
+      // Get questions from all selected documents
+      let allQuestionsData = [];
+      let allDocumentDetails = [];
+      
+      for (const docId of documentsToFilter) {
+        try {
+          const questionsData = await getQuestionsByDocument(docId);
+          
+          // Find which category this document belongs to
+          let documentDetails = null;
+          let documentCategoryId = null;
+          
+          for (const categoryId of categoriesToFilter) {
+            if (categoryDocuments[categoryId]) {
+              documentDetails = categoryDocuments[categoryId].find(
+                (doc) => doc.id === docId
+              );
+              if (documentDetails) {
+                documentCategoryId = categoryId;
+                break;
+              }
+            }
+          }
+          
+          if (!documentDetails) {
+            // Fallback if document not found in selected categories
+            documentDetails = {
+              id: docId,
+              title: "Unknown Document",
+              categoryId: categoriesToFilter[0],
+            };
+            documentCategoryId = categoriesToFilter[0];
+          }
+          
+          allDocumentDetails.push(documentDetails);
+          
+          // Add document info to each question
+          const questionsWithDocInfo = questionsData.map((question) => ({
+            ...question,
+            documentTitle: documentDetails.title || "",
+            documentId: documentDetails.id || "",
+            categoryId: documentCategoryId || "",
+            categoryTitle: allCategories.find(cat => cat.id === documentCategoryId)?.title || "",
+            categoryLogo: allCategories.find(cat => cat.id === documentCategoryId)?.logo || null,
+            url_question: question.url_question || "",
+            url_answer: question.url_answer || "",
+          }));
+          
+          allQuestionsData = [...allQuestionsData, ...questionsWithDocInfo];
+        } catch (docError) {
+          console.error(`Error loading questions for document ${docId}:`, docError);
+        }
       }
-      if (!documentDetails) {
-        documentDetails = {
-          id: filterDocument,
-          title: "Unknown Document",
-          categoryId: filterCategory,
-        };
+      
+      setQuestions(allQuestionsData || []);
+      
+      // Set the first document and category as primary selection for compatibility
+      if (documentsToFilter.length > 0) {
+        setSelectedDocumentFilter(documentsToFilter[0]);
+        setSelectedDocument(documentsToFilter[0]);
       }
-      const categoryDetails = allCategories.find(
-        (cat) => cat.id === filterCategory
-      ) || {
-        id: filterCategory,
-        title: "Unknown Category",
-      };
-      const questionsWithInfo = questionsData.map((question) => ({
-        ...question,
-        documentTitle: documentDetails.title || "",
-        documentId: documentDetails.id || "",
-        categoryId: categoryDetails.id || "",
-        categoryTitle: categoryDetails.title || "",
-        categoryLogo: categoryDetails.logo || null,
-        url_question: question.url_question || "",
-        url_answer: question.url_answer || "",
-      }));
-      setQuestions(questionsWithInfo || []);
-      setSelectedDocumentFilter(filterDocument);
-      setSelectedCategory(filterCategory);
-      setSelectedDocument(filterDocument);
-      if (documentDetails) {
-        setDocuments([documentDetails]);
+      
+      if (categoriesToFilter.length > 0) {
+        setSelectedCategory(categoriesToFilter[0]);
       }
+      
+      setDocuments(allDocumentDetails);
       setShowFilterModal(false);
       setLoading(false);
     } catch (error) {
