@@ -23,6 +23,13 @@ let lastCompareTime = 0;
 const COMPARE_DEBOUNCE_MS = 2000; // 2 seconds
 let debugMode = true; // Enable debug mode for troubleshooting
 
+// Debug logging function
+function debugLog(...args) {
+    if (debugMode) {
+        console.log('[Tailieu Extension]', ...args);
+    }
+}
+
 // Load cached questions when page loads
 loadCachedQuestions();
 
