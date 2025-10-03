@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const FilterQuestionModal = ({
   showFilterModal,
@@ -12,6 +12,100 @@ const FilterQuestionModal = ({
   handleApplyFilter,
   setShowFilterModal,
 }) => {
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [showDocumentDropdown, setShowDocumentDropdown] = useState(false);
+  const [filteredDocuments, setFilteredDocuments] = useState([]);
+  const [selectedDocumentTitle, setSelectedDocumentTitle] = useState("");
+  const documentInputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Update filtered documents when category or search changes
+  useEffect(() => {
+    if (filterCategory && categoryDocuments[filterCategory]) {
+      const documents = categoryDocuments[filterCategory];
+      if (documentSearch.trim()) {
+        const filtered = documents.filter((doc) =>
+          doc.title.toLowerCase().includes(documentSearch.toLowerCase())
+        );
+        setFilteredDocuments(filtered);
+      } else {
+        setFilteredDocuments(documents);
+      }
+    } else {
+      setFilteredDocuments([]);
+    }
+  }, [filterCategory, categoryDocuments, documentSearch]);
+
+  // Update selected document title when filterDocument changes
+  useEffect(() => {
+    if (filterDocument && filterCategory && categoryDocuments[filterCategory]) {
+      const selectedDoc = categoryDocuments[filterCategory].find(
+        (doc) => doc.id === filterDocument
+      );
+      if (selectedDoc) {
+        setSelectedDocumentTitle(selectedDoc.title);
+        setDocumentSearch("");
+        setShowDocumentDropdown(false);
+      }
+    } else {
+      setSelectedDocumentTitle("");
+    }
+  }, [filterDocument, filterCategory, categoryDocuments]);
+
+  // Handle document search input focus
+  const handleDocumentSearchFocus = () => {
+    if (filterCategory && categoryDocuments[filterCategory]) {
+      setShowDocumentDropdown(true);
+      setDocumentSearch(selectedDocumentTitle);
+      // Select all text for easy replacement
+      setTimeout(() => {
+        if (documentInputRef.current) {
+          documentInputRef.current.select();
+        }
+      }, 0);
+    }
+  };
+
+  // Handle document search input change
+  const handleDocumentSearchChange = (e) => {
+    setDocumentSearch(e.target.value);
+    setShowDocumentDropdown(true);
+  };
+
+  // Handle document selection from dropdown
+  const handleDocumentSelect = (doc) => {
+    setFilterDocument(doc.id);
+    setSelectedDocumentTitle(doc.title);
+    setDocumentSearch("");
+    setShowDocumentDropdown(false);
+  };
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDocumentDropdown(false);
+        setDocumentSearch("");
+      }
+    };
+
+    if (showDocumentDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [showDocumentDropdown]);
+
+  // Reset document selection when category changes
+  const handleCategoryChange = (e) => {
+    setFilterCategory(e.target.value);
+    setFilterDocument(null);
+    setSelectedDocumentTitle("");
+    setDocumentSearch("");
+    setShowDocumentDropdown(false);
+  };
+
   if (!showFilterModal) return null;
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
@@ -23,16 +117,28 @@ const FilterQuestionModal = ({
           &zwnj;
         </span>
         <div
-          className={`inline-block align-bottom rounded-lg text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full ${
+          className={`inline-block align-bottom rounded-lg text-left sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full ${
             isDarkMode
               ? "bg-gray-700 border border-gray-600"
               : "bg-gray-50 border border-gray-200"
           }`}
+          style={{
+            minHeight: showDocumentDropdown ? "600px" : "350px",
+            maxHeight: "90vh",
+            overflow: "hidden",
+            position: "relative"
+          }}
         >
           <div
             className={`px-6 pt-6 pb-6 ${
               isDarkMode ? "bg-gray-800" : "bg-white"
             }`}
+            style={{
+              minHeight: showDocumentDropdown ? "550px" : "300px",
+              position: "relative",
+              overflow: "visible",
+              height: "100%"
+            }}
           >
             <h3 className="text-xl font-medium leading-6 mb-5">Lọc câu hỏi</h3>
             <div className="mb-5">
@@ -50,10 +156,7 @@ const FilterQuestionModal = ({
                     : "bg-gray-50 text-gray-900 border-gray-200"
                 } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 value={filterCategory || ""}
-                onChange={(e) => {
-                  setFilterCategory(e.target.value);
-                  setFilterDocument(null);
-                }}
+                onChange={handleCategoryChange}
               >
                 <option value="">Chọn danh mục</option>
                 {allCategories.map((category) => (
@@ -63,34 +166,138 @@ const FilterQuestionModal = ({
                 ))}
               </select>
             </div>
-            <div className="mb-5">
+            <div className="mb-20" ref={dropdownRef}>
               <label
                 htmlFor="filterDocument"
                 className="block text-sm font-medium mb-2"
               >
                 Tài liệu
               </label>
-              <select
-                id="filterDocument"
-                className={`w-full rounded-xl py-3 px-4 ${
-                  isDarkMode
-                    ? "bg-gray-700 text-white border-gray-600"
-                    : "bg-gray-50 text-gray-900 border-gray-200"
-                } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                value={filterDocument || ""}
-                onChange={(e) => setFilterDocument(e.target.value)}
-                disabled={!filterCategory}
+              <div 
+                className="relative"
+                style={{
+                  position: "relative",
+                  zIndex: 1
+                }}
               >
-                <option value="">Chọn tài liệu</option>
-                {filterCategory &&
-                  categoryDocuments[filterCategory]?.map((doc) => (
-                    <option key={doc.id} value={doc.id}>
-                      {doc.title}
-                    </option>
-                  ))}
-              </select>
+                <input
+                  ref={documentInputRef}
+                  type="text"
+                  id="filterDocument"
+                  className={`w-full rounded-xl py-3 px-4 pr-10 ${
+                    isDarkMode
+                      ? "bg-gray-700 text-white border-gray-600"
+                      : "bg-gray-50 text-gray-900 border-gray-200"
+                  } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholder={
+                    filterCategory
+                      ? "Tìm kiếm tài liệu..."
+                      : "Chọn danh mục trước"
+                  }
+                  value={
+                    showDocumentDropdown
+                      ? documentSearch
+                      : selectedDocumentTitle
+                  }
+                  onChange={handleDocumentSearchChange}
+                  onFocus={handleDocumentSearchFocus}
+                  disabled={!filterCategory}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg
+                    className={`h-5 w-5 ${
+                      isDarkMode ? "text-gray-400" : "text-gray-400"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    {showDocumentDropdown ? (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 15l7-7 7 7"
+                      />
+                    ) : (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    )}
+                  </svg>
+                </div>
+
+                {/* Dropdown list */}
+                {showDocumentDropdown && filterCategory && (
+                  <div
+                    className={`absolute w-full mt-1 overflow-auto rounded-lg shadow-xl border-2 ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-500"
+                        : "bg-white border-gray-300"
+                    }`}
+                    style={{
+                      maxHeight: "300px",
+                      zIndex: 10,
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      position: "absolute"
+                    }}
+                  >
+                    {filteredDocuments.length > 0 ? (
+                      filteredDocuments.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className={`px-4 py-3 cursor-pointer hover:${
+                            isDarkMode ? "bg-gray-600" : "bg-gray-100"
+                          } ${
+                            filterDocument === doc.id
+                              ? isDarkMode
+                                ? "bg-blue-700"
+                                : "bg-blue-100"
+                              : ""
+                          }`}
+                          onClick={() => handleDocumentSelect(doc)}
+                        >
+                          <div className="text-sm font-medium">{doc.title}</div>
+                          {doc.description && (
+                            <div
+                              className={`text-xs ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              {doc.description}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div
+                        className={`px-4 py-3 text-sm ${
+                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        {documentSearch.trim()
+                          ? "Không tìm thấy tài liệu nào"
+                          : "Không có tài liệu trong danh mục này"}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex justify-end space-x-4">
+            <div 
+              className="flex justify-end space-x-4"
+              style={{
+                position: "relative",
+                zIndex: 0,
+                marginTop: "auto"
+              }}
+            >
               <button
                 type="button"
                 className={`px-4 py-2 rounded-md font-medium ${

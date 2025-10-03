@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Icon Generator - Convert SVG to PNG</title>
     <style>
@@ -10,17 +11,20 @@
             padding: 20px;
             background: #f5f5f5;
         }
+
         .container {
             background: white;
             padding: 30px;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             color: #333;
             text-align: center;
             margin-bottom: 30px;
         }
+
         .icon-section {
             margin: 30px 0;
             padding: 20px;
@@ -28,17 +32,20 @@
             border-radius: 8px;
             text-align: center;
         }
+
         .icon-preview {
             margin: 20px 0;
             padding: 20px;
             background: #f9f9f9;
             border-radius: 5px;
         }
+
         canvas {
             border: 1px solid #ccc;
             margin: 10px;
             background: white;
         }
+
         button {
             background: #4CAF50;
             color: white;
@@ -49,9 +56,11 @@
             font-size: 16px;
             margin: 10px;
         }
+
         button:hover {
             background: #45a049;
         }
+
         .download-link {
             display: inline-block;
             margin: 10px;
@@ -61,9 +70,11 @@
             text-decoration: none;
             border-radius: 4px;
         }
+
         .download-link:hover {
             background: #1976D2;
         }
+
         .info {
             background: #e3f2fd;
             padding: 15px;
@@ -72,10 +83,11 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>🎨 Tailieu Extension Icon Generator</h1>
-        
+
         <div class="info">
             <strong>Hướng dẫn:</strong> Tool này sẽ tự động load SVG icons và convert sang PNG cho Chrome Extension
         </div>
@@ -88,7 +100,8 @@
                 <canvas id="canvas16" width="16" height="16"></canvas>
             </div>
             <button onclick="generateIcon16()">Generate PNG 16x16</button>
-            <a id="download16" class="download-link" style="display:none;" download="icon16.png">📥 Download icon16.png</a>
+            <a id="download16" class="download-link" style="display:none;" download="icon16.png">📥 Download
+                icon16.png</a>
         </div>
 
         <!-- Icon 128x128 -->
@@ -99,7 +112,8 @@
                 <canvas id="canvas128" width="128" height="128"></canvas>
             </div>
             <button onclick="generateIcon128()">Generate PNG 128x128</button>
-            <a id="download128" class="download-link" style="display:none;" download="icon128.png">📥 Download icon128.png</a>
+            <a id="download128" class="download-link" style="display:none;" download="icon128.png">📥 Download
+                icon128.png</a>
         </div>
 
         <!-- Generate All -->
@@ -220,31 +234,31 @@
         function svgToPng(svgContent, size, canvasId, downloadId) {
             const canvas = document.getElementById(canvasId);
             const ctx = canvas.getContext('2d');
-            
+
             // Clear canvas
             ctx.clearRect(0, 0, size, size);
-            
+
             // Create image from SVG
             const img = new Image();
-            const svgBlob = new Blob([svgContent], {type: 'image/svg+xml;charset=utf-8'});
+            const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(svgBlob);
-            
-            img.onload = function() {
+
+            img.onload = function () {
                 // Draw image on canvas
                 ctx.drawImage(img, 0, 0, size, size);
-                
+
                 // Convert canvas to PNG
-                canvas.toBlob(function(blob) {
+                canvas.toBlob(function (blob) {
                     const url = URL.createObjectURL(blob);
                     const downloadLink = document.getElementById(downloadId);
                     downloadLink.href = url;
                     downloadLink.style.display = 'inline-block';
                     console.log(`✅ Generated PNG ${size}x${size}`);
                 }, 'image/png');
-                
+
                 URL.revokeObjectURL(url);
             };
-            
+
             img.src = url;
         }
 
@@ -266,10 +280,11 @@
         }
 
         // Load previews when page loads
-        window.onload = function() {
+        window.onload = function () {
             loadSvgPreviews();
             console.log('📱 Icon Generator ready!');
         };
     </script>
 </body>
+
 </html>

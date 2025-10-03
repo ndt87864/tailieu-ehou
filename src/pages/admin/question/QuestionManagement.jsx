@@ -1325,6 +1325,10 @@ const QuestionManagement = () => {
           questionType={questionType}
           setQuestionType={setQuestionType}
           documents={documents}
+          allCategories={allCategories}
+          categoryDocuments={categoryDocuments}
+          selectedDocumentFilter={selectedDocumentFilter}
+          setSelectedDocumentFilter={setSelectedDocumentFilter}
           newQuestion={newQuestion}
           handleInputChange={handleInputChange}
           questionImageInputRef={questionImageInputRef}
@@ -1360,6 +1364,10 @@ const QuestionManagement = () => {
           imageError={imageError}
           handleUpdateQuestion={handleUpdateQuestion}
           documents={documents}
+          allCategories={allCategories}
+          categoryDocuments={categoryDocuments}
+          selectedDocumentFilter={selectedDocumentFilter}
+          setSelectedDocumentFilter={setSelectedDocumentFilter}
           editQuestion={editQuestion}
           handleEditInputChange={handleEditInputChange}
           questionImageInputRef={questionImageInputRef}

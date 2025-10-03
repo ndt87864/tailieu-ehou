@@ -5,7 +5,7 @@ Extension Chrome để hiển thị câu hỏi và đáp án từ API Tailieu.
 ## 🚀 Tính năng
 
 - 🔍 Tự động quét và nhận diện câu hỏi trắc nghiệm trên trang web
-- ✅ Tìm kiếm đáp án chính xác từ cơ sở dữ liệu Tailieu  
+- ✅ Tìm kiếm đáp án chính xác từ cơ sở dữ liệu Tailieu
 - 🎨 Highlight đáp án đúng với màu sắc nổi bật
 - 📚 Hỗ trợ nhiều danh mục môn học khác nhau
 - 💾 Lưu trữ câu hỏi và đáp án để sử dụng offline
@@ -45,11 +45,12 @@ Server sẽ chạy tại: http://localhost:3001
 Extension đã có đầy đủ icons chất lượng cao:
 
 - ✅ `icon16.png` (16x16px) - Toolbar icon
-- ✅ `icon48.png` (48x48px) - Extension management  
+- ✅ `icon48.png` (48x48px) - Extension management
 - ✅ `icon128.png` (128x128px) - Chrome Web Store
 - 📄 `icon16.svg`, `icon48.svg`, `icon128.svg` - Source files
 
 **Tạo thêm PNG từ SVG:**
+
 - Mở file: `icons/icon-generator-simple.html` trong Chrome
 - Click "Generate & Download PNG Icons" để tạo PNG mới
 
