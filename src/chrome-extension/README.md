@@ -4,10 +4,14 @@ Extension Chrome để hiển thị câu hỏi và đáp án từ API Tailieu.
 
 ## 🚀 Tính năng
 
-- Hiển thị popup cho phép chọn danh mục và tài liệu
-- Lấy danh sách câu hỏi và đáp án từ tài liệu được chọn
-- Giao diện đẹp và dễ sử dụng
-- Tích hợp với REST API của Tailieu
+- 🔍 Tự động quét và nhận diện câu hỏi trắc nghiệm trên trang web
+- ✅ Tìm kiếm đáp án chính xác từ cơ sở dữ liệu Tailieu  
+- 🎨 Highlight đáp án đúng với màu sắc nổi bật
+- 📚 Hỗ trợ nhiều danh mục môn học khác nhau
+- 💾 Lưu trữ câu hỏi và đáp án để sử dụng offline
+- 🚀 Hoạt động tự động khi phát hiện câu hỏi
+- 🎯 Giao diện popup đẹp và dễ sử dụng
+- 🔄 Tích hợp với REST API của Tailieu
 
 ## 📦 Cài đặt
 
@@ -36,13 +40,18 @@ Server sẽ chạy tại: http://localhost:3001
 
 4. **Extension được cài đặt**: Bạn sẽ thấy extension xuất hiện trong danh sách
 
-### 3. Tạo Icons (Tuỳ chọn)
+### 3. Icons đã sẵn sàng
 
-Để extension có icon đẹp, tạo các file sau trong thư mục `icons/`:
+Extension đã có đầy đủ icons chất lượng cao:
 
-- `icon16.png` (16x16px)
-- `icon48.png` (48x48px)
-- `icon128.png` (128x128px)
+- ✅ `icon16.png` (16x16px) - Toolbar icon
+- ✅ `icon48.png` (48x48px) - Extension management  
+- ✅ `icon128.png` (128x128px) - Chrome Web Store
+- 📄 `icon16.svg`, `icon48.svg`, `icon128.svg` - Source files
+
+**Tạo thêm PNG từ SVG:**
+- Mở file: `icons/icon-generator-simple.html` trong Chrome
+- Click "Generate & Download PNG Icons" để tạo PNG mới
 
 ## 🎯 Sử dụng
 

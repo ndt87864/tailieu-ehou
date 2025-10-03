@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Tailieu Questions Extension",
+  "name": "Tailieu Questions - Tự động tìm đáp án câu hỏi",
   "version": "1.0.4",
-  "description": "Extension để hiển thị câu hỏi và đáp án từ Tailieu API",
+  "description": "Tự động tìm và highlight đáp án đúng cho câu hỏi trắc nghiệm từ cơ sở dữ liệu Tailieu. Hỗ trợ học tập hiệu quả.",
   "permissions": [
     "activeTab",
     "storage",

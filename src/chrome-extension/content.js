@@ -1,14 +1,12 @@
 // Content script for Tailieu Questions Extension
 // Prevent multiple script injections
 if (window.tailieuExtensionLoaded) {
-    console.log('Tailieu Questions Extension already loaded, skipping');
+    // Already loaded, skip
 } else {
     window.tailieuExtensionLoaded = true;
-    console.log('Tailieu Questions Extension content script loaded');
     
     // Ensure basic DOM safety by waiting for document to be available
     if (!document) {
-        console.error('Document is not available, extension cannot run');
         throw new Error('Document not available');
     }
 
@@ -72,13 +70,13 @@ async function performAutoCompare(force = false) {
     // Throttle auto-compare to avoid too frequent calls (unless forced)
     const now = Date.now();
     if (!force && now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
-        debugLog('Auto-compare throttled, too soon since last compare');
+
         return;
     }
     
     // Skip if currently comparing
     if (isComparing) {
-        debugLog('Auto-compare skipped, already comparing');
+
         return;
     }
     
@@ -88,7 +86,7 @@ async function performAutoCompare(force = false) {
     }
     
     if (extensionQuestions.length > 0) {
-        debugLog('Auto-comparing questions on page:', extensionQuestions.length);
+
         lastCompareTime = now;
         isComparing = true;
         
@@ -110,7 +108,7 @@ async function performAutoCompare(force = false) {
             const result = await compareAndHighlightQuestions();
             
             if (result.matched > 0) {
-                console.log(` Tự động so sánh: Tìm thấy ${result.matched}/${extensionQuestions.length} câu hỏi trên trang`);
+
                 showAutoCompareNotification(result.matched, extensionQuestions.length);
                 
                 // Notify popup about successful comparison
@@ -125,19 +123,19 @@ async function performAutoCompare(force = false) {
                     }
                 } catch (err) {
                     if (err.message.includes('Extension context invalidated')) {
-                        console.log('Extension was reloaded, message sending skipped');
+
                     } else {
-                        debugLog('Could not notify popup:', err.message);
+
                     }
                 }
             } else {
-                debugLog('Auto-compare completed, no matches found');
+
             }
         } finally {
             isComparing = false;
         }
     } else {
-        debugLog('Auto-compare skipped, no questions available');
+
     }
 }
 
@@ -231,7 +229,7 @@ monitorUrlChanges();
 // Also listen to popstate events (back/forward buttons)
 if (!window.tailieuPopstateListener) {
     window.addEventListener('popstate', () => {
-        debugLog('Popstate event detected, performing auto-compare');
+
         setTimeout(performAutoCompare, 1000);
     });
     window.tailieuPopstateListener = true;
@@ -245,13 +243,13 @@ if (!window.tailieuHistoryOverridden) {
 
     history.pushState = function(...args) {
         originalPushState.apply(this, args);
-        debugLog('PushState detected, performing auto-compare');
+
         setTimeout(performAutoCompare, 1000);
     };
 
     history.replaceState = function(...args) {
         originalReplaceState.apply(this, args);
-        debugLog('ReplaceState detected, performing auto-compare');
+
         setTimeout(performAutoCompare, 1000);
     };
     
@@ -262,7 +260,7 @@ if (!window.tailieuHistoryOverridden) {
 if (chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local' && changes[QUESTIONS_CACHE_KEY]) {
-            console.log('Questions cache updated, triggering auto-compare');
+
             
             // Update local questions cache
             if (changes[QUESTIONS_CACHE_KEY].newValue) {
@@ -291,12 +289,7 @@ if (chrome?.storage?.onChanged) {
     });
 }
 
-// Conditional logging function
-function debugLog(...args) {
-    if (debugMode) {
-        console.log(...args);
-    }
-}
+
 
 // Safely append element to body when available
 function safeAppendToBody(element, callback = null) {
@@ -330,7 +323,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return true; // Keep message channel open
         }
     } catch (error) {
-        console.error('Error handling getPageInfo:', error);
+
         sendResponse({ error: error.message });
         return true;
     }
@@ -350,7 +343,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     totalPageQuestions: result.pageQuestions.length 
                 });
             } catch (error) {
-                console.error('Error handling compareQuestions:', error);
+
                 sendResponse({ error: error.message });
             }
         })();
@@ -370,7 +363,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error handling setExtensionQuestions:', error);
+
             sendResponse({ error: error.message });
         }
         return true;
@@ -381,7 +374,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             clearAllHighlights();
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error handling clearHighlights:', error);
+
             sendResponse({ error: error.message });
         }
         return true;
@@ -392,7 +385,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             updateQuestionsPopup(request.questions || []);
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error handling updateQuestionsPopup:', error);
+
             sendResponse({ error: error.message });
         }
         return true;
@@ -425,7 +418,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             
             sendResponse({ success: true });
         } catch (error) {
-            console.error('Error handling clearCache:', error);
+
             sendResponse({ error: error.message });
         }
         return true;
@@ -456,7 +449,7 @@ async function loadCachedQuestions() {
                 // Update questions popup with cached questions (safely)
                 updateQuestionsPopup(extensionQuestions);
             } catch (uiError) {
-                console.warn('Error updating UI elements:', uiError.message);
+
                 // Continue execution even if UI updates fail
             }
         }
@@ -464,7 +457,7 @@ async function loadCachedQuestions() {
         if (error.message.includes('Extension context invalidated')) {
             return;
         }
-        console.error('Error loading cached questions:', error);
+
     }
 }
 
@@ -481,7 +474,7 @@ async function saveCachedQuestions() {
         if (error.message.includes('Extension context invalidated')) {
             return;
         }
-        console.error('Error saving questions to cache:', error);
+
     }
 }
 
@@ -712,18 +705,18 @@ async function compareAndHighlightQuestions() {
                 const finalValidation = performFinalValidation(pageQ.text, extQ.question);
                 
                 if (!finalValidation.isValid) {
-                    debugLog(`⚠️ REJECTED after final validation: ${finalValidation.reason}`);
-                    debugLog(`  Page: "${cleanPageQuestion.substring(0, 40)}..."`);
-                    debugLog(`  DB:   "${cleanExtQuestion.substring(0, 40)}..."`);
+
+
+
                     continue; // Skip this match
                 }
                 
                 // Find ALL correct answers for this question
                 const allCorrectAnswers = findAllCorrectAnswersForQuestion(extQ.question);
                 if (allCorrectAnswers.length > 0) {
-                    console.log(`   Correct answers found (${allCorrectAnswers.length})`);
+
                 } else {
-                    console.log(`  No correct answers found for question`);
+
                 }
 
                 // Highlight the question and try to find/highlight all answers
@@ -742,7 +735,7 @@ async function compareAndHighlightQuestions() {
             }
         }        // Show progress for long lists
         if (totalComparisons > 100 && pageIndex % 10 === 0) {
-            debugLog(`Progress: ${pageIndex}/${pageQuestions.length} page questions processed`);
+
         }
         
         // Small delay every 10 items to allow UI updates
@@ -1329,7 +1322,7 @@ function findAllCorrectAnswersForQuestion(questionText) {
     const cleanQuestion = cleanQuestionText(questionText);
     const correctAnswers = [];
     
-    debugLog('Finding ALL correct answers for question:', cleanQuestion);
+
     
     // Search through all extension questions for matching questions
     extensionQuestions.forEach(extQuestion => {
@@ -1342,13 +1335,13 @@ function findAllCorrectAnswersForQuestion(questionText) {
                 // Only add if not already in the list (avoid duplicates)
                 if (!correctAnswers.includes(answer)) {
                     correctAnswers.push(answer);
-                    debugLog('Found correct answer:', answer);
+
                 }
             }
         }
     });
     
-    debugLog('Total correct answers found:', correctAnswers.length);
+
     return correctAnswers;
 }
 
@@ -1396,7 +1389,7 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
         const actuallyHighlightedAnswers = [];
         
-        debugLog('Trying to highlight ALL correct answers:', allCorrectAnswers);
+
         
         // Try to highlight ALL correct answers from database
         // IMPORTANT: Pass the specific question element and pageQuestion to limit search scope
@@ -1406,9 +1399,9 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
                     const wasHighlighted = highlightAnswerOnPage(correctAnswer, element, pageQuestion);
                     if (wasHighlighted) {
                         actuallyHighlightedAnswers.push(correctAnswer);
-                        debugLog(`Successfully highlighted correct answer ${index + 1}: "${correctAnswer}"`);
+
                     } else {
-                        debugLog(` Could not highlight correct answer ${index + 1}: "${correctAnswer}"`);
+
                     }
                 }
             });
@@ -1489,9 +1482,9 @@ function highlightAllCorrectAnswersOnPage(correctAnswers, questionElement, pageQ
             const found = highlightAnswerOnPage(correctAnswer, questionElement, pageQuestion);
             if (found) {
                 totalHighlighted++;
-                debugLog(`Correct answer ${index + 1} highlighted successfully`);
+
             } else {
-                debugLog(`Correct answer ${index + 1} not found on page`);
+
             }
         }
     });
@@ -1631,7 +1624,7 @@ function belongsToCurrentQuestion(element, questionElement, pageQuestion) {
 // Function to highlight answer text on the page
 function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null) {
     if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
-        debugLog('Skipping answer highlight - no answer text or highlighting disabled');
+
         return;
     }
     
@@ -1644,7 +1637,7 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
         const questionContainer = findQuestionContainer(questionElement, pageQuestion);
         if (questionContainer) {
             searchContainers.push(questionContainer);
-            debugLog('Using question-specific container for answer search');
+
         }
         
         // Also search immediate siblings of the question
@@ -1874,7 +1867,7 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
                     (existingText.length > 10 && currentAnswerLower.length > 10 && 
                      (existingText.includes(currentAnswerLower) || currentAnswerLower.includes(existingText)))) {
                     
-                    debugLog('This answer is already highlighted elsewhere:', existingText);
+
                     alreadyHighlighted = true;
                     found = true; // Mark as found since it's already highlighted
                     break;
@@ -1884,44 +1877,25 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
             if (!alreadyHighlighted) {
                 // Highlight the answer
                 highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
-                debugLog('✅ Answer highlighted successfully:', bestMatch.pattern);
+
                 found = true;
             }
         } else {
-            debugLog('Skipped EXACT match due to essential filters:', {
-                negative: hasNegativeIndicators,
-                alreadyHighlighted: isAlreadyHighlightedElsewhere,
-                belongsToQuestion: belongsToCurrentQuestion(bestMatch.element, questionElement, pageQuestion),
-                score: bestScore,
-                isExactMatch: bestMatch.isExactMatch
-            });
+            // Skipped EXACT match due to essential filters
         }
     }
     
     if (!found) {
-        debugLog('❌ No EXACT matches found');
-        debugLog('Clean answer:', cleanAnswer);
-        debugLog('Total candidates checked:', elementsArray.length);
-        debugLog('Total EXACT matches found:', allMatches.length);
+
         
-        if (allMatches.length > 0) {
-            debugLog('EXACT matches that were rejected by filters:');
-            allMatches.slice(0, 3).forEach((match, i) => {
-                debugLog(`Rejected EXACT match ${i + 1}:`, {
-                    pattern: match.pattern,
-                    score: match.score,
-                    elementText: match.elementText.substring(0, 50),
-                    isExact: match.isExactMatch
-                });
-            });
-        }
+
         
-        debugLog('🔒 STRICT MODE: Only EXACT matches are allowed - no fallback search');
+
     } else {
-        debugLog('✅ EXACT match highlighting completed successfully');
+
     }
     
-    debugLog('=== ANSWER HIGHLIGHTING END ===');
+
     return found;
 }
 
@@ -2001,7 +1975,7 @@ function tryHighlightPartialAnswer(pattern, elementsArray) {
         const elementText = element.textContent?.toLowerCase().trim() || '';
         if (elementText.includes(patternLower) && patternLower.length > 3) {
             highlightAnswerTextInElement(element, pattern);
-            debugLog('Partial answer highlighted:', pattern);
+
             return true;
         }
     }
@@ -2113,7 +2087,7 @@ function generateAnswerPatterns(cleanAnswer) {
             return b.length - a.length;
         });
     
-    debugLog('Generated patterns for "' + cleanAnswer + '":', finalPatterns.slice(0, 5)); // Log top 5 patterns
+
     return finalPatterns;
 }
 
@@ -2316,8 +2290,7 @@ function removeIncorrectAndDuplicateHighlights() {
         }
     });
     
-    debugLog('Checking highlights against correct answers:', Array.from(allCorrectAnswers));
-    debugLog('Total highlights to check:', allHighlights.length);
+
     
     const seenCorrectTexts = new Set();
     const toRemove = [];
