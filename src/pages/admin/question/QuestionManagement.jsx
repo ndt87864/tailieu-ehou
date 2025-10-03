@@ -21,13 +21,15 @@ import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import * as XLSX from "xlsx";
 import { Document, Packer, Paragraph, TextRun, ImageRun } from "docx";
 import { saveAs } from "file-saver";
-const IMGBB_API_KEY = "f051ba26b2f74b1480f701e485184185"; // API Key cho ImgBB
 import AddQuestionModal from "./AddQuestionModal";
 import EditQuestionModal from "./EditQuestionModal";
 import DeleteQuestionModal from "./DeleteQuestionModal";
 import FilterQuestionModal from "./FilterQuestionModal";
 import BulkDeleteModal from "./BulkDeleteModal";
 import QuestionTable from "./QuestionTable";
+import FirestoreConnectionMonitor from "../../../components/FirestoreConnectionMonitor";
+
+const IMGBB_API_KEY = "f051ba26b2f74b1480f701e485184185"; // API Key cho ImgBB
 const QuestionManagement = () => {
   const [questions, setQuestions] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -128,7 +130,16 @@ const QuestionManagement = () => {
 
       try {
         setLoading(true);
-        const categoriesWithDocs = await getAllCategoriesWithDocuments();
+        
+        // Add timeout for loading to prevent hanging
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Load timeout')), 30000)
+        );
+        
+        const categoriesWithDocs = await Promise.race([
+          getAllCategoriesWithDocuments(),
+          timeoutPromise
+        ]);
 
         const sortedCategories = [...categoriesWithDocs].sort(
           (a, b) =>
@@ -1377,6 +1388,7 @@ const QuestionManagement = () => {
         isDarkMode ? "bg-gray-900" : "bg-slate-100"
       }`}
     >
+      <FirestoreConnectionMonitor isDarkMode={isDarkMode} />
       {windowWidth < 770 && (
         <DocumentMobileHeader
           setIsSidebarOpen={setIsSidebarOpen}
@@ -1642,19 +1654,31 @@ const QuestionManagement = () => {
                 </div>
               </div>
 
-              <QuestionTable
-                loading={loading}
-                filteredQuestions={filteredQuestions}
-                isDarkMode={isDarkMode}
-                selectedRows={selectedRows}
-                handleSelectAll={handleSelectAll}
-                handleDeleteSelected={handleDeleteSelected}
-                isDeleting={isDeleting}
-                handleSelectRow={handleSelectRow}
-                openEditModal={openEditModal}
-                openDeleteModal={openDeleteModal}
-                setSelectedRows={setSelectedRows}
-              />
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  <p className="mt-4 text-gray-600 dark:text-gray-400">
+                    Đang tải dữ liệu câu hỏi...
+                  </p>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">
+                    Vui lòng đợi trong giây lát
+                  </p>
+                </div>
+              ) : (
+                <QuestionTable
+                  loading={loading}
+                  filteredQuestions={filteredQuestions}
+                  isDarkMode={isDarkMode}
+                  selectedRows={selectedRows}
+                  handleSelectAll={handleSelectAll}
+                  handleDeleteSelected={handleDeleteSelected}
+                  isDeleting={isDeleting}
+                  handleSelectRow={handleSelectRow}
+                  openEditModal={openEditModal}
+                  openDeleteModal={openDeleteModal}
+                  setSelectedRows={setSelectedRows}
+                />
+              )}
             </div>
           </main>
         </div>

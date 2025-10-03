@@ -1,7 +1,7 @@
 
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Firebase configuration - Updated from Firebase console
@@ -17,9 +17,40 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Firebase services with error handling
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+// Enhanced connection management
+let isFirestoreInitialized = false;
+
+const initializeFirestoreConnection = async () => {
+  if (isFirestoreInitialized) return;
+  
+  try {
+    // Enable network if needed
+    await enableNetwork(db);
+    isFirestoreInitialized = true;
+    console.log('Firestore network enabled successfully');
+  } catch (error) {
+    console.warn('Firestore network enable failed:', error);
+    // Try to disable and re-enable network
+    try {
+      await disableNetwork(db);
+      setTimeout(async () => {
+        await enableNetwork(db);
+        isFirestoreInitialized = true;
+      }, 1000);
+    } catch (retryError) {
+      console.error('Firestore connection retry failed:', retryError);
+    }
+  }
+};
+
+// Initialize connection on load
+initializeFirestoreConnection();
 
 // Function to get auth instance (required by some components)
 const getAuthInstance = () => {
@@ -28,13 +59,34 @@ const getAuthInstance = () => {
 
 // Function to reinitialize Firebase services if needed
 let initialized = false;
-const reinitializeFirebase = () => {
+const reinitializeFirebase = async () => {
   if (initialized) return { app, auth, db, storage };
 
-  // Already initialized, just return the existing instances
-  initialized = true;
-  return { app, auth, db, storage };
+  try {
+    await initializeFirestoreConnection();
+    initialized = true;
+    return { app, auth, db, storage };
+  } catch (error) {
+    console.error('Firebase reinitialization failed:', error);
+    return { app, auth, db, storage };
+  }
+};
+
+// Simple retry mechanism for backward compatibility
+const retryFirestoreOperation = async (operation, maxRetries = 3) => {
+  // Import error handler dynamically to avoid circular dependency
+  const { retryFirestoreOperationWithErrorHandling } = await import('./errorHandler.js');
+  return await retryFirestoreOperationWithErrorHandling(operation, maxRetries);
 };
 
 // Export the Firebase services and functions
-export { app, auth, db, storage, reinitializeFirebase, getAuthInstance };
+export { 
+  app, 
+  auth, 
+  db, 
+  storage, 
+  reinitializeFirebase, 
+  getAuthInstance,
+  initializeFirestoreConnection,
+  retryFirestoreOperation 
+};
