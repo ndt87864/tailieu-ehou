@@ -10,7 +10,6 @@ const FilterQuestionModal = ({
   allCategories,
   categoryDocuments,
   handleApplyFilter,
-  handleRemoveDuplicates,
   setShowFilterModal,
 }) => {
   const [categorySearch, setCategorySearch] = useState("");
@@ -703,44 +702,46 @@ const FilterQuestionModal = ({
               </div>
             </div>
             <div
-              className="flex justify-end space-x-4"
+              className="flex justify-between items-center space-x-4"
               style={{
                 position: "relative",
                 zIndex: 0,
                 marginTop: "auto",
               }}
             >
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-md font-medium ${
-                  isDarkMode
-                    ? "bg-gray-600 hover:bg-gray-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                } transition-colors`}
-                onClick={() => setShowFilterModal(false)}
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                className={`px-4 py-2 rounded-md font-medium ${
-                  isDarkMode
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-500 hover:bg-blue-600 text-white"
-                } transition-colors ${
-                  selectedCategories.length === 0 ||
-                  selectedDocuments.length === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
-                }`}
-                onClick={handleApplyFilter}
-                disabled={
-                  selectedCategories.length === 0 ||
-                  selectedDocuments.length === 0
-                }
-              >
-                Áp dụng ({selectedDocuments.length})
-              </button>
+              <div className="flex space-x-4">
+                <button
+                  type="button"
+                  className={`px-4 py-2 rounded-md font-medium ${
+                    isDarkMode
+                      ? "bg-gray-600 hover:bg-gray-500 text-white"
+                      : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  } transition-colors`}
+                  onClick={() => setShowFilterModal(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 rounded-md font-medium ${
+                    isDarkMode
+                      ? "bg-blue-600 hover:bg-blue-700 text-white"
+                      : "bg-blue-500 hover:bg-blue-600 text-white"
+                  } transition-colors ${
+                    selectedCategories.length === 0 ||
+                    selectedDocuments.length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : ""
+                  }`}
+                  onClick={handleApplyFilter}
+                  disabled={
+                    selectedCategories.length === 0 ||
+                    selectedDocuments.length === 0
+                  }
+                >
+                  Áp dụng ({selectedDocuments.length})
+                </button>
+              </div>
             </div>
           </div>
         </div>
