@@ -902,6 +902,8 @@ const QuestionManagement = () => {
     try {
       setLoading(true);
 
+      console.log(" Bắt đầu quá trình phân tích và xóa trùng lặp...");
+
       // Sử dụng câu hỏi hiện tại đang hiển thị
       const questionsToCheck = filteredQuestions;
 
@@ -909,6 +911,8 @@ const QuestionManagement = () => {
         alert("Không có câu hỏi nào đang hiển thị để kiểm tra trùng lặp.");
         return;
       }
+
+      console.log(` Phân tích ${questionsToCheck.length} câu hỏi...`);
 
       // Tìm các câu hỏi trùng lặp (dựa trên nội dung question)
       const questionGroups = {};
@@ -959,55 +963,126 @@ const QuestionManagement = () => {
         questionsToDelete.push(...group.slice(1));
       });
 
-      // Thực hiện xóa từng câu hỏi từ Firestore
-      let successfulDeletes = 0;
-      const failedDeletes = [];
-
+      // Thực hiện xóa song song tất cả câu hỏi từ Firestore với batch processing
       console.log(
-        `Bắt đầu xóa ${questionsToDelete.length} câu hỏi trùng lặp...`
+        ` Bắt đầu xóa song song ${questionsToDelete.length} câu hỏi trùng lặp...`
       );
 
-      for (const question of questionsToDelete) {
-        try {
-          if (!question.id) {
-            throw new Error("Question ID is missing");
+      const startTime = performance.now();
+
+      // Cấu hình batch để tránh quá tải Firestore
+      const BATCH_SIZE = 50; // Xử lý tối đa 50 câu hỏi đồng thời
+      const allResults = [];
+
+      // Chia thành các batch và xử lý tuần tự từng batch
+      for (let i = 0; i < questionsToDelete.length; i += BATCH_SIZE) {
+        const batch = questionsToDelete.slice(i, i + BATCH_SIZE);
+        console.log(
+          `Xử lý batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(
+            questionsToDelete.length / BATCH_SIZE
+          )} (${batch.length} câu hỏi)`
+        );
+
+        // Tạo mảng các Promise xóa cho batch hiện tại
+        const batchDeletePromises = batch.map(async (question, batchIndex) => {
+          const globalIndex = i + batchIndex;
+
+          try {
+            if (!question.id) {
+              throw new Error("Question ID is missing");
+            }
+
+            console.log(
+              `[${globalIndex + 1}/${questionsToDelete.length}] Đang xóa: ${
+                question.id
+              } - ${question.question?.substring(0, 50)}...`
+            );
+
+            // Xóa câu hỏi từ Firestore
+            await deleteQuestion(question.id);
+
+            return {
+              success: true,
+              question,
+              globalIndex,
+            };
+          } catch (deleteError) {
+            console.error(
+              ` [${globalIndex + 1}] Lỗi xóa ${question.id}:`,
+              deleteError.message
+            );
+
+            return {
+              success: false,
+              question,
+              error: deleteError.message,
+              globalIndex,
+            };
           }
+        });
 
-          console.log(
-            `Đang xóa câu hỏi ID: ${
-              question.id
-            }, Question: ${question.question?.substring(0, 50)}...`
-          );
+        // Chạy batch hiện tại song song
+        console.log(
+          `⏱Đang thực hiện ${batchDeletePromises.length} thao tác xóa song song...`
+        );
+        const batchResults = await Promise.allSettled(batchDeletePromises);
+        allResults.push(...batchResults);
 
-          // Thử với hàm deleteQuestion từ firestoreService trước
-          await deleteQuestion(question.id);
-          successfulDeletes++;
-          console.log(`✅ Đã xóa thành công câu hỏi ID: ${question.id}`);
-        } catch (deleteError) {
-          console.error(
-            `❌ Lỗi khi xóa câu hỏi ID ${question.id}:`,
-            deleteError
-          );
-          failedDeletes.push({
-            id: question.id,
-            question: question.question?.substring(0, 100) || "N/A",
-            error: deleteError.message,
-          });
+        // Tạm dừng ngắn giữa các batch để tránh rate limiting
+        if (i + BATCH_SIZE < questionsToDelete.length) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
+      // Xử lý tất cả kết quả
+      const results = allResults;
+
+      // Xử lý kết quả
+      const successfulDeletes = [];
+      const failedDeletes = [];
+
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          const { success, question, error } = result.value;
+          if (success) {
+            successfulDeletes.push(question);
+            console.log(` [${index + 1}] Thành công: ${question.id}`);
+          } else {
+            failedDeletes.push({
+              id: question.id,
+              question: question.question?.substring(0, 100) || "N/A",
+              error: error || "Unknown error",
+            });
+          }
+        } else {
+          // Promise bị rejected
+          const question = questionsToDelete[index];
+          failedDeletes.push({
+            id: question?.id || "unknown",
+            question: question?.question?.substring(0, 100) || "N/A",
+            error: result.reason?.message || "Promise rejected",
+          });
+          console.error(` [${index + 1}] Promise rejected:`, result.reason);
+        }
+      });
+
+      const endTime = performance.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+
       console.log(
-        `Kết quả: ${successfulDeletes} thành công, ${failedDeletes.length} thất bại`
+        `Hoàn thành trong ${duration}s: ${successfulDeletes.length} thành công, ${failedDeletes.length} thất bại`
       );
 
-      // Chỉ cập nhật state với những câu hỏi đã xóa thành công
-      if (successfulDeletes > 0) {
-        const successfullyDeletedIds = questionsToDelete
-          .filter((q) => !failedDeletes.some((f) => f.id === q.id))
-          .map((q) => q.id);
+      // Cập nhật state với những câu hỏi đã xóa thành công
+      if (successfulDeletes.length > 0) {
+        const successfullyDeletedIds = successfulDeletes.map((q) => q.id);
 
         setQuestions((prevQuestions) =>
           prevQuestions.filter((q) => !successfullyDeletedIds.includes(q.id))
+        );
+
+        console.log(
+          ` Đã cập nhật state, loại bỏ ${successfullyDeletedIds.length} câu hỏi`
         );
       }
 
@@ -1019,9 +1094,9 @@ const QuestionManagement = () => {
 
       // Xóa tất cả cache câu hỏi để đảm bảo dữ liệu mới được tải
       try {
-        // Xóa cache cho tất cả documents liên quan
+        // Xóa cache cho tất cả documents liên quan (chỉ những cái đã xóa thành công)
         const documentIds = [
-          ...new Set(questionsToDelete.map((q) => q.documentId)),
+          ...new Set(successfulDeletes.map((q) => q.documentId)),
         ];
         documentIds.forEach((docId) => {
           if (docId) {
@@ -1036,26 +1111,40 @@ const QuestionManagement = () => {
 
         console.log(`Đã xóa cache cho ${documentIds.length} documents`);
       } catch (e) {
-        console.warn("Không thể xóa cache:", e);
+        console.warn(" Không thể xóa cache:", e);
       }
 
-      // Hiển thị kết quả chi tiết
+      // Hiển thị kết quả chi tiết với thống kê hiệu suất
       if (failedDeletes.length > 0) {
         alert(
-          `⚠️ Kết quả xóa trùng lặp:\n\n` +
-            `✅ Đã xóa thành công: ${successfulDeletes} câu hỏi\n` +
-            `❌ Không thể xóa: ${failedDeletes.length} câu hỏi\n\n` +
-            `Chi tiết lỗi:\n` +
-            failedDeletes.map((f) => `- ${f.question} (${f.error})`).join("\n")
+          ` Kết quả xóa trùng lặp (${duration}s):\n\n` +
+            ` Đã xóa thành công: ${successfulDeletes.length} câu hỏi\n` +
+            ` Không thể xóa: ${failedDeletes.length} câu hỏi\n\n` +
+            ` Tốc độ: ${(
+              successfulDeletes.length / parseFloat(duration)
+            ).toFixed(1)} câu hỏi/giây\n\n` +
+            `Chi tiết lỗi (5 đầu tiên):\n` +
+            failedDeletes
+              .slice(0, 5)
+              .map((f) => `- ${f.question} (${f.error})`)
+              .join("\n") +
+            (failedDeletes.length > 5
+              ? `\n... và ${failedDeletes.length - 5} lỗi khác`
+              : "")
         );
       } else {
         alert(
-          ` Đã xóa thành công ${successfulDeletes} câu hỏi trùng lặp khỏi hệ thống Firestore!\n\n` +
-            `Dữ liệu đã được cập nhật vĩnh viễn.`
+          ` Xóa trùng lặp hoàn tất!\n\n` +
+            ` Đã xóa: ${successfulDeletes.length} câu hỏi\n` +
+            ` Thời gian: ${duration}s\n` +
+            ` Tốc độ: ${(
+              successfulDeletes.length / parseFloat(duration)
+            ).toFixed(1)} câu hỏi/giây\n\n` +
+            `Dữ liệu đã được cập nhật vĩnh viễn trong Firestore.`
         );
       }
 
-      console.log("Hoàn tất quá trình xóa trùng lặp.");
+      console.log(`✨ Hoàn tất quá trình xóa trùng lặp trong ${duration}s`);
     } catch (error) {
       console.error("Lỗi khi xóa câu hỏi trùng lặp:", error);
       alert("Có lỗi xảy ra khi xóa câu hỏi trùng lặp: " + error.message);
