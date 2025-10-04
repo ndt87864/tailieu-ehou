@@ -8,8 +8,8 @@ import {
   updateProfile,
   getAuth
 } from 'firebase/auth';
-import { auth } from './firebase';
-import { saveUserToFirestore, setUserOffline } from './firestoreService';
+import { auth } from './firebase.js';
+import { saveUserToFirestore, setUserOffline } from './firestoreService.js';
 
 /**
  * Login with email and password

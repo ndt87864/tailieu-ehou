@@ -6,7 +6,7 @@ import {
   updateCategory,
   deleteCategory,
   getCategoryById
-} from './categoryService';
+} from './categoryService.js';
 
 import {
   getDocumentsByCategory,
@@ -15,7 +15,7 @@ import {
   addDocument,
   updateDocument,
   incrementDocumentViewCount
-} from './documentService';
+} from './documentService.js';
 
 import {
   getQuestionsByDocument,
@@ -24,7 +24,7 @@ import {
   updateQuestion,
   deleteQuestion,
   getLimitedQuestionsWithDocumentInfo
-} from './questionService';
+} from './questionService.js';
 
 import {
   saveUserThemePreference,
@@ -65,7 +65,7 @@ import {
   getAnonymousVisitorCount,
   updateUserExcelPermission,
   updateUserExcelPercentage
-} from './userService';
+} from './userService.js';
 
 // Import Firestore functions for footer management
 import { 
