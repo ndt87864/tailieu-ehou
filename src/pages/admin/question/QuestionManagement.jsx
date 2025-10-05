@@ -68,6 +68,7 @@ const QuestionManagement = () => {
     question: "",
     answer: "",
     documentId: "",
+    stt: 0,
     url_question: "",
     url_answer: "",
   });
@@ -423,6 +424,13 @@ const QuestionManagement = () => {
     setUploadProgress(0);
 
     try {
+      // Get current max stt for this document
+      const existingQuestions = await getQuestionsByDocument(documentId);
+      let maxStt = 0;
+      if (existingQuestions && existingQuestions.length > 0) {
+        maxStt = Math.max(...existingQuestions.map((q) => q.stt || 0));
+      }
+
       for (let i = 0; i < questions.length; i++) {
         const row = questions[i];
 
@@ -430,6 +438,7 @@ const QuestionManagement = () => {
           question: row.A.toString().trim(),
           answer: row.B.toString().trim(),
           documentId: documentId,
+          stt: maxStt + i + 1,
           url_question: "",
           url_answer: "",
         };
@@ -490,33 +499,29 @@ const QuestionManagement = () => {
           url_answer = await uploadImageToImgBB(answerImage);
         }
 
+        // Get current max stt for this document to assign next stt
+        const existingQuestions = await getQuestionsByDocument(
+          selectedDocumentFilter
+        );
+        let maxStt = 0;
+        if (existingQuestions && existingQuestions.length > 0) {
+          maxStt = Math.max(...existingQuestions.map((q) => q.stt || 0));
+        }
+
         const questionData = {
           question: newQuestion.question.trim(),
           answer: newQuestion.answer.trim(),
           documentId: selectedDocumentFilter,
+          stt: maxStt + 1,
           url_question,
           url_answer,
         };
 
         const addedQuestion = await addQuestion(questionData);
 
-        const document = documents.find(
-          (doc) => doc.id === questionData.documentId
-        );
-
-        setQuestions((prevQuestions) => [
-          ...prevQuestions,
-          {
-            ...addedQuestion,
-            documentTitle: document?.title || "",
-            documentId: document?.id || "",
-            categoryId: document?.categoryId || "",
-            categoryTitle: document?.categoryTitle || "",
-            categoryLogo: document?.categoryLogo || null,
-            url_question,
-            url_answer,
-          },
-        ]);
+        // Clear cache and reload questions from database to ensure data consistency
+        clearQuestionsCache();
+        await reloadQuestions();
 
         setNewQuestion({
           question: "",
@@ -564,26 +569,19 @@ const QuestionManagement = () => {
           `Đã nhập thành công ${addedCount} câu hỏi từ file Excel!`
         );
 
-        setTimeout(() => {
+        // Clear cache and reload questions from database
+        clearQuestionsCache();
+
+        setTimeout(async () => {
           setExcelFile(null);
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
           }
           setProcessingExcel(false);
           setShowAddModal(false);
-          const refreshQuestions = async () => {
-            try {
-              const questionsData = await getAllQuestionsWithDocumentInfo();
-              const filteredQuestions = questionsData.filter(
-                (question) => question.documentId === selectedDocumentFilter
-              );
-              setQuestions(filteredQuestions || []);
-            } catch (error) {
-              console.error("Error refreshing questions:", error);
-            }
-          };
 
-          refreshQuestions();
+          // Reload questions from database
+          await reloadQuestions();
         }, 2000);
       } catch (error) {
         console.error("Error processing Excel file:", error);
@@ -627,31 +625,16 @@ const QuestionManagement = () => {
         question: editQuestion.question.trim(),
         answer: editQuestion.answer.trim(),
         documentId: selectedDocumentFilter,
+        stt: editQuestion.stt || 0, // Preserve existing stt
         url_question,
         url_answer,
       };
 
       await updateQuestion(editQuestion.id, questionData);
 
-      const document = documents.find(
-        (doc) => doc.id === questionData.documentId
-      );
-
-      setQuestions((prevQuestions) =>
-        prevQuestions.map((question) =>
-          question.id === editQuestion.id
-            ? {
-                ...question,
-                ...questionData,
-                documentTitle: document?.title || question.documentTitle,
-                categoryId: document?.categoryId || question.categoryId,
-                categoryTitle:
-                  document?.categoryTitle || question.categoryTitle,
-                categoryLogo: document?.categoryLogo || question.categoryLogo,
-              }
-            : question
-        )
-      );
+      // Clear cache and reload questions from database to ensure data consistency
+      clearQuestionsCache();
+      await reloadQuestions();
 
       setShowEditModal(false);
       setQuestionImage(null);
@@ -703,6 +686,7 @@ const QuestionManagement = () => {
       question: question.question,
       answer: question.answer,
       documentId: selectedDocumentFilter,
+      stt: question.stt || 0,
       url_question: question.url_question || "",
       url_answer: question.url_answer || "",
     });
