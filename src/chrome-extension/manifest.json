@@ -11,12 +11,7 @@
     "webRequest"
   ],
   "host_permissions": [
-    "http://localhost:5174/*",
-    "https://tailieuehou.id.vn/*",
-    "https://*.firebaseapp.com/*",
-    "https://*.web.app/*",
-    "https://*.ehou.edu.vn/*",
-    "https://dic.tienganh123.com/*"
+    "https://learning.ehou.edu.vn/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -24,7 +19,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["https://learning.ehou.edu.vn/*"],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_start"

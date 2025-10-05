@@ -74,6 +74,10 @@ function initAutoCompareOnLoad() {
 
 // Perform auto-compare if we have cached questions
 async function performAutoCompare(force = false) {
+        // Chỉ thực hiện so sánh khi ở đúng domain
+        if (window.location.hostname !== 'learning.ehou.edu.vn') {
+            return;
+        }
     // Throttle auto-compare to avoid too frequent calls (unless forced)
     const now = Date.now();
     if (!force && now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
@@ -843,56 +847,16 @@ function resetCompareButton(matchedCount) {
 
 // Check if two questions are similar - Enhanced for 100% accuracy
 function isQuestionSimilar(q1, q2) {
-    // Exact match first
-    if (q1 === q2) return true;
-    
-    // Clean both questions for better comparison
-    const clean1 = cleanQuestionText(q1);
-    const clean2 = cleanQuestionText(q2);
-    
-    if (clean1 === clean2) return true;
-    
-    // STRICT LENGTH CHECK: If one is significantly shorter/longer, not similar
-    const minLen = Math.min(clean1.length, clean2.length);
-    const maxLen = Math.max(clean1.length, clean2.length);
-    
-    // For very short questions, require exact or near-exact match
-    if (minLen < 20) {
-        const similarity = calculateSimilarity(clean1, clean2);
-        return similarity >= 0.95;
+    // Chỉ xác định trùng nhau khi giống nhau 100% (bỏ qua ký tự đặc biệt, dấu câu)
+    // Chuẩn hóa: loại bỏ ký tự đặc biệt, dấu câu, chuyển về chữ thường
+    function normalize(text) {
+        return (text || "")
+            .replace(/[\p{P}\p{S}]/gu, "") // loại bỏ dấu câu, ký tự đặc biệt
+            .replace(/\s+/g, " ") // chuẩn hóa khoảng trắng
+            .trim()
+            .toLowerCase();
     }
-    
-    // KEY WORDS VALIDATION - Extract and compare important words
-    const keyWords1 = extractKeyWords(clean1);
-    const keyWords2 = extractKeyWords(clean2);
-    
-    // Require significant overlap in key words
-    const commonKeyWords = keyWords1.filter(w => keyWords2.includes(w));
-    const keyWordOverlap = commonKeyWords.length / Math.min(keyWords1.length, keyWords2.length);
-    
-    if (keyWordOverlap < 0.6) {
-        return false;
-    }
-    
-    // SEMANTIC STRUCTURE CHECK - Check question structure
-    if (!haveSimilarStructure(clean1, clean2)) {
-        return false;
-    }
-    
-    // Calculate similarity using enhanced algorithm
-    const similarity = calculateEnhancedSimilarity(clean1, clean2);
-    
-    // STRICT THRESHOLD based on question characteristics
-    let threshold = 0.90; // Very high default threshold
-    
-    // Adjust threshold based on length and complexity
-    if (minLen > 100) threshold = 0.88; // Slightly lower for very long questions
-    if (keyWordOverlap > 0.8) threshold = 0.85; // Lower if key words match well
-    
-    const result = similarity >= threshold;
-    
-    
-    return result;
+    return normalize(q1) === normalize(q2);
 }
 
 // Extract key words from question text
