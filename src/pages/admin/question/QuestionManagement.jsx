@@ -130,15 +130,15 @@ const QuestionManagement = () => {
 
       try {
         setLoading(true);
-        
+
         // Add timeout for loading to prevent hanging
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Load timeout')), 30000)
+          setTimeout(() => reject(new Error("Load timeout")), 30000)
         );
-        
+
         const categoriesWithDocs = await Promise.race([
           getAllCategoriesWithDocuments(),
-          timeoutPromise
+          timeoutPromise,
         ]);
 
         const sortedCategories = [...categoriesWithDocs].sort(
@@ -925,26 +925,34 @@ const QuestionManagement = () => {
 
       console.log(` Phân tích ${questionsToCheck.length} câu hỏi...`);
 
-      // Tìm các câu hỏi trùng lặp (dựa trên nội dung question)
+      // Tìm các câu hỏi trùng lặp (dựa trên cả câu hỏi VÀ đáp án)
       const questionGroups = {};
 
       questionsToCheck.forEach((question) => {
-        const normalizedQuestion = question.question?.trim().toLowerCase();
-        if (normalizedQuestion) {
-          if (!questionGroups[normalizedQuestion]) {
-            questionGroups[normalizedQuestion] = [];
+        const normalizedQuestion = normalize(question.question);
+        const normalizedAnswer = normalize(question.answer);
+
+        // Chỉ kiểm tra trùng khi cả câu hỏi và đáp án đều có nội dung
+        if (normalizedQuestion && normalizedAnswer) {
+          // Tạo key duy nhất từ cả câu hỏi và đáp án
+          const key = normalizedQuestion + "||" + normalizedAnswer;
+
+          if (!questionGroups[key]) {
+            questionGroups[key] = [];
           }
-          questionGroups[normalizedQuestion].push(question);
+          questionGroups[key].push(question);
         }
       });
 
-      // Tìm các nhóm có nhiều hơn 1 câu hỏi (trùng lặp)
+      // Tìm các nhóm có nhiều hơn 1 câu hỏi (trùng lặp cả câu hỏi và đáp án)
       const duplicateGroups = Object.values(questionGroups).filter(
         (group) => group.length > 1
       );
 
       if (duplicateGroups.length === 0) {
-        alert("Không tìm thấy câu hỏi trùng lặp nào trong danh sách hiện tại.");
+        alert(
+          "Không tìm thấy câu hỏi nào có cả câu hỏi và đáp án trùng lặp trong danh sách hiện tại."
+        );
         return;
       }
 
@@ -954,15 +962,20 @@ const QuestionManagement = () => {
         0
       );
       const confirmed = window.confirm(
-        `Tìm thấy ${duplicateGroups.length} nhóm câu hỏi trùng lặp trong danh sách hiện tại với tổng ${totalDuplicates} câu hỏi sẽ bị xóa.\n\nMỗi nhóm sẽ giữ lại câu hỏi cũ nhất (theo thời gian tạo).\n\nBạn có muốn tiếp tục?`
+        `Tìm thấy ${duplicateGroups.length} nhóm câu hỏi có cả câu hỏi và đáp án trùng lặp hoàn toàn trong danh sách hiện tại với tổng ${totalDuplicates} câu hỏi sẽ bị xóa.\n\nMỗi nhóm sẽ giữ lại câu hỏi cũ nhất (theo thời gian tạo).\n\nBạn có muốn tiếp tục?`
       );
 
       if (!confirmed) return;
 
       // Xóa các câu hỏi trùng lặp (giữ lại câu đầu tiên trong mỗi nhóm)
       const questionsToDelete = [];
+      const questionsToKeep = [];
 
-      duplicateGroups.forEach((group) => {
+      duplicateGroups.forEach((group, groupIndex) => {
+        console.log(
+          `Nhóm ${groupIndex + 1}: ${group.length} câu hỏi trùng lặp`
+        );
+
         // Sắp xếp theo thời gian tạo (giữ lại câu cũ nhất)
         group.sort((a, b) => {
           const timeA = a.createdAt?.seconds || a.createdAt || 0;
@@ -970,13 +983,66 @@ const QuestionManagement = () => {
           return timeA - timeB;
         });
 
-        // Thêm tất cả câu hỏi trừ câu đầu tiên vào danh sách xóa
-        questionsToDelete.push(...group.slice(1));
+        // Câu hỏi đầu tiên sẽ được giữ lại
+        const questionToKeep = group[0];
+        questionsToKeep.push(questionToKeep);
+        console.log(
+          `  Giữ lại: "${questionToKeep.question?.substring(0, 50)}..." (ID: ${
+            questionToKeep.id
+          })`
+        );
+
+        // Thêm tất cả câu hỏi còn lại vào danh sách xóa
+        const questionsToDeleteInGroup = group.slice(1);
+        questionsToDelete.push(...questionsToDeleteInGroup);
+
+        questionsToDeleteInGroup.forEach((q, idx) => {
+          console.log(
+            `   Xóa: "${q.question?.substring(0, 50)}..." (ID: ${q.id})`
+          );
+        });
       });
+
+      console.log(
+        `Tổng kết: Giữ lại ${questionsToKeep.length} câu hỏi, xóa ${questionsToDelete.length} câu hỏi`
+      );
+
+      // ✅ KIỂM TRA LOGIC: Đảm bảo tổng số đúng
+      const totalOriginalDuplicates = duplicateGroups.reduce(
+        (sum, group) => sum + group.length,
+        0
+      );
+      const totalProcessed = questionsToKeep.length + questionsToDelete.length;
+
+      if (totalOriginalDuplicates !== totalProcessed) {
+        console.error(
+          ` LOGIC ERROR: Tổng câu hỏi gốc ${totalOriginalDuplicates} ≠ Tổng xử lý ${totalProcessed}`
+        );
+        alert(
+          " LỖI LOGIC: Số lượng câu hỏi không khớp. Hủy thao tác để kiểm tra."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // ✅ KIỂM TRA AN TOÀN: Đảm bảo không xóa hết tất cả
+      if (questionsToKeep.length === 0) {
+        alert(
+          "LỖI: Logic không đúng - không có câu hỏi nào được giữ lại! Hủy thao tác để tránh xóa sạch dữ liệu."
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (questionsToDelete.length === 0) {
+        alert("⚠️ Không có câu hỏi nào để xóa. Có thể đã xử lý trước đó.");
+        setLoading(false);
+        return;
+      }
 
       // Thực hiện xóa song song tất cả câu hỏi từ Firestore với batch processing
       console.log(
-        ` Bắt đầu xóa song song ${questionsToDelete.length} câu hỏi trùng lặp...`
+        `Bắt đầu xóa song song ${questionsToDelete.length} câu hỏi có cả câu hỏi và đáp án trùng lặp hoàn toàn...`
       );
 
       const startTime = performance.now();
@@ -1084,30 +1150,14 @@ const QuestionManagement = () => {
         `Hoàn thành trong ${duration}s: ${successfulDeletes.length} thành công, ${failedDeletes.length} thất bại`
       );
 
-      // Cập nhật state với những câu hỏi đã xóa thành công
-      if (successfulDeletes.length > 0) {
-        const successfullyDeletedIds = successfulDeletes.map((q) => q.id);
-
-        setQuestions((prevQuestions) =>
-          prevQuestions.filter((q) => !successfullyDeletedIds.includes(q.id))
-        );
-
-        console.log(
-          ` Đã cập nhật state, loại bỏ ${successfullyDeletedIds.length} câu hỏi`
-        );
-      }
-
-      // Kiểm tra lại để đảm bảo câu hỏi đã được xóa hoàn toàn
-      console.log("Đang kiểm tra lại sau khi xóa...");
-
-      // Đợi một chút để Firestore sync
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       // Xóa tất cả cache câu hỏi để đảm bảo dữ liệu mới được tải
       try {
-        // Xóa cache cho tất cả documents liên quan (chỉ những cái đã xóa thành công)
+        // Xóa cache cho tất cả documents liên quan
         const documentIds = [
-          ...new Set(successfulDeletes.map((q) => q.documentId)),
+          ...new Set([
+            ...successfulDeletes.map((q) => q.documentId),
+            ...questionsToKeep.map((q) => q.documentId),
+          ]),
         ];
         documentIds.forEach((docId) => {
           if (docId) {
@@ -1120,9 +1170,33 @@ const QuestionManagement = () => {
         // Xóa cache hiện tại nếu có
         clearQuestionsCache();
 
-        console.log(`Đã xóa cache cho ${documentIds.length} documents`);
+        console.log(`🧹 Đã xóa cache cho ${documentIds.length} documents`);
       } catch (e) {
-        console.warn(" Không thể xóa cache:", e);
+        console.warn("⚠️ Không thể xóa cache:", e);
+      }
+
+      // 🔄 RELOAD DỮ LIỆU TỪ FIRESTORE để đảm bảo đồng bộ hoàn toàn
+      console.log(" Đang reload dữ liệu từ Firestore...");
+
+      try {
+        // Đợi một chút để Firestore sync hoàn toàn
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Reload lại tất cả câu hỏi từ database
+        await reloadQuestions();
+
+        console.log(" Đã reload dữ liệu thành công từ Firestore");
+        console.log(`State hiện tại có ${questions.length} câu hỏi`);
+      } catch (reloadError) {
+        console.error("Lỗi khi reload dữ liệu:", reloadError);
+        // Fallback: Cập nhật state thủ công nếu reload thất bại
+        if (successfulDeletes.length > 0) {
+          const successfullyDeletedIds = successfulDeletes.map((q) => q.id);
+          setQuestions((prevQuestions) =>
+            prevQuestions.filter((q) => !successfullyDeletedIds.includes(q.id))
+          );
+          console.log("🔧 Đã fallback cập nhật state thủ công");
+        }
       }
 
       // Hiển thị kết quả chi tiết với thống kê hiệu suất
@@ -1146,16 +1220,23 @@ const QuestionManagement = () => {
       } else {
         alert(
           ` Xóa trùng lặp hoàn tất!\n\n` +
-            ` Đã xóa: ${successfulDeletes.length} câu hỏi\n` +
-            ` Thời gian: ${duration}s\n` +
-            ` Tốc độ: ${(
+            ` Đã xóa: ${successfulDeletes.length} câu hỏi trùng lặp\n` +
+            `Đã giữ lại: ${questionsToKeep.length} câu hỏi duy nhất\n` +
+            ` Số nhóm trùng lặp: ${duplicateGroups.length}\n\n` +
+            `⏱ Thời gian: ${duration}s\n` +
+            `Tốc độ: ${(
               successfulDeletes.length / parseFloat(duration)
             ).toFixed(1)} câu hỏi/giây\n\n` +
-            `Dữ liệu đã được cập nhật vĩnh viễn trong Firestore.`
+            `Dữ liệu đã được cập nhật vĩnh viễn trong Firestore.\n` +
+            `Mỗi nhóm trùng lặp đã giữ lại 1 câu hỏi cũ nhất.\n` +
+            ` Dữ liệu đã được đồng bộ lại từ database.`
         );
       }
 
-      console.log(`✨ Hoàn tất quá trình xóa trùng lặp trong ${duration}s`);
+      console.log(` Hoàn tất quá trình xóa trùng lặp trong ${duration}s`);
+      console.log(
+        `Thống kê cuối: ${questionsToKeep.length} câu hỏi được giữ lại, ${successfulDeletes.length} câu hỏi đã xóa`
+      );
     } catch (error) {
       console.error("Lỗi khi xóa câu hỏi trùng lặp:", error);
       alert("Có lỗi xảy ra khi xóa câu hỏi trùng lặp: " + error.message);
@@ -1231,40 +1312,110 @@ const QuestionManagement = () => {
   };
 
   const reloadQuestions = async () => {
-    if (!selectedDocumentFilter) return;
+    if (
+      !selectedDocumentFilter &&
+      (!filterDocument || filterDocument.length === 0)
+    )
+      return;
+
+    console.log(" Bắt đầu reload questions...");
     setLoading(true);
+
     try {
-      const questionsData = await getQuestionsByDocument(
-        selectedDocumentFilter
+      // Xác định documents cần reload
+      const documentsToReload =
+        filterDocument && filterDocument.length > 0
+          ? filterDocument
+          : [selectedDocumentFilter];
+
+      console.log(
+        ` Reload ${documentsToReload.length} documents:`,
+        documentsToReload
       );
-      let documentDetails = null;
-      if (
-        categoryDocuments &&
-        selectedCategory &&
-        categoryDocuments[selectedCategory]
-      ) {
-        documentDetails = categoryDocuments[selectedCategory].find(
-          (doc) => doc.id === selectedDocumentFilter
-        );
+
+      let allQuestionsData = [];
+
+      // Reload từng document
+      for (const docId of documentsToReload) {
+        try {
+          console.log(` Đang reload document: ${docId}`);
+          const questionsData = await getQuestionsByDocument(docId);
+
+          // Tìm thông tin document và category
+          let documentDetails = null;
+          let documentCategoryId = null;
+
+          // Tìm trong tất cả categories
+          for (const categoryId of Object.keys(categoryDocuments)) {
+            if (categoryDocuments[categoryId]) {
+              documentDetails = categoryDocuments[categoryId].find(
+                (doc) => doc.id === docId
+              );
+              if (documentDetails) {
+                documentCategoryId = categoryId;
+                break;
+              }
+            }
+          }
+
+          // Fallback nếu không tìm thấy
+          if (!documentDetails) {
+            documentDetails = documents.find((doc) => doc.id === docId) || {
+              id: docId,
+              title: "Unknown Document",
+              categoryId: selectedCategory || "",
+            };
+            documentCategoryId = selectedCategory || "";
+          }
+
+          const categoryDetails = allCategories.find(
+            (cat) => cat.id === documentCategoryId
+          ) || { id: documentCategoryId, title: "Unknown Category" };
+
+          // Thêm thông tin vào mỗi câu hỏi
+          const questionsWithInfo = questionsData.map((question) => ({
+            ...question,
+            documentTitle: documentDetails.title || "",
+            documentId: documentDetails.id || "",
+            categoryId: categoryDetails.id || "",
+            categoryTitle: categoryDetails.title || "",
+            categoryLogo: categoryDetails.logo || null,
+            url_question: question.url_question || "",
+            url_answer: question.url_answer || "",
+          }));
+
+          allQuestionsData = [...allQuestionsData, ...questionsWithInfo];
+          console.log(
+            `Reload thành công ${questionsWithInfo.length} câu hỏi từ document ${docId}`
+          );
+        } catch (docError) {
+          console.error(` Lỗi reload document ${docId}:`, docError);
+        }
       }
-      const categoryDetails = allCategories.find(
-        (cat) => cat.id === selectedCategory
-      ) || { id: selectedCategory, title: "Unknown Category" };
-      const questionsWithInfo = questionsData.map((question) => ({
-        ...question,
-        documentTitle: documentDetails?.title || "",
-        documentId: documentDetails?.id || "",
-        categoryId: categoryDetails.id || "",
-        categoryTitle: categoryDetails.title || "",
-        categoryLogo: categoryDetails.logo || null,
-        url_question: question.url_question || "",
-        url_answer: question.url_answer || "",
-      }));
-      setQuestions(questionsWithInfo || []);
+
+      console.log(`Tổng cộng reload được ${allQuestionsData.length} câu hỏi`);
+      setQuestions(allQuestionsData || []);
+
+      // 🔍 DEBUG: Kiểm tra câu hỏi trùng lặp sau reload
+      setTimeout(() => {
+        const reloadedDuplicates = groupDuplicatesBoth(allQuestionsData);
+        console.log(
+          ` Sau reload: Tìm thấy ${reloadedDuplicates.length} nhóm câu hỏi trùng lặp`
+        );
+        reloadedDuplicates.forEach((group, idx) => {
+          console.log(
+            `   Nhóm ${idx + 1}: ${
+              group.length
+            } câu hỏi - "${group[0]?.question?.substring(0, 30)}..."`
+          );
+        });
+      }, 500);
     } catch (err) {
+      console.error("❌ Lỗi khi reload questions:", err);
       setError("Không thể tải lại danh sách câu hỏi: " + err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Lấy documentTitle hiện tại
@@ -1583,9 +1734,6 @@ const QuestionManagement = () => {
                   </div>
                 </div>
                 <div className="w-full md:w-64">
-                  <label className="block text-sm font-medium mb-1">
-                    Lọc trùng
-                  </label>
                   <div className="flex flex-row space-x-4 p-3 rounded-md border bg-gray-50 dark:bg-gray-700 dark:border-gray-600 border-gray-200">
                     <label className="inline-flex items-center">
                       <input
@@ -1617,9 +1765,6 @@ const QuestionManagement = () => {
                 </div>
 
                 <div className="w-full md:w-48">
-                  <label className="block text-sm font-medium mb-1">
-                    Xóa trùng lặp
-                  </label>
                   <button
                     type="button"
                     className={`w-full flex items-center justify-center px-4 py-3 rounded-md border font-medium transition-colors ${
@@ -1633,7 +1778,7 @@ const QuestionManagement = () => {
                     }`}
                     onClick={handleRemoveDuplicates}
                     disabled={filteredQuestions.length === 0 || loading}
-                    title="Xóa các câu hỏi trùng lặp từ danh sách hiện tại, chỉ giữ lại 1 câu duy nhất"
+                    title="Xóa các câu hỏi có cả câu hỏi và đáp án trùng lặp hoàn toàn từ danh sách hiện tại, chỉ giữ lại 1 câu duy nhất"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
