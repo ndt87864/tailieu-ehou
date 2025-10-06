@@ -3098,15 +3098,74 @@ function createQuestionsPopup() {
     });
 
     let isMinimized = false;
+    let originalWidth = '400px';
+    let originalHeight = '500px';
+    let originalMaxHeight = '500px';
+
     minimizeBtn.addEventListener('click', () => {
         isMinimized = !isMinimized;
         if (isMinimized) {
+            // Thu gọn thành icon
+            originalWidth = popup.style.width;
+            originalHeight = popup.style.height;
+            originalMaxHeight = popup.style.maxHeight;
+
+            popup.style.width = '60px';
+            popup.style.height = '60px';
+            popup.style.maxHeight = '60px';
             content.style.display = 'none';
-            popup.style.height = 'auto';
-            minimizeBtn.innerHTML = '□';
+            header.style.display = 'none';
+
+            // Thêm icon vào popup khi thu gọn
+            popup.innerHTML = `
+                <div style="
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 50%;
+                    font-size: 24px;
+                " title="Nhấn để mở rộng">
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ffffff"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                </div>
+            `;
+
+            // Thêm event listener cho icon thu gọn
+            const iconContainer = popup.querySelector('div');
+            iconContainer.addEventListener('click', () => {
+                minimizeBtn.click(); // Mô phỏng click minimize button
+            });
+
         } else {
+            // Mở rộng lại
+            popup.style.width = originalWidth;
+            popup.style.height = originalHeight;
+            popup.style.maxHeight = originalMaxHeight;
             content.style.display = 'block';
-            minimizeBtn.innerHTML = '−';
+            header.style.display = 'flex';
+
+            // Khôi phục header và content
+            popup.innerHTML = '';
+            popup.appendChild(header);
+            popup.appendChild(content);
         }
         localStorage.setItem('tailieu-questions-popup-minimized', isMinimized.toString());
     });
@@ -3145,65 +3204,6 @@ function createQuestionsPopup() {
         }
     });
 
-    // Create toggle button to show/hide popup
-    const toggleBtn = document.createElement('div');
-    toggleBtn.id = 'tailieu-questions-toggle-btn';
-    toggleBtn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 80px;
-        width: 60px;
-        height: 60px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 50%;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 999998;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-        font-size: 24px;
-    `;
-    toggleBtn.innerHTML = `
-        <?xml version="1.0" encoding="utf-8"?>
-        <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-        <svg 
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#ffffff"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-    `;
-    toggleBtn.title = 'Hiển thị/Ẩn danh sách câu hỏi';
-
-    toggleBtn.addEventListener('click', () => {
-        const isVisible = popup.style.display !== 'none';
-        popup.style.display = isVisible ? 'none' : 'block';
-        localStorage.setItem('tailieu-questions-popup-visible', (!isVisible).toString());
-        console.log('Toggle button clicked, popup now:', !isVisible ? 'visible' : 'hidden');
-    });
-
-    toggleBtn.addEventListener('mouseenter', () => {
-        toggleBtn.style.transform = 'scale(1.1)';
-    });
-
-    toggleBtn.addEventListener('mouseleave', () => {
-        toggleBtn.style.transform = 'scale(1)';
-    });
-
-    safeAppendToBody(toggleBtn, () => {
-        console.log('Toggle button created and added to DOM');
-    });
-
     // Restore saved state
     const savedVisible = localStorage.getItem('tailieu-questions-popup-visible');
     const savedMinimized = localStorage.getItem('tailieu-questions-popup-minimized');
@@ -3213,8 +3213,49 @@ function createQuestionsPopup() {
 
     if (savedMinimized === 'true') {
         isMinimized = true;
+        // Thực hiện minimize ngay lập tức
+        popup.style.width = '60px';
+        popup.style.height = '60px';
+        popup.style.maxHeight = '60px';
         content.style.display = 'none';
-        minimizeBtn.innerHTML = '□';
+        header.style.display = 'none';
+
+        popup.innerHTML = `
+            <div style="
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 50%;
+                font-size: 24px;
+            " title="Nhấn để mở rộng">
+                <?xml version="1.0" encoding="utf-8"?>
+                <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ffffff"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+            </div>
+        `;
+
+        // Thêm event listener cho icon thu gọn
+        const iconContainer = popup.querySelector('div');
+        iconContainer.addEventListener('click', () => {
+            minimizeBtn.click();
+        });
     }
 
     const savedPosition = localStorage.getItem('tailieu-questions-popup-position');

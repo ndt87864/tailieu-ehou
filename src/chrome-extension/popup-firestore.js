@@ -47,21 +47,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('✅ Firebase initialized with project:', config.projectId);
     }
     
-    await initializeElements();
-    setupEventListeners();
-    
-    // Try to restore from cache first
-    const hasCache = await restoreFromCache();
-    
-    // Load categories (luôn load để đảm bảo có categories list)
-    await loadCategories();
-    
-    // Auto-restore selections if available (chỉ khi có cache)
-    if (hasCache) {
-      await autoRestoreSelections();
+    // Reset toàn bộ dữ liệu và UI mỗi lần popup mở lại
+    categories = [];
+    documents = [];
+    selectedDocuments = [];
+    filteredDocuments = [];
+    questions = [];
+    highlightAnswersEnabled = true;
+
+    resetUI(); // Đảm bảo UI về trạng thái ban đầu
+    hideError();
+    showLoading(true);
+
+    try {
+      await waitForFirebase();
+      await initializeElements();
+      setupEventListeners();
+      await restoreFromCache(); // Khôi phục cache và selections
+      await loadCategories(true); // Luôn reload categories khi mở popup
+      showLoading(false);
+    } catch (error) {
+      showLoading(false);
+      showError('Lỗi khởi tạo: ' + (error?.message || error));
     }
-    
-    console.log('✅ Extension popup initialized successfully with Firestore');
   } catch (error) {
     console.error('❌ Failed to initialize extension popup:', error);
     showError('Lỗi khởi tạo extension: ' + error.message);
