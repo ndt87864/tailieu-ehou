@@ -51,13 +51,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     
     // Try to restore from cache first
-    await restoreFromCache();
+    const hasCache = await restoreFromCache();
     
-    // Load categories (from Firestore or cache)
+    // Load categories (luôn load để đảm bảo có categories list)
     await loadCategories();
     
-    // Auto-restore selections if available
-    await autoRestoreSelections();
+    // Auto-restore selections if available (chỉ khi có cache)
+    if (hasCache) {
+      await autoRestoreSelections();
+    }
     
     console.log('✅ Extension popup initialized successfully with Firestore');
   } catch (error) {
@@ -173,19 +175,21 @@ async function restoreFromCache() {
       // ⚠️ Note: Will reload fresh data from Firestore to ensure up-to-date
     }
 
-    const cachedDocuments = await getFromCache(CACHE_KEYS.DOCUMENTS);
-    if (cachedDocuments && cachedDocuments.length > 0) {
-      documents = cachedDocuments;
-      console.log('Restored documents from cache:', documents.length);
-    }
-
+    // KHÔNG restore documents - sẽ load khi user chọn category
+    // documents = []; // Keep empty
+    
+    // Restore questions và selected documents (nếu có session trước đó)
     const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
     const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
     
     if (cachedQuestions && cachedQuestions.length > 0 && selectedDocumentIds && selectedDocumentIds.length > 0) {
       questions = cachedQuestions;
+      selectedDocuments = selectedDocumentIds;
       hasUsefulCache = true;
-      console.log('Restored questions from cache:', questions.length);
+      console.log('✅ Restored session:', {
+        questions: questions.length,
+        selectedDocuments: selectedDocuments.length
+      });
       sendQuestionsToContentScript(questions);
     }
 
@@ -276,34 +280,22 @@ async function loadCategories(forceReload = false) {
 
 async function loadDocuments(categoryId) {
   try {
-    if (documents.length > 0 && categoryId) {
-      const categoryDocuments = documents.filter(doc => doc.categoryId === categoryId);
-      if (categoryDocuments.length > 0) {
-        console.log('Using cached documents for category:', categoryId, categoryDocuments.length);
-        documents = categoryDocuments;
-        populateDocumentList();
-        return;
-      }
-    }
-    
     showLoading(true);
     hideError();
     
     console.log(`📄 Loading documents from Firestore for category: ${categoryId}...`);
+    
+    // Luôn load fresh data từ Firestore khi user chọn category
     documents = await getDocumentsByCategory(categoryId);
     console.log('✅ Documents loaded from Firestore:', documents.length);
     
-    const allCachedDocuments = await getFromCache(CACHE_KEYS.DOCUMENTS) || [];
-    const mergedDocuments = [...allCachedDocuments];
+    // Reset selected documents khi đổi category
+    selectedDocuments = [];
+    filteredDocuments = [];
     
-    documents.forEach(doc => {
-      if (!mergedDocuments.find(cached => cached.id === doc.id)) {
-        mergedDocuments.push(doc);
-      }
-    });
-    
-    await saveToCache(CACHE_KEYS.DOCUMENTS, mergedDocuments);
     populateDocumentList();
+    updateSelectedCount();
+    updateControlsState();
     
   } catch (err) {
     console.error('❌ Failed to load documents:', err);
@@ -318,14 +310,8 @@ async function loadQuestions(documentIds) {
     showLoading(true);
     hideError();
     
-    console.log('🔍 Loading questions for documents:', documentIds);
-    console.log('🔍 Selected documents details:', selectedDocuments.map(id => {
-      const doc = documents.find(d => d.id === id);
-      return doc ? `${doc.title} (${id})` : id;
-    }));
-    
     if (!documentIds || documentIds.length === 0) {
-      console.log('No documents selected');
+      console.log('⚠️ No documents selected');
       showQuestionsStatus(0);
       showLoading(false);
       return;
