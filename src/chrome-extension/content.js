@@ -20,7 +20,8 @@ const QUESTIONS_CACHE_KEY = 'tailieu_questions';
 // Debug flags and throttling
 let isComparing = false;
 let lastCompareTime = 0;
-const COMPARE_DEBOUNCE_MS = 2000; // 2 seconds
+const COMPARE_DEBOUNCE_MS = 1000; // 1 second (reduced from 2 seconds for better UX)
+const MANUAL_COMPARE_DEBOUNCE_MS = 500; // 0.5 second for manual clicks (faster response)
 let debugMode = true; // Enable debug mode for troubleshooting
 
 // Debug logging function
@@ -30,8 +31,11 @@ function debugLog(...args) {
     }
 }
 
-// Load cached questions when page loads
-loadCachedQuestions();
+// Load cached questions when page loads (immediately and asynchronously)
+(async () => {
+    await loadCachedQuestions();
+    console.log('[Tailieu Extension] Cached questions loaded:', extensionQuestions.length);
+})();
 
 // Auto-compare questions when page is fully loaded
 function initAutoCompareOnLoad() {
@@ -148,6 +152,43 @@ async function performAutoCompare(force = false) {
     } else {
 
     }
+}
+
+// Generic notification function
+function showNotification(message, type = 'info', duration = 5000) {
+    // Type can be: 'info', 'success', 'warning', 'error'
+    const colors = {
+        info: 'rgba(33, 150, 243, 0.95)',      // Blue
+        success: 'rgba(76, 175, 80, 0.95)',    // Green
+        warning: 'rgba(255, 152, 0, 0.95)',    // Orange
+        error: 'rgba(244, 67, 54, 0.95)'       // Red
+    };
+    
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${colors[type] || colors.info};
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        z-index: 10000;
+        font-size: 13px;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
+        max-width: 300px;
+    `;
+    
+    safeAppendToBody(notification, () => {
+        setTimeout(() => {
+            if (notification && notification.parentNode) {
+                notification.remove();
+            }
+        }, duration);
+    });
 }
 
 // Show notification for auto-compare results with enhanced details
@@ -701,11 +742,37 @@ function cleanQuestionText(text) {
 }
 
 // Compare questions and highlight matches
-async function compareAndHighlightQuestions() {
+async function compareAndHighlightQuestions(isManual = false) {
+    // Use different debounce time for manual clicks vs auto-compare
+    const debounceTime = isManual ? MANUAL_COMPARE_DEBOUNCE_MS : COMPARE_DEBOUNCE_MS;
+    
     // Prevent excessive calls and logging
     const now = Date.now();
-    if (isComparing || (now - lastCompareTime) < COMPARE_DEBOUNCE_MS) {
+    if (isComparing) {
+        console.log('[Tailieu Extension] ⏱️ Already comparing, please wait...');
         return { matched: [], pageQuestions: [] };
+    }
+    
+    if (!isManual && (now - lastCompareTime) < debounceTime) {
+        console.log('[Tailieu Extension] ⏱️ Skipping auto-compare - throttled');
+        return { matched: [], pageQuestions: [] };
+    }
+    
+    // CRITICAL: Ensure questions are loaded before comparing
+    if (extensionQuestions.length === 0) {
+        console.log('[Tailieu Extension] ⚠️ No questions loaded, trying to load from cache...');
+        await loadCachedQuestions();
+        
+        if (extensionQuestions.length === 0) {
+            console.log('[Tailieu Extension] ❌ Still no questions after loading cache');
+            // Show user-friendly message
+            if (isManual) {
+                showNotification('Chưa có câu hỏi nào được tải. Vui lòng chọn danh mục và tài liệu trước.', 'warning');
+            }
+            return { matched: [], pageQuestions: [] };
+        } else {
+            console.log('[Tailieu Extension] Successfully loaded', extensionQuestions.length, 'questions from cache');
+        }
     }
     
     isComparing = true;
@@ -777,8 +844,6 @@ async function compareAndHighlightQuestions() {
         
         // Log các câu hỏi được highlight
         const highlightedQuestionsLog = matched.map(m => m.pageQuestion);
-        console.log('[Tailieu Extension] Các câu hỏi được highlight:', highlightedQuestionsLog);
-        
         // Count total highlights before cleanup
         const highlightsBeforeCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
         console.log('[Tailieu Extension] Số highlight trước khi cleanup:', highlightsBeforeCleanup);
@@ -1749,11 +1814,6 @@ function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion
             if (normalizedElement === normalizedPattern) {
                 isExactMatch = true;
                 matchScore = 1.0;
-                console.log(`[Tailieu Extension] ✅ EXACT MATCH found:`, {
-                    original: elementText.substring(0, 50),
-                    pattern: patternLower.substring(0, 50),
-                    normalized: normalizedElement.substring(0, 50)
-                });
             }
             
             // REMOVED all fuzzy matching logic (includes, contains, etc.)
@@ -2537,7 +2597,7 @@ function removeIncorrectAndDuplicateHighlights() {
                 } else {
                     // First time seeing this answer in THIS question - keep it
                     seenTextsInThisQuestion.add(text);
-                    console.log(`[Tailieu Extension] ✅ Giữ lại đáp án đúng:`, text, `(match với: ${matchedCorrectAnswer})`);
+                    console.log(`[Tailieu Extension] Giữ lại đáp án đúng:`, text, `(match với: ${matchedCorrectAnswer})`);
                 }
             } else {
                 // This is NOT a correct answer - remove it
@@ -2792,7 +2852,24 @@ function showCachedQuestionsIndicator() {
         if (compareNowBtn) {
             compareNowBtn.addEventListener('click', async () => {
                 if (!compareNowBtn.disabled) {
-                    await compareAndHighlightQuestions();
+                    console.log('[Tailieu Extension] 🖱️ User clicked "So sánh ngay" button');
+                    
+                    // Disable button and show loading state
+                    compareNowBtn.disabled = true;
+                    const originalText = compareNowBtn.textContent;
+                    compareNowBtn.textContent = 'Đang xử lý...';
+                    compareNowBtn.style.opacity = '0.7';
+                    
+                    try {
+                        await compareAndHighlightQuestions(true); // isManual = true
+                    } catch (error) {
+                        console.error('[Tailieu Extension] Error during comparison:', error);
+                        showNotification('Có lỗi xảy ra khi so sánh câu hỏi', 'error');
+                        // Reset button
+                        compareNowBtn.disabled = false;
+                        compareNowBtn.textContent = originalText;
+                        compareNowBtn.style.opacity = '1';
+                    }
                     // Don't remove indicator immediately, let resetCompareButton handle it
                 }
             });
