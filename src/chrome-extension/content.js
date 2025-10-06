@@ -669,6 +669,20 @@ function extractQuestionsFromPage() {
     return questions;
 }
 
+// Normalize text for EXACT matching (remove special chars, punctuation, extra spaces)
+// Used for both question and answer matching to ensure 100% accuracy
+function normalizeTextForMatching(text) {
+    if (!text) return '';
+    
+    return text
+        .toLowerCase()
+        .trim()
+        // Remove all punctuation and special characters (keep only letters, numbers, Vietnamese chars)
+        .replace(/[\p{P}\p{S}]/gu, '') // Remove all punctuation and symbols
+        .replace(/\s+/g, ' ') // Normalize whitespace to single space
+        .trim();
+}
+
 // Clean question text for better matching - Enhanced for accuracy
 function cleanQuestionText(text) {
     return text
@@ -709,53 +723,47 @@ async function compareAndHighlightQuestions() {
     for (let pageIndex = 0; pageIndex < pageQuestions.length; pageIndex++) {
         const pageQ = pageQuestions[pageIndex];
         const cleanPageQuestion = cleanQuestionText(pageQ.text);
-        let matched_for_this_page = false;
 
-        for (let extIndex = 0; extIndex < extensionQuestions.length && !matched_for_this_page; extIndex++) {
+        // Track if this page question has been matched to avoid duplicate processing
+        let hasMatchedThisPageQuestion = false;
+
+        for (let extIndex = 0; extIndex < extensionQuestions.length; extIndex++) {
             const extQ = extensionQuestions[extIndex];
             const cleanExtQuestion = cleanQuestionText(extQ.question);
             comparisons++;
 
             // STRICT VALIDATION: Check for similarity with enhanced accuracy
             if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
-                
                 // ADDITIONAL VALIDATION: Double-check with stricter criteria
                 const finalValidation = performFinalValidation(pageQ.text, extQ.question);
-                
                 if (!finalValidation.isValid) {
-
-
-
                     continue; // Skip this match
                 }
                 
-                // Find ALL correct answers for this question
-                const allCorrectAnswers = findAllCorrectAnswersForQuestion(extQ.question);
-                if (allCorrectAnswers.length > 0) {
-
-                } else {
-
+                // Only highlight the question ONCE (first match)
+                if (!hasMatchedThisPageQuestion) {
+                    // Find ALL correct answers for this question
+                    const allCorrectAnswers = findAllCorrectAnswersForQuestion(extQ.question);
+                    // Highlight the question and try to find/highlight all answers
+                    highlightMatchedQuestion(pageQ, extQ);
+                    hasMatchedThisPageQuestion = true;
                 }
-
-                // Highlight the question and try to find/highlight all answers
-                highlightMatchedQuestion(pageQ, extQ);
-
+                
+                // Always record the match for statistics
                 matched.push({
                     pageQuestion: pageQ.text,
                     extensionQuestion: extQ.question,
                     answer: extQ.answer,
-                    allCorrectAnswers: allCorrectAnswers, // Store all correct answers
                     similarity: calculateEnhancedSimilarity(cleanPageQuestion, cleanExtQuestion),
                     confidence: finalValidation.confidence
                 });
-
-                matched_for_this_page = true; // Stop searching for this page question
+                // KHÔNG dừng vòng lặp, để có thể tìm và highlight tất cả câu trả lời giống nhau
             }
-        }        // Show progress for long lists
-        if (totalComparisons > 100 && pageIndex % 10 === 0) {
-
         }
-        
+        // Show progress for long lists
+        if (totalComparisons > 100 && pageIndex % 10 === 0) {
+            // ...existing code...
+        }
         // Small delay every 10 items to allow UI updates
         if ((pageIndex + 1) % 10 === 0) {
             await new Promise(resolve => setTimeout(resolve, 5));
@@ -766,13 +774,27 @@ async function compareAndHighlightQuestions() {
     if (matched.length > 0) {
         // Log average confidence
         const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
-        // Remove only duplicate highlights (same answer highlighted multiple times)
-        setTimeout(() => {
-            const removedCount = removeDuplicateHighlights();
-        }, 500); // Small delay to let all highlighting complete first
+        
         // Log các câu hỏi được highlight
         const highlightedQuestionsLog = matched.map(m => m.pageQuestion);
         console.log('[Tailieu Extension] Các câu hỏi được highlight:', highlightedQuestionsLog);
+        
+        // Count total highlights before cleanup
+        const highlightsBeforeCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
+        console.log('[Tailieu Extension] Số highlight trước khi cleanup:', highlightsBeforeCleanup);
+        
+        // Remove only duplicate highlights (same answer highlighted multiple times WITHIN same question)
+        // TEMPORARILY DISABLED FOR DEBUGGING
+        setTimeout(() => {
+            console.log('[Tailieu Extension] ⚠️ CLEANUP FUNCTION DISABLED FOR DEBUGGING');
+            console.log('[Tailieu Extension] Nếu vẫn bị xóa highlight, vấn đề không phải ở cleanup function');
+            
+            // UNCOMMENT TO ENABLE CLEANUP:
+            // const removedCount = removeDuplicateHighlights();
+            // const highlightsAfterCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
+            // console.log('[Tailieu Extension] Đã xóa', removedCount, 'highlight duplicate/sai');
+            // console.log('[Tailieu Extension] Số highlight sau cleanup:', highlightsAfterCleanup);
+        }, 500); // Small delay to let all highlighting complete first
     }
     
     // Reset comparison flag and button after completion with small delay for visual feedback
@@ -857,16 +879,8 @@ function resetCompareButton(matchedCount) {
 
 // Check if two questions are similar - Enhanced for 100% accuracy
 function isQuestionSimilar(q1, q2) {
-    // Chỉ xác định trùng nhau khi giống nhau 100% (bỏ qua ký tự đặc biệt, dấu câu)
-    // Chuẩn hóa: loại bỏ ký tự đặc biệt, dấu câu, chuyển về chữ thường
-    function normalize(text) {
-        return (text || "")
-            .replace(/[\p{P}\p{S}]/gu, "") // loại bỏ dấu câu, ký tự đặc biệt
-            .replace(/\s+/g, " ") // chuẩn hóa khoảng trắng
-            .trim()
-            .toLowerCase();
-    }
-    return normalize(q1) === normalize(q2);
+    // Use the same normalization function as answer matching for consistency
+    return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
 }
 
 // Extract key words from question text
@@ -1377,8 +1391,9 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         if (answerHighlightingEnabled && allCorrectAnswers.length > 0) {
             allCorrectAnswers.forEach((correctAnswer, index) => {
                 if (correctAnswer && correctAnswer.trim()) {
-                    const wasHighlighted = highlightAnswerOnPage(correctAnswer, element, pageQuestion);
-                    if (wasHighlighted) {
+                    // NEW: Try to highlight ALL instances of this answer on the page, not just the first one
+                    const highlightCount = highlightAllInstancesOfAnswer(correctAnswer, element, pageQuestion);
+                    if (highlightCount > 0) {
                         actuallyHighlightedAnswers.push(correctAnswer);
 
                     } else {
@@ -1561,11 +1576,26 @@ function findQuestionContainer(questionElement, pageQuestion) {
     }
     
     if (bestContainer) {
-        return bestContainer;
+        const questionMatches = bestContainer.textContent.match(/câu\s*(?:hỏi\s*)?\d+/gi);
+        if (questionMatches && questionMatches.length > 1) {
+            // Nếu container có nhiều câu hỏi, chỉ trả về chính questionElement và các sibling kế tiếp
+            if (questionElement.parentElement) {
+                const siblings = Array.from(questionElement.parentElement.children);
+                const idx = siblings.indexOf(questionElement);
+                return siblings.slice(idx, idx + 4); // chính nó và 3 sibling sau
+            } else {
+                return [questionElement];
+            }
+        }
+        return [bestContainer];
     }
-    
-    // Fallback: return a tightly scoped container
-    return questionElement.parentElement || questionElement;
+    // Fallback: chỉ trả về chính nó và 2 sibling sau
+    if (questionElement.parentElement) {
+        const siblings = Array.from(questionElement.parentElement.children);
+        const idx = siblings.indexOf(questionElement);
+        return siblings.slice(idx, idx + 3);
+    }
+    return [questionElement];
 }
 
 // Helper function to check if an element belongs to the current question
@@ -1602,11 +1632,185 @@ function belongsToCurrentQuestion(element, questionElement, pageQuestion) {
     return true;
 }
 
-// Function to highlight answer text on the page
+// NEW: Function to highlight ALL instances of an answer on the page (not just the first one)
+function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion = null) {
+    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
+        return 0;
+    }
+    
+    const cleanAnswer = cleanAnswerText(answerText);
+    const answerPatterns = generateAnswerPatterns(cleanAnswer);
+    
+    // Determine search scope
+    const searchContainers = [];
+    if (pageQuestion && questionElement) {
+        const questionContainers = findQuestionContainer(questionElement, pageQuestion);
+        if (questionContainers && Array.isArray(questionContainers)) {
+            questionContainers.forEach(el => {
+                if (el && !isExtensionElement(el)) searchContainers.push(el);
+            });
+        }
+    }
+    
+    if (searchContainers.length === 0) {
+        searchContainers.push(
+            questionElement.parentElement || document.body,
+            questionElement
+        );
+    }
+    
+    // Collect all candidate elements (same logic as highlightAnswerOnPage)
+    const candidateElements = new Set();
+    
+    for (const container of searchContainers) {
+        if (pageQuestion && container !== questionElement && container !== questionElement.parentElement) {
+            const allElements = container.querySelectorAll('*');
+            allElements.forEach(el => {
+                if (el.textContent && el.textContent.trim().length > 0 && 
+                    !isExtensionElement(el) && 
+                    !['SCRIPT', 'STYLE'].includes(el.tagName?.toUpperCase()) &&
+                    belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                    candidateElements.add(el);
+                }
+            });
+            if (container.textContent && container.textContent.trim().length > 0) {
+                candidateElements.add(container);
+            }
+        }
+        else if (container === questionElement.parentElement || 
+                (searchContainers.length > 1 && container !== questionElement)) {
+            if (container === questionElement.parentElement) {
+                const siblings = Array.from(container.children);
+                const questionIndex = siblings.indexOf(questionElement);
+                const searchRange = pageQuestion ? 
+                    { start: questionIndex, end: Math.min(questionIndex + 5, siblings.length) } :
+                    { start: Math.max(0, questionIndex - 2), end: Math.min(questionIndex + 10, siblings.length) };
+                
+                for (let i = searchRange.start; i < searchRange.end; i++) {
+                    if (siblings[i] && !isExtensionElement(siblings[i]) && 
+                        belongsToCurrentQuestion(siblings[i], questionElement, pageQuestion)) {
+                        candidateElements.add(siblings[i]);
+                        siblings[i].querySelectorAll('*').forEach(el => {
+                            if (el.tagName && !['SCRIPT', 'STYLE'].includes(el.tagName.toUpperCase()) && 
+                                !el.hidden && el.textContent.trim().length > 0 && !isExtensionElement(el) &&
+                                belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                                candidateElements.add(el);
+                            }
+                        });
+                    }
+                }
+            } else {
+                container.querySelectorAll('*').forEach(el => {
+                    if (el.textContent && el.textContent.trim().length > 0 && !isExtensionElement(el) &&
+                        belongsToCurrentQuestion(el, questionElement, pageQuestion)) {
+                        candidateElements.add(el);
+                    }
+                });
+            }
+        }
+        else if (container === questionElement) {
+            questionElement.querySelectorAll('*').forEach(el => {
+                if (!isExtensionElement(el)) {
+                    candidateElements.add(el);
+                }
+            });
+        }
+    }
+    
+    const elementsArray = Array.from(candidateElements).filter(el => 
+        el && el.textContent && el.textContent.trim().length > 2 && 
+        !isExtensionElement(el) &&
+        !el.classList.contains('tailieu-answer-highlight')
+    );
+    
+    // Find ALL matches (not just the best one)
+    const allMatches = [];
+    
+    for (const candidateElement of elementsArray) {
+        if (isExtensionElement(candidateElement)) continue;
+        
+        const elementText = candidateElement.textContent?.toLowerCase().trim() || '';
+        if (elementText.length < 2) continue;
+        if (candidateElement.classList.contains('tailieu-answer-highlight')) continue;
+        
+        for (const pattern of answerPatterns) {
+            const patternLower = pattern.toLowerCase().trim();
+            if (patternLower.length < 2) continue;
+            
+            // STRICT MATCHING: Normalize both texts (remove special chars, punctuation, extra spaces)
+            // Same logic as question comparison
+            const normalizedElement = normalizeTextForMatching(elementText);
+            const normalizedPattern = normalizeTextForMatching(patternLower);
+            
+            // Only match if EXACTLY the same after normalization
+            let isExactMatch = false;
+            let matchScore = 0;
+            
+            if (normalizedElement === normalizedPattern) {
+                isExactMatch = true;
+                matchScore = 1.0;
+                console.log(`[Tailieu Extension] ✅ EXACT MATCH found:`, {
+                    original: elementText.substring(0, 50),
+                    pattern: patternLower.substring(0, 50),
+                    normalized: normalizedElement.substring(0, 50)
+                });
+            }
+            
+            // REMOVED all fuzzy matching logic (includes, contains, etc.)
+            // Only EXACT matches are allowed
+            
+            if (isExactMatch) {
+                allMatches.push({ 
+                    element: candidateElement, 
+                    pattern: pattern, 
+                    score: matchScore,
+                    elementText: elementText,
+                    patternLength: pattern.length,
+                    isExactMatch: true,
+                    normalizedElement: normalizedElement,
+                    normalizedPattern: normalizedPattern
+                });
+            }
+        }
+    }
+    
+    // Sort by score
+    allMatches.sort((a, b) => {
+        if (Math.abs(a.score - b.score) > 0.01) {
+            return b.score - a.score;
+        }
+        const aIsPerfectText = a.elementText === a.pattern.toLowerCase();
+        const bIsPerfectText = b.elementText === b.pattern.toLowerCase();
+        if (aIsPerfectText && !bIsPerfectText) return -1;
+        if (!aIsPerfectText && bIsPerfectText) return 1;
+        return b.patternLength - a.patternLength;
+    });
+    
+    // Highlight ALL valid matches (not just the first one)
+    let highlightedCount = 0;
+    
+    for (const match of allMatches) {
+        const elementText = match.elementText.toLowerCase();
+        const hasNegativeIndicators = /(sai|wrong|incorrect|false|không đúng|không chính xác)/i.test(elementText);
+        const isAlreadyHighlighted = match.element.classList.contains('tailieu-answer-highlight');
+        const belongsToQuestion = belongsToCurrentQuestion(match.element, questionElement, pageQuestion);
+        
+        const shouldSkip = hasNegativeIndicators || isAlreadyHighlighted || !belongsToQuestion;
+        
+        if (!shouldSkip) {
+            highlightAnswerTextInElement(match.element, match.pattern);
+            highlightedCount++;
+        }
+    }
+    
+    return highlightedCount;
+}
+
+// Function to highlight answer text on the page (kept for backward compatibility, but now only highlights first instance)
 function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null) {
     if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
 
-        return;
+        return false;
     }
     
     const cleanAnswer = cleanAnswerText(answerText);
@@ -1615,23 +1819,11 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
     
     if (pageQuestion && questionElement) {
         // Find the question container and its associated answer area
-        const questionContainer = findQuestionContainer(questionElement, pageQuestion);
-        if (questionContainer) {
-            searchContainers.push(questionContainer);
-
-        }
-        
-        // Also search immediate siblings of the question
-        if (questionElement.parentElement) {
-            const siblings = Array.from(questionElement.parentElement.children);
-            const questionIndex = siblings.indexOf(questionElement);
-            
-            // Search in next few elements after the question (where answers usually are)
-            for (let i = questionIndex + 1; i < Math.min(questionIndex + 5, siblings.length); i++) {
-                if (siblings[i] && !isExtensionElement(siblings[i])) {
-                    searchContainers.push(siblings[i]);
-                }
-            }
+        const questionContainers = findQuestionContainer(questionElement, pageQuestion);
+        if (questionContainers && Array.isArray(questionContainers)) {
+            questionContainers.forEach(el => {
+                if (el && !isExtensionElement(el)) searchContainers.push(el);
+            });
         }
     }
     
@@ -1745,45 +1937,34 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
             const patternLower = pattern.toLowerCase().trim();
             if (patternLower.length < 2) continue;
             
-            // STRICT MATCHING: Only accept EXACT matches
+            // STRICT MATCHING: Normalize both texts (remove special chars, punctuation, extra spaces)
+            // Same logic as question comparison
+            const normalizedElement = normalizeTextForMatching(elementText);
+            const normalizedPattern = normalizeTextForMatching(patternLower);
+            
+            // Only match if EXACTLY the same after normalization
             let isExactMatch = false;
             let matchScore = 0;
             
-            // Check for exact text match (highest priority)
-            if (elementText === patternLower) {
+            if (normalizedElement === normalizedPattern) {
                 isExactMatch = true;
                 matchScore = 1.0;
             }
-            // Check for exact substring match (element text completely within pattern)
-            else if (patternLower.includes(elementText) && elementText.length >= patternLower.length * 0.8) {
-                isExactMatch = true;
-                matchScore = 0.95;
-            }
-            // Check for exact pattern within element text (pattern completely within element)
-            else if (elementText.includes(patternLower) && patternLower.length >= elementText.length * 0.8) {
-                isExactMatch = true;
-                matchScore = 0.9;
-            }
-            // Additional check for normalized exact match (remove punctuation/spaces)
-            else {
-                const normalizedElement = elementText.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-                const normalizedPattern = patternLower.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-                
-                if (normalizedElement === normalizedPattern) {
-                    isExactMatch = true;
-                    matchScore = 0.85;
-                }
-            }
+            
+            // REMOVED all fuzzy matching logic (includes, contains, substring, etc.)
+            // Only EXACT matches are allowed to prevent "speak" matching "speaks"
             
             // Only proceed if we have an exact match
-            if (isExactMatch && matchScore > 0.8) {
+            if (isExactMatch) {
                 allMatches.push({ 
                     element: candidateElement, 
                     pattern: pattern, 
                     score: matchScore,
                     elementText: elementText,
                     patternLength: pattern.length,
-                    isExactMatch: true
+                    isExactMatch: true,
+                    normalizedElement: normalizedElement,
+                    normalizedPattern: normalizedPattern
                 });
                 
             }
@@ -2072,8 +2253,9 @@ function generateAnswerPatterns(cleanAnswer) {
     return finalPatterns;
 }
 
-// Clean answer text for better matching
+// Clean answer text for better matching (remove answer markers)
 function cleanAnswerText(text) {
+    if (!text) return '';
     return text
         .replace(/^[A-Da-d][\.\)]\s*/, '') // Remove A. B. C. D. prefixes
         .replace(/^\d+[\.\)]\s*/, '') // Remove number prefixes
@@ -2173,14 +2355,7 @@ function calculateAnswerSimilarity(elementText, pattern) {
     return Math.min(0.6, Math.max(wordSimilarity, levenSimilarity));
 }
 
-// Clean answer text for better matching
-function cleanAnswerText(text) {
-    return text
-        .replace(/^[A-Da-d][\.\)]\s*/, '') // Remove A. B. C. D. prefixes
-        .replace(/^\d+[\.\)]\s*/, '') // Remove number prefixes
-        .replace(/^(Đáp án|Trả lời|Kết quả):\s*/gi, '') // Remove Vietnamese answer markers
-        .trim();
-}
+// NOTE: cleanAnswerText() is defined earlier in the file - duplicate removed
 
 // Highlight answer text within an element
 function highlightAnswerTextInElement(element, searchText) {
@@ -2260,6 +2435,7 @@ function highlightAnswerTextInElement(element, searchText) {
 
 
 // Remove duplicate highlights and incorrect highlights (smart cleanup)
+// ONLY removes duplicates WITHIN the same question, NOT between different questions
 function removeIncorrectAndDuplicateHighlights() {
     const allHighlights = document.querySelectorAll('.tailieu-answer-highlight');
     
@@ -2273,44 +2449,107 @@ function removeIncorrectAndDuplicateHighlights() {
     
 
     
-    const seenCorrectTexts = new Set();
-    const toRemove = [];
+    // Group highlights by their question container to handle duplicates per question
+    const questionGroups = new Map();
     
-    allHighlights.forEach((highlight, index) => {
-        const text = cleanAnswerText(highlight.textContent).toLowerCase().trim();
+    allHighlights.forEach((highlight, idx) => {
+        // Find the nearest question container or question element
+        let questionElement = highlight;
+        let depth = 0;
+        const maxDepth = 15;
+        let foundReason = 'reached max depth';
         
-        // Check if this highlight matches any correct answer
-        let isCorrectAnswer = false;
-        for (const correctAnswer of allCorrectAnswers) {
-            if (text === correctAnswer || 
-                text.includes(correctAnswer) || 
-                correctAnswer.includes(text)) {
-                isCorrectAnswer = true;
+        // Travel up to find a question marker
+        while (questionElement && questionElement.parentElement && depth < maxDepth) {
+            const parent = questionElement.parentElement;
+            
+            // Check if parent is a highlighted question
+            if (parent.classList && parent.classList.contains('tailieu-highlighted-question')) {
+                questionElement = parent;
+                foundReason = 'found .tailieu-highlighted-question';
                 break;
             }
+            
+            // Check if parent looks like a question container
+            if (parent.className && parent.className.match(/(question|cau|item|quiz|test|exercise)/i)) {
+                questionElement = parent;
+                foundReason = 'found question container class';
+                break;
+            }
+            
+            questionElement = parent;
+            depth++;
         }
         
-        if (isCorrectAnswer) {
-            // This is a correct answer
-            if (seenCorrectTexts.has(text)) {
-                // But it's a duplicate of a correct answer we already saw
-                toRemove.push({highlight, reason: 'duplicate correct answer', text});
-                debugLog(`Found duplicate correct answer highlight ${index + 1}:`, text);
-            } else {
-                // First time seeing this correct answer - keep it
-                seenCorrectTexts.add(text);
-                debugLog(`Keeping correct answer highlight ${index + 1}:`, text);
-            }
-        } else {
-            // This is NOT a correct answer - remove it
-            toRemove.push({highlight, reason: 'incorrect answer', text});
-            debugLog(`Found incorrect answer highlight ${index + 1}:`, text);
+        console.log(`[Tailieu Extension] Highlight ${idx + 1} grouped to question container (${foundReason}):`, cleanAnswerText(highlight.textContent).substring(0, 30) + '...');
+        
+        // Use the question element as the group key
+        if (!questionGroups.has(questionElement)) {
+            questionGroups.set(questionElement, []);
         }
+        questionGroups.get(questionElement).push(highlight);
+    });
+    
+    console.log(`[Tailieu Extension] 📊 Grouped ${allHighlights.length} highlights into ${questionGroups.size} question groups`);
+    
+    // Debug: Show which highlights belong to which group
+    let groupIndex = 0;
+    questionGroups.forEach((highlights, questionContainer) => {
+        groupIndex++;
+        console.log(`[Tailieu Extension] Group ${groupIndex}: ${highlights.length} highlights`);
+        highlights.forEach((h, i) => {
+            const text = cleanAnswerText(h.textContent).substring(0, 40);
+            console.log(`  - Highlight ${i + 1}: "${text}..."`);
+        });
+    });
+    
+    const toRemove = [];
+    
+    // Process each question group separately
+    questionGroups.forEach((highlights, questionContainer) => {
+        const seenTextsInThisQuestion = new Set();
+        
+        console.log(`[Tailieu Extension] ⚙️ Đang xử lý nhóm câu hỏi với ${highlights.length} highlights`);
+        
+        highlights.forEach((highlight, index) => {
+            const text = cleanAnswerText(highlight.textContent).toLowerCase().trim();
+            
+            // Check if this highlight matches any correct answer
+            let isCorrectAnswer = false;
+            let matchedCorrectAnswer = null;
+            for (const correctAnswer of allCorrectAnswers) {
+                if (text === correctAnswer || 
+                    text.includes(correctAnswer) || 
+                    correctAnswer.includes(text)) {
+                    isCorrectAnswer = true;
+                    matchedCorrectAnswer = correctAnswer;
+                    break;
+                }
+            }
+            
+            if (isCorrectAnswer) {
+                // This is a correct answer
+                // IMPORTANT: Only check for duplicates WITHIN THIS QUESTION
+                if (seenTextsInThisQuestion.has(text)) {
+                    // Duplicate within the SAME question - remove it
+                    toRemove.push({highlight, reason: 'duplicate in same question', text});
+                    console.log(`[Tailieu Extension] ❌ Tìm thấy duplicate trong CÙNG câu hỏi:`, text);
+                } else {
+                    // First time seeing this answer in THIS question - keep it
+                    seenTextsInThisQuestion.add(text);
+                    console.log(`[Tailieu Extension] ✅ Giữ lại đáp án đúng:`, text, `(match với: ${matchedCorrectAnswer})`);
+                }
+            } else {
+                // This is NOT a correct answer - remove it
+                toRemove.push({highlight, reason: 'incorrect answer', text});
+                console.log(`[Tailieu Extension] ❌ Tìm thấy đáp án SAI:`, text);
+            }
+        });
     });
     
     // Remove incorrect and duplicate highlights
     toRemove.forEach((item, index) => {
-        debugLog(`Removing ${item.reason} ${index + 1}:`, item.text);
+        debugLog(`Removing ${item.reason}:`, item.text);
         
         item.highlight.classList.remove('tailieu-answer-highlight');
         item.highlight.style.backgroundColor = '';
@@ -2329,7 +2568,7 @@ function removeIncorrectAndDuplicateHighlights() {
         }
     });
     
-    debugLog(`Removed ${toRemove.length} incorrect/duplicate highlights`);
+    debugLog(`Removed ${toRemove.length} incorrect/duplicate highlights from ${questionGroups.size} questions`);
     return toRemove.length;
 }
 
