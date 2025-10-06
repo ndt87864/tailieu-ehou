@@ -570,6 +570,11 @@ function extractQuestionsFromPage() {
             isQuestion = true;
             questionReason = 'pattern match';
         }
+        // NEW: Fill-in-the-blank detection (dạng điền từ, không cần dấu hỏi)
+        if (!isQuestion && /([_.‥…]{2,}|\.{2,}|…{1,}|___{1,})/.test(cleanText)) {
+            isQuestion = true;
+            questionReason = 'fill-in-the-blank';
+        }
         
         // Class name hints - prefer content classes
         if (!isQuestion && element.className) {
@@ -667,13 +672,15 @@ function extractQuestionsFromPage() {
 // Clean question text for better matching - Enhanced for accuracy
 function cleanQuestionText(text) {
     return text
-        .replace(/Câu\s*(hỏi\s*)?\d+[:\.\)\s]*/gi, '') // Remove "Câu" or "Câu hỏi" numbers
-        .replace(/Bài\s*(tập\s*)?\d+[:\.\)\s]*/gi, '') // Remove "Bài" or "Bài tập" numbers
-        .replace(/Question\s*\d+[:\.\)\s]*/gi, '') // Remove "Question" numbers
-        .replace(/^\s*\d+[\.\)]\s*/, '') // Remove leading numbers
-        .replace(/^\s*[A-D][\.\)\-]\s*/gi, '') // Remove answer options
-        .replace(/^\s*[-\*\+•]\s*/, '') // Remove bullet points
-        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/Câu\s*(hỏi\s*)?\d+[:\.\)\s]*/gi, '')
+        .replace(/Bài\s*(tập\s*)?\d+[:\.\)\s]*/gi, '')
+        .replace(/Question\s*\d+[:\.\)\s]*/gi, '')
+        .replace(/^\s*\d+[\.\)]\s*/, '')
+        .replace(/^\s*[A-D][\.\)\-]\s*/gi, '')
+        .replace(/^\s*[-\*\+•]\s*/, '')
+        .replace(/\s+/g, ' ')
+        // Giữ lại chuỗi dấu chấm liên tiếp (........ hoặc ...), thay vì loại bỏ
+        .replace(/(\.{3,})/g, ' $1 ') // Đảm bảo dấu chấm được giữ lại và tách biệt
         .replace(/[^\w\sÀ-ỹ\?\.,!]/g, ' ') // Keep only letters, Vietnamese chars, basic punctuation
         .trim()
         .toLowerCase();
@@ -763,6 +770,9 @@ async function compareAndHighlightQuestions() {
         setTimeout(() => {
             const removedCount = removeDuplicateHighlights();
         }, 500); // Small delay to let all highlighting complete first
+        // Log các câu hỏi được highlight
+        const highlightedQuestionsLog = matched.map(m => m.pageQuestion);
+        console.log('[Tailieu Extension] Các câu hỏi được highlight:', highlightedQuestionsLog);
     }
     
     // Reset comparison flag and button after completion with small delay for visual feedback
@@ -981,9 +991,9 @@ function performFinalValidation(pageQuestionRaw, dbQuestionRaw) {
         };
     }
     
-    // Stage 4: Final similarity check with high threshold
+    // Stage 4: Final similarity check with lower threshold (fix strict matching)
     const finalSimilarity = calculateEnhancedSimilarity(pageClean, dbClean);
-    if (finalSimilarity < 0.88) {
+    if (finalSimilarity < 0.75) {
         return {
             isValid: false,
             reason: `Final similarity too low: ${finalSimilarity.toFixed(3)}`,
