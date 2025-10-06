@@ -3113,6 +3113,10 @@ function createQuestionsPopup() {
             popup.style.width = '60px';
             popup.style.height = '60px';
             popup.style.maxHeight = '60px';
+            popup.style.bottom = '20px';
+            popup.style.right = '20px';
+            popup.style.left = 'auto';
+            popup.style.top = 'auto';
             content.style.display = 'none';
             header.style.display = 'none';
 
@@ -3128,6 +3132,8 @@ function createQuestionsPopup() {
                     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     border-radius: 50%;
                     font-size: 24px;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                    transition: transform 0.2s;
                 " title="Nhấn để mở rộng">
                     <?xml version="1.0" encoding="utf-8"?>
                     <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
@@ -3154,11 +3160,21 @@ function createQuestionsPopup() {
                 minimizeBtn.click(); // Mô phỏng click minimize button
             });
 
+            iconContainer.addEventListener('mouseenter', () => {
+                iconContainer.style.transform = 'scale(1.1)';
+            });
+
+            iconContainer.addEventListener('mouseleave', () => {
+                iconContainer.style.transform = 'scale(1)';
+            });
+
         } else {
             // Mở rộng lại
             popup.style.width = originalWidth;
             popup.style.height = originalHeight;
             popup.style.maxHeight = originalMaxHeight;
+            popup.style.bottom = '20px';
+            popup.style.right = '20px';
             content.style.display = 'block';
             header.style.display = 'flex';
 
@@ -3217,6 +3233,10 @@ function createQuestionsPopup() {
         popup.style.width = '60px';
         popup.style.height = '60px';
         popup.style.maxHeight = '60px';
+        popup.style.bottom = '20px';
+        popup.style.right = '20px';
+        popup.style.left = 'auto';
+        popup.style.top = 'auto';
         content.style.display = 'none';
         header.style.display = 'none';
 
@@ -3231,6 +3251,8 @@ function createQuestionsPopup() {
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 border-radius: 50%;
                 font-size: 24px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                transition: transform 0.2s;
             " title="Nhấn để mở rộng">
                 <?xml version="1.0" encoding="utf-8"?>
                 <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
@@ -3255,6 +3277,14 @@ function createQuestionsPopup() {
         const iconContainer = popup.querySelector('div');
         iconContainer.addEventListener('click', () => {
             minimizeBtn.click();
+        });
+
+        iconContainer.addEventListener('mouseenter', () => {
+            iconContainer.style.transform = 'scale(1.1)';
+        });
+
+        iconContainer.addEventListener('mouseleave', () => {
+            iconContainer.style.transform = 'scale(1)';
         });
     }
 
