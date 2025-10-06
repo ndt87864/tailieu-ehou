@@ -570,7 +570,15 @@
         <div id="questionsList"></div>
     </div>
 
-    <script src="popup.js"></script>
+    <!-- Firebase SDK (local files - compat mode) -->
+    <script src="firebase-app-compat.js"></script>
+    <script src="firebase-firestore-compat.js"></script>
+    <script src="firebase-analytics-compat.js"></script>
+    
+    <!-- Extension scripts -->
+    <script src="firebase.extends.js"></script>
+    <script src="firebaseService.js"></script>
+    <script src="popup-firestore.js"></script>
 </body>
 
 </html>

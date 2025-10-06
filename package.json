@@ -68,6 +68,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.2",
     "concurrently": "^8.2.2",
+    "firebase-admin": "^13.5.0",
     "javascript-obfuscator": "^4.1.1",
     "postcss": "^8.4.5",
     "rimraf": "^5.0.10",
