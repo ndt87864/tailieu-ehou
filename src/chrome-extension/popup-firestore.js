@@ -32,19 +32,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wait for Firebase to be ready
     await waitForFirebase();
     
-    // Initialize Firebase app
+    // Initialize Firebase app (sử dụng cùng project với web)
     if (!firebase.apps || !firebase.apps.find(app => app.name === 'extendsApp')) {
       const config = {
-        apiKey: "AIzaSyADDnlNwrgxweNLQomLXJiaTQFOWMTVggE",
-        authDomain: "tai-lieu-extends.firebaseapp.com",
-        projectId: "tai-lieu-extends",
-        storageBucket: "tai-lieu-extends.firebasestorage.app",
-        messagingSenderId: "917264262253",
-        appId: "1:917264262253:web:9cc9602f391a3583818b64",
-        measurementId: "G-P6R68G2CQS"
+        apiKey: "AIzaSyDj_FhdiYG8sgrqzSBlf9SrGF8FQR4fCI4",
+        authDomain: "tailieu-89ca9.firebaseapp.com",
+        projectId: "tailieu-89ca9",
+        storageBucket: "tailieu-89ca9.firebasestorage.app",
+        messagingSenderId: "739034600322",
+        appId: "1:739034600322:web:771c49578c29c8cabe359b",
+        measurementId: "G-4KTZWXH5KE"
       };
       firebase.initializeApp(config, "extendsApp");
-      console.log('✅ Firebase initialized');
+      console.log('✅ Firebase initialized with project:', config.projectId);
     }
     
     await initializeElements();
@@ -170,6 +170,7 @@ async function restoreFromCache() {
     if (cachedCategories && cachedCategories.length > 0) {
       categories = cachedCategories;
       console.log('Restored categories from cache:', categories.length);
+      // ⚠️ Note: Will reload fresh data from Firestore to ensure up-to-date
     }
 
     const cachedDocuments = await getFromCache(CACHE_KEYS.DOCUMENTS);
@@ -247,9 +248,9 @@ async function autoRestoreSelections() {
 }
 
 // Firestore Functions
-async function loadCategories() {
+async function loadCategories(forceReload = false) {
   try {
-    if (categories.length > 0) {
+    if (categories.length > 0 && !forceReload) {
       console.log('Using cached categories:', categories.length);
       populateCategorySelect();
       return;
@@ -462,7 +463,9 @@ function onHighlightAnswersChange() {
 function populateCategorySelect() {
   categorySelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
   
+  console.log('📋 Populating categories, total:', categories.length);
   categories.forEach(category => {
+    console.log(`  - ${category.stt || '?'}. ${category.title} (${category.id})`);
     const option = document.createElement('option');
     option.value = category.id;
     option.textContent = category.title;
@@ -663,7 +666,8 @@ async function clearAllCache() {
       chrome.tabs.sendMessage(tab.id, { action: 'updateQuestionsPopup', questions: [] }).catch(() => {});
     }
     
-    await loadCategories();
+    // Force reload categories from Firestore
+    await loadCategories(true);
     
     showSuccessMessage('✅ Cache đã được xóa thành công!');
     

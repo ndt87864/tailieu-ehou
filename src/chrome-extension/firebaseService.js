@@ -8,6 +8,16 @@ function getDb() {
   }
   // Lấy app "extendsApp" 
   const app = firebase.app('extendsApp');
+  
+  // Log config để verify đang dùng đúng project
+  if (app && app.options) {
+    console.log('🔍 Firebase Config being used:', {
+      projectId: app.options.projectId,
+      authDomain: app.options.authDomain,
+      apiKey: app.options.apiKey ? app.options.apiKey.substring(0, 15) + '...' : 'N/A'
+    });
+  }
+  
   return firebase.firestore(app);
 }
 
@@ -20,13 +30,69 @@ function getDb() {
 async function getAllCategories() {
   try {
     const db = getDb();
-    const querySnapshot = await db.collection('categories').get();
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    
+    console.log('🔍 Fetching categories from Firestore...');
+    const querySnapshot = await db.collection('categories').limit(100).get();
+    
+    console.log('📊 Raw query result:', {
+      empty: querySnapshot.empty,
+      size: querySnapshot.size,
+      docs: querySnapshot.docs.length
+    });
+    
+    if (querySnapshot.empty) {
+      console.warn('⚠️ No categories found in Firestore!');
+      return [];
+    }
+    
+    const categoriesData = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log(`  📁 Found category: ${data.title} (stt:${data.stt}, id:${doc.id})`);
+      return {
+        id: doc.id,
+        ...data,
+        documentCount: 0
+      };
+    });
+    
+    console.log(`✅ Total categories fetched: ${categoriesData.length}`);
+    
+    // Đếm số tài liệu cho mỗi category
+    const countPromises = categoriesData.map(async (category) => {
+      try {
+        const documentsQuery = await db.collection('documents')
+          .where('categoryId', '==', category.id)
+          .limit(1000)
+          .get();
+        
+        return {
+          ...category,
+          documentCount: documentsQuery.size
+        };
+      } catch (error) {
+        console.error(`Error counting documents for category ${category.id}:`, error);
+        return category;
+      }
+    });
+    
+    const categoriesWithCount = await Promise.all(countPromises);
+    
+    console.log('🔍 Categories before sort:', categoriesWithCount.length);
+    categoriesWithCount.forEach(cat => {
+      console.log(`  - stt:${cat.stt}, title:"${cat.title}", id:${cat.id}, docs:${cat.documentCount}`);
+    });
+    
+    // Sắp xếp theo stt (giống web)
+    const sortedCategories = [...categoriesWithCount].sort((a, b) => (a.stt || 0) - (b.stt || 0));
+    
+    console.log('✅ Categories after sort:', sortedCategories.length);
+    sortedCategories.forEach(cat => {
+      console.log(`  - stt:${cat.stt}, title:"${cat.title}"`);
+    });
+    
+    return sortedCategories;
   } catch (error) {
-    console.error('Error getting categories:', error);
+    console.error('❌ Error getting categories:', error);
     throw error;
   }
 }

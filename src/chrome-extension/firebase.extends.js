@@ -2,26 +2,40 @@
 // Import từ CDN - sẽ được load từ popup.html
 
 const extendsFirebaseConfig = {
-  apiKey: "AIzaSyADDnlNwrgxweNLQomLXJiaTQFOWMTVggE",
-  authDomain: "tai-lieu-extends.firebaseapp.com",
-  projectId: "tai-lieu-extends",
-  storageBucket: "tai-lieu-extends.firebasestorage.app",
-  messagingSenderId: "917264262253",
-  appId: "1:917264262253:web:9cc9602f391a3583818b64",
-  measurementId: "G-P6R68G2CQS"
+  apiKey: "AIzaSyDj_FhdiYG8sgrqzSBlf9SrGF8FQR4fCI4",
+  authDomain: "tailieu-89ca9.firebaseapp.com",
+  projectId: "tailieu-89ca9",
+  storageBucket: "tailieu-89ca9.firebasestorage.app",
+  messagingSenderId: "739034600322",
+  appId: "1:739034600322:web:771c49578c29c8cabe359b",
+  measurementId: "G-4KTZWXH5KE"
 };
 
 // Đợi Firebase được load từ CDN
 let extendsApp, extendsDb, extendsAnalytics;
 
 function initializeFirebase() {
+  console.log('🚀 Initializing Firebase...');
+  
   if (typeof firebase === 'undefined') {
+    console.error('❌ Firebase SDK not loaded!');
     throw new Error('Firebase chưa được load. Vui lòng đảm bảo Firebase SDK đã được load từ CDN.');
   }
+  
+  console.log('✅ Firebase SDK loaded');
+  console.log('🔧 Config:', {
+    projectId: extendsFirebaseConfig.projectId,
+    authDomain: extendsFirebaseConfig.authDomain,
+    apiKey: extendsFirebaseConfig.apiKey.substring(0, 15) + '...'
+  });
   
   // Khởi tạo app Firebase riêng cho extends
   extendsApp = firebase.initializeApp(extendsFirebaseConfig, "extendsApp");
   extendsDb = firebase.firestore(extendsApp);
+  
+  console.log('✅ Firebase initialized successfully');
+  console.log('📊 App name:', extendsApp.name);
+  console.log('📊 Project ID:', extendsApp.options.projectId);
   
   // Analytics (optional)
   try {
