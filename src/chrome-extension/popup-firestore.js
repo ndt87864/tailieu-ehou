@@ -318,6 +318,12 @@ async function loadQuestions(documentIds) {
     showLoading(true);
     hideError();
     
+    console.log('🔍 Loading questions for documents:', documentIds);
+    console.log('🔍 Selected documents details:', selectedDocuments.map(id => {
+      const doc = documents.find(d => d.id === id);
+      return doc ? `${doc.title} (${id})` : id;
+    }));
+    
     if (!documentIds || documentIds.length === 0) {
       console.log('No documents selected');
       showQuestionsStatus(0);

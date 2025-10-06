@@ -282,14 +282,26 @@ async function getQuestionsByDocuments(documentIds) {
     const chunkSize = 10;
     for (let i = 0; i < documentIds.length; i += chunkSize) {
       const chunk = documentIds.slice(i, i + chunkSize);
+      
+      console.log(`🔍 Fetching questions for chunk:`, chunk);
+      
       const querySnapshot = await db.collection('questions')
         .where('documentId', 'in', chunk)
         .get();
+      
+      console.log(`  📊 Found ${querySnapshot.size} questions for this chunk`);
       
       const chunkQuestions = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      
+      // Log breakdown by document
+      const breakdown = {};
+      chunkQuestions.forEach(q => {
+        breakdown[q.documentId] = (breakdown[q.documentId] || 0) + 1;
+      });
+      console.log(`  📈 Breakdown:`, breakdown);
       
       allQuestions.push(...chunkQuestions);
     }
