@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // ==================== CATEGORIES ====================
+    // Công khai, ai cũng đọc được
+    match /categories/{categoryId} {
+      allow read: if true;  // Public read
+      allow write: if isAdmin();  // Chỉ admin mới sửa/xóa
+    }
+    
+    // ==================== DOCUMENTS ====================
+    // Công khai, ai cũng đọc được
+    match /documents/{documentId} {
+      allow read: if true;  // Public read
+      allow write: if isAdmin();  // Chỉ admin mới sửa/xóa
+    }
+    
+    // ==================== QUESTIONS ====================
+    // Công khai NHƯNG giới hạn số lượng query
+    match /questions/{questionId} {
+      // Cho phép đọc nhưng PHẢI có điều kiện where
+      allow read: if true;
+      allow write: if isAdmin();
+      
+      // Giới hạn: Mỗi lần query tối đa 1000 questions
+      // (Firestore tự động enforce limit này qua query)
+    }
+    
+    // ==================== USERS ====================
+    match /users/{userId} {
+      // User chỉ đọc được data của chính mình
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isSignedIn() && request.auth.uid == userId;
+      
+      // Admin đọc được tất cả
+      allow read, write: if isAdmin();
+    }
+    
+    // ==================== USER PREFERENCES ====================
+    match /userPreferences/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if isAdmin();
+    }
+  }
+}

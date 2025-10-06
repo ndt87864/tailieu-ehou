@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Specific Question - Mother's Sister</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .question-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+        }
+        .question-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .answers {
+            margin-top: 15px;
+        }
+        .answer-option {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .answer-option:hover {
+            background: #f0f0f0;
+            border-color: #4CAF50;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d32f2f;
+        }
+        .test-case {
+            background: #fff9c4;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #fbc02d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Specific Question: Mother's Sister</h1>
+        
+        <div class="info">
+            <h3>📋 Test Case Info:</h3>
+            <p><strong>Database:</strong> <code>#137 Ha is my mother's sister. She is my ...............</code></p>
+            <p><strong>Expected Answer:</strong> <code>aunt</code></p>
+            <p><strong>Web variants to test:</strong></p>
+            <ul>
+                <li>Câu hỏi 4: Ha is my mother's sister. She is my ...............</li>
+                <li>Different apostrophe types: mother's vs mother's</li>
+                <li>Different ellipsis lengths: ... vs ...............</li>
+            </ul>
+        </div>
+
+        <!-- Test Case 1: Exact match with different numbering -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu hỏi 4: Ha is my mother's sister. She is my ...............
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. aunt</div>
+                <div class="answer-option">b. sister</div>
+                <div class="answer-option">c. uncle</div>
+                <div class="answer-option">d. Cousin</div>
+            </div>
+        </div>
+
+        <!-- Test Case 2: Different apostrophe (Unicode) -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 4: Ha is my mother's sister. She is my ...............
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. aunt</div>
+                <div class="answer-option">b. sister</div>
+                <div class="answer-option">c. uncle</div>
+                <div class="answer-option">d. Cousin</div>
+            </div>
+        </div>
+
+        <!-- Test Case 3: Shorter ellipsis -->
+        <div class="question-container">
+            <div class="question-text">
+                Ha is my mother's sister. She is my ...
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. aunt</div>
+                <div class="answer-option">b. sister</div>
+                <div class="answer-option">c. uncle</div>
+                <div class="answer-option">d. Cousin</div>
+            </div>
+        </div>
+
+        <!-- Test Case 4: Even longer ellipsis -->
+        <div class="question-container">
+            <div class="question-text">
+                #137 Ha is my mother's sister. She is my .......................
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. aunt</div>
+                <div class="answer-option">b. sister</div>
+                <div class="answer-option">c. uncle</div>
+                <div class="answer-option">d. Cousin</div>
+            </div>
+        </div>
+
+        <!-- Test Case 5: No ellipsis, just blank -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 5: Ha is my mother's sister. She is my _______
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. aunt</div>
+                <div class="answer-option">b. sister</div>
+                <div class="answer-option">c. uncle</div>
+                <div class="answer-option">d. Cousin</div>
+            </div>
+        </div>
+
+        <div class="info" style="margin-top: 30px; background: #fff3e0;">
+            <h3>🎯 Expected Console Output:</h3>
+            <pre style="background: #f5f5f5; padding: 10px; overflow-x: auto; font-size: 12px;">
+[Tailieu Extension] 🧹 Clean text: {
+  original: "Câu hỏi 4: Ha is my mother's sister. She is my ...............",
+  cleaned: "ha is my mothers sister she is my",
+  length: 33
+}
+
+[Tailieu Extension] 🧹 Clean text: {
+  original: "#137 Ha is my mother's sister. She is my ...............",
+  cleaned: "ha is my mothers sister she is my",
+  length: 33
+}
+
+[Tailieu Extension] ✅ Exact match (cleaned)
+[Tailieu Extension] ✅ MATCH FOUND! Page[0] <=> Ext[137]
+[Tailieu Extension] 🎯 Correct answers found: 1
+[Tailieu Extension]    Answers: aunt
+[Tailieu Extension] 🎨 Highlighting question and answers...
+            </pre>
+        </div>
+
+        <div class="test-case">
+            <h4>🔍 How cleanQuestionText() works:</h4>
+            <ol>
+                <li><strong>Input:</strong> <code>"#137 Ha is my mother's sister. She is my ..............."</code></li>
+                <li><strong>Normalize apostrophe:</strong> <code>mother's → mother's</code></li>
+                <li><strong>Normalize ellipsis:</strong> <code>............... → ...</code></li>
+                <li><strong>Remove prefix:</strong> <code>#137 → ""</code></li>
+                <li><strong>Lowercase:</strong> <code>Ha → ha</code></li>
+                <li><strong>Remove ellipsis:</strong> <code>... → " "</code></li>
+                <li><strong>Remove special chars:</strong> <code>. → ""</code> (but keep normal dot)</li>
+                <li><strong>Output:</strong> <code>"ha is my mothers sister she is my"</code></li>
+            </ol>
+        </div>
+
+        <div class="test-case" style="background: #e8f5e9; border-left-color: #4caf50;">
+            <h4>✅ All 5 test cases should match because:</h4>
+            <ul>
+                <li>✅ Different apostrophes normalized to same: <code>' → '</code></li>
+                <li>✅ Different ellipsis removed: <code>... → ""</code></li>
+                <li>✅ Different prefixes removed: <code>#137, Câu 4, Câu hỏi 4 → ""</code></li>
+                <li>✅ Core content identical: <code>"ha is my mothers sister she is my"</code></li>
+            </ul>
+        </div>
+
+        <div class="info" style="background: #ffebee;">
+            <h3>❌ If not working, check:</h3>
+            <ol>
+                <li><strong>Extension loaded?</strong> Go to chrome://extensions/ and reload</li>
+                <li><strong>Questions loaded?</strong> Open popup and verify #137 exists</li>
+                <li><strong>Console logs?</strong> Press F12 and filter by <code>[Tailieu Extension]</code></li>
+                <li><strong>Clean text output?</strong> Compare cleaned text in console</li>
+                <li><strong>Similarity score?</strong> Should be 1.0 for exact match</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        console.log('🧪 Test page loaded: Mother\'s Sister Question');
+        console.log('📊 Total test cases: 5');
+        console.log('🎯 Expected matches: 5/5');
+        console.log('✅ Expected answer: "aunt" (option a)');
+        console.log('');
+        console.log('Test variations:');
+        console.log('  1. Câu hỏi 4: ... (full ellipsis)');
+        console.log('  2. Câu 4: ... (Unicode apostrophe)');
+        console.log('  3. No prefix, short ellipsis (...)');
+        console.log('  4. #137 prefix, very long ellipsis');
+        console.log('  5. Underscore instead of ellipsis');
+        console.log('');
+        console.log('👉 Open extension popup and click compare to start testing');
+    </script>
+</body>
+</html>

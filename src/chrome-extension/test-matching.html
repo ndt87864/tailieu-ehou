@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Matching - Tailieu Extension</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .question-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+        }
+        .question-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            margin: 10px 0;
+        }
+        .answers {
+            margin-top: 15px;
+        }
+        .answer-option {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .answer-option:hover {
+            background: #f0f0f0;
+            border-color: #4CAF50;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        .info h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Question Matching - Tailieu Extension</h1>
+        
+        <div class="info">
+            <h3>📋 Hướng dẫn test:</h3>
+            <ol>
+                <li>Mở extension và load câu hỏi từ database</li>
+                <li>Click vào popup extension để compare câu hỏi</li>
+                <li>Kiểm tra Console (F12) để xem debug logs</li>
+                <li>Đáp án đúng sẽ được highlight màu xanh</li>
+            </ol>
+            <p><strong>Debug mode:</strong> Bật Console để xem chi tiết quá trình matching</p>
+        </div>
+
+        <!-- Test Case 1: Câu hỏi y hệt -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 1: Chọn đáp án đúng nhất Lan is....................in the class
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 2: Câu hỏi tương tự (có dấu cách khác) -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 2: Chọn đáp án đúng nhất   Lan is ..... in the class
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 3: Câu hỏi không có prefix "Câu X" -->
+        <div class="question-container">
+            <div class="question-text">
+                Chọn đáp án đúng nhất Lan is....................in the class
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 4: Câu hỏi có ký tự đặc biệt -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 3: Chọn đáp án đúng nhất: "Lan is....................in the class"
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 5: Câu hỏi viết hoa/thường khác -->
+        <div class="question-container">
+            <div class="question-text">
+                CÂU 4: CHỌN ĐÁP ÁN ĐÚNG NHẤT LAN IS....................IN THE CLASS
+            </div>
+            <div class="answers">
+                <div class="answer-option">A. THE MOST BEAUTIFUL</div>
+                <div class="answer-option">B. MORE BEAUTIFUL</div>
+                <div class="answer-option">C. BEAUTIFUL</div>
+                <div class="answer-option">D. BEAUTIFULLER</div>
+            </div>
+        </div>
+
+        <!-- Test Case 6: Câu hỏi có line break -->
+        <div class="question-container">
+            <div class="question-text">
+                Câu 5: Chọn đáp án đúng nhất
+                Lan is....................in the class
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 7: Câu hỏi trong tag khác -->
+        <div class="question-container">
+            <h3 class="question-text">
+                Câu 6: Chọn đáp án đúng nhất Lan is....................in the class
+            </h3>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <!-- Test Case 8: Câu hỏi với số thứ tự khác -->
+        <div class="question-container">
+            <div class="question-text">
+                Bài 159: Chọn đáp án đúng nhất Lan is....................in the class
+            </div>
+            <div class="answers">
+                <div class="answer-option">a. the most beautiful</div>
+                <div class="answer-option">b. more beautiful</div>
+                <div class="answer-option">c. beautiful</div>
+                <div class="answer-option">d. beautifuller</div>
+            </div>
+        </div>
+
+        <div class="info" style="margin-top: 30px; background: #fff3e0;">
+            <h3>🎯 Expected Results:</h3>
+            <ul>
+                <li>Tất cả 8 test cases trên đều phải match với câu trong DB</li>
+                <li>Đáp án đúng: <code>the most beautiful</code> (option a) phải được highlight màu xanh</li>
+                <li>Console log sẽ hiển thị chi tiết quá trình matching</li>
+                <li>Notification sẽ hiện "Tìm thấy X/8 câu hỏi"</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        console.log('🧪 Test page loaded');
+        console.log('📊 Total test cases: 8');
+        console.log('🎯 Expected matches: 8/8');
+        console.log('✅ Expected answer: "the most beautiful" (option a)');
+        console.log('');
+        console.log('👉 Open extension popup and click compare to start testing');
+    </script>
+</body>
+</html>
