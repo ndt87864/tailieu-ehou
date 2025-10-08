@@ -349,13 +349,19 @@ function safeAppendToBody(element, callback = null) {
         document.body.appendChild(element);
         if (callback) callback();
     } else {
-        // Wait for body to be available
+        // Wait for body to be available, but limit retries
+        let retryCount = 0;
+        const maxRetries = 50; // 5 seconds max wait
+        
         const checkBody = () => {
+            retryCount++;
             if (document.body) {
                 document.body.appendChild(element);
                 if (callback) callback();
+            } else if (retryCount < maxRetries) {
+                setTimeout(checkBody, 100);
             } else {
-                setTimeout(checkBody, 50);
+                console.error('Failed to append element to body after maximum retries');
             }
         };
         checkBody();
@@ -2959,6 +2965,53 @@ function createFloatingButton() {
     safeAppendToBody(button);
 }
 
+// Setup monitoring to recreate popup if it's removed from DOM
+function setupPopupMonitoring() {
+    // Use MutationObserver to watch for popup removal
+    const observer = new MutationObserver((mutations) => {
+        let popupRemoved = false;
+        
+        mutations.forEach((mutation) => {
+            mutation.removedNodes.forEach((node) => {
+                if (node.id === 'tailieu-questions-popup' || 
+                    (node.querySelector && node.querySelector('#tailieu-questions-popup'))) {
+                    popupRemoved = true;
+                }
+            });
+        });
+        
+        if (popupRemoved) {
+            console.log('Popup was removed from DOM, recreating...');
+            // Recreate popup after a short delay
+            setTimeout(() => {
+                const existingPopup = document.getElementById('tailieu-questions-popup');
+                if (!existingPopup) {
+                    createQuestionsPopup();
+                    // Update with current questions if any
+                    if (extensionQuestions && extensionQuestions.length > 0) {
+                        updateQuestionsPopup(extensionQuestions);
+                    }
+                }
+            }, 500);
+        }
+    });
+    
+    // Start observing
+    if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+        // Wait for body
+        const waitForBody = () => {
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+                setTimeout(waitForBody, 100);
+            }
+        };
+        waitForBody();
+    }
+}
+
 // Create questions popup at bottom right
 function createQuestionsPopup() {
     // Create popup container
@@ -3301,20 +3354,46 @@ function createQuestionsPopup() {
         }
     }
 
-    console.log('Questions popup created successfully');
+    // Verify popup was added successfully
+    setTimeout(() => {
+        const addedPopup = document.getElementById('tailieu-questions-popup');
+        if (!addedPopup) {
+            console.error('Popup was not added to DOM successfully');
+        } else {
+            console.log('Questions popup created successfully');
+        }
+    }, 50);
+
     return popup;
 }
 
 // Update questions popup content
-function updateQuestionsPopup(questions = []) {
+function updateQuestionsPopup(questions = [], retryCount = 0) {
     const popup = document.getElementById('tailieu-questions-popup');
     const content = document.getElementById('tailieu-questions-content');
     
     if (!popup || !content) {
+        // Prevent infinite loop - limit retries to 5 attempts
+        if (retryCount >= 5) {
+            console.error('Failed to create questions popup after 5 attempts');
+            return;
+        }
+        
         console.log('Popup or content not found, creating popup...');
         createQuestionsPopup();
-        // Try again after creating
-        setTimeout(() => updateQuestionsPopup(questions), 100);
+        
+        // Check if popup was created successfully before retrying
+        setTimeout(() => {
+            const newPopup = document.getElementById('tailieu-questions-popup');
+            const newContent = document.getElementById('tailieu-questions-content');
+            if (!newPopup || !newContent) {
+                // Popup creation failed, retry
+                updateQuestionsPopup(questions, retryCount + 1);
+            } else {
+                // Popup created successfully, now update it
+                updateQuestionsPopup(questions, 0);
+            }
+        }, 100);
         return;
     }
 
@@ -3538,6 +3617,9 @@ function showHighlightNotification(questionText) {
 console.log('Creating questions popup...');
 const questionsPopup = createQuestionsPopup();
 console.log('Questions popup created:', questionsPopup ? 'Success' : 'Failed');
+
+// Setup popup monitoring to recreate if removed
+setupPopupMonitoring();
 
 // Expose functions for debugging
 window.tailieuDebug = {
