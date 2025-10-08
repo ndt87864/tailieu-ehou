@@ -2925,7 +2925,7 @@ function createFloatingButton() {
         right: 20px;
         width: 50px;
         height: 50px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #42A5F5, #1E88E5);
         color: white;
         border-radius: 50%;
         display: flex;
@@ -2985,13 +2985,13 @@ function createQuestionsPopup() {
     // Create header
     const header = document.createElement('div');
     header.style.cssText = `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #42A5F5, #1E88E5);
         color: white;
         padding: 15px 20px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-weight: 600;
+        font-weight: 400;
         cursor: move;
     `;
     
@@ -3129,7 +3129,7 @@ function createQuestionsPopup() {
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #42A5F5, #1E88E5);
                     border-radius: 50%;
                     font-size: 24px;
                     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
@@ -3248,7 +3248,7 @@ function createQuestionsPopup() {
                 align-items: center;
                 justify-content: center;
                 cursor: pointer;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #42A5F5, #1E88E5);
                 border-radius: 50%;
                 font-size: 24px;
                 box-shadow: 0 4px 16px rgba(0,0,0,0.2);

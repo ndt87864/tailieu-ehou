@@ -10,14 +10,16 @@
             margin: 0;
             padding: 15px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
+            background: rgba(248, 249, 250, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .header {
             text-align: center;
             margin-bottom: 20px;
             padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #42A5F5, #1E88E5);
             color: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
@@ -336,19 +338,23 @@
 
         .questions-section {
             display: none;
-            background: white;
+            background: rgba(255, 255, 255, 0.527);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             max-height: 300px;
             overflow-y: auto;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .questions-header {
             padding: 15px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e1e5e9;
+            background: rgba(248, 249, 250, 0.6);
+            border-bottom: 1px solid rgba(225, 229, 233, 0.8);
             font-weight: 600;
             color: #333;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .question-item {
@@ -574,7 +580,7 @@
     <script src="firebase-app-compat.js"></script>
     <script src="firebase-firestore-compat.js"></script>
     <script src="firebase-analytics-compat.js"></script>
-    
+
     <!-- Extension scripts -->
     <script src="firebase.extends.js"></script>
     <script src="firebaseService.js"></script>
