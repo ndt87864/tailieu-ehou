@@ -476,13 +476,21 @@ const QuestionManagement = () => {
     setImageError("");
 
     if (questionType === "text") {
-      if (!newQuestion.question.trim()) {
-        setFormError("Vui lòng nhập câu hỏi");
+      // Allow either text OR image for question and answer
+      const hasQuestionText =
+        !!newQuestion.question && newQuestion.question.trim() !== "";
+      const hasAnswerText =
+        !!newQuestion.answer && newQuestion.answer.trim() !== "";
+      const hasQuestionImage = !!questionImage;
+      const hasAnswerImage = !!answerImage;
+
+      if (!hasQuestionText && !hasQuestionImage) {
+        setFormError("Vui lòng cung cấp câu hỏi (văn bản hoặc hình ảnh)");
         return;
       }
 
-      if (!newQuestion.answer.trim()) {
-        setFormError("Vui lòng nhập câu trả lời");
+      if (!hasAnswerText && !hasAnswerImage) {
+        setFormError("Vui lòng cung cấp câu trả lời (văn bản hoặc hình ảnh)");
         return;
       }
 
@@ -509,8 +517,8 @@ const QuestionManagement = () => {
         }
 
         const questionData = {
-          question: newQuestion.question.trim(),
-          answer: newQuestion.answer.trim(),
+          question: (newQuestion.question || "").trim(),
+          answer: (newQuestion.answer || "").trim(),
           documentId: selectedDocumentFilter,
           stt: maxStt + 1,
           url_question,
@@ -598,13 +606,21 @@ const QuestionManagement = () => {
     setFormError("");
     setImageError("");
 
-    if (!editQuestion.question.trim()) {
-      setFormError("Vui lòng nhập câu hỏi");
+    // Allow either text OR image for question and answer when updating
+    const hasQuestionText =
+      !!editQuestion.question && editQuestion.question.trim() !== "";
+    const hasAnswerText =
+      !!editQuestion.answer && editQuestion.answer.trim() !== "";
+    const hasQuestionImage = !!questionImage || !!editQuestion.url_question;
+    const hasAnswerImage = !!answerImage || !!editQuestion.url_answer;
+
+    if (!hasQuestionText && !hasQuestionImage) {
+      setFormError("Vui lòng cung cấp câu hỏi (văn bản hoặc hình ảnh)");
       return;
     }
 
-    if (!editQuestion.answer.trim()) {
-      setFormError("Vui lòng nhập câu trả lời");
+    if (!hasAnswerText && !hasAnswerImage) {
+      setFormError("Vui lòng cung cấp câu trả lời (văn bản hoặc hình ảnh)");
       return;
     }
 
@@ -622,8 +638,8 @@ const QuestionManagement = () => {
       }
 
       const questionData = {
-        question: editQuestion.question.trim(),
-        answer: editQuestion.answer.trim(),
+        question: (editQuestion.question || "").trim(),
+        answer: (editQuestion.answer || "").trim(),
         documentId: selectedDocumentFilter,
         stt: editQuestion.stt || 0, // Preserve existing stt
         url_question,
