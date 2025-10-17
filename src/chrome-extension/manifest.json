@@ -20,8 +20,8 @@
   "content_scripts": [
     {
       "matches": ["https://learning.ehou.edu.vn/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "js": ["content.js", "question-scanner/scanner.js"],
+      "css": ["styles.css", "question-scanner/scanner.css"],
       "run_at": "document_start"
     }
   ],
