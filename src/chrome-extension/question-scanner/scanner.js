@@ -12,6 +12,7 @@
 
     let scannedQuestions = [];
     let existingQuestions = [];
+    let existingQuestionKeys = new Set();
 
     // Normalize text for comparison
     function normalizeText(text) {
@@ -136,6 +137,14 @@
         
         questionElements.forEach((element, index) => {
             try {
+                // Skip any elements that are part of our extension UI (avoid scanning popup/DB list)
+                if (!element) return;
+                const elId = (element.id || '').toLowerCase();
+                const elClass = (element.className || '').toLowerCase();
+                if (elId.includes('tailieu') || elClass.includes('tailieu') || element.hasAttribute && element.hasAttribute('data-tailieu')) {
+                    return;
+                }
+
                 const questionText = element.innerText?.trim();
                 if (!questionText || questionText.length < 10) return;
 
@@ -190,6 +199,8 @@
         try {
             const result = await chrome.storage.local.get(['tailieu_questions']);
             existingQuestions = result.tailieu_questions || [];
+            // Build normalized key set for fast lookup
+            existingQuestionKeys = new Set((existingQuestions || []).map(q => normalizedQuestionKey(q.question || q)));
             console.log(`Loaded ${existingQuestions.length} existing questions from storage`);
         } catch (error) {
             console.error('Error loading existing questions:', error);
@@ -199,12 +210,20 @@
 
     // Check if question already exists in database
     function isQuestionNew(questionText) {
-        const normalizedQuestion = normalizeText(questionText);
-        
-        return !existingQuestions.some(existingQ => {
-            const existingNormalized = normalizeText(existingQ.question);
-            return existingNormalized === normalizedQuestion;
-        });
+        const key = normalizedQuestionKey(questionText);
+        return !existingQuestionKeys.has(key);
+    }
+
+    // Build a normalized key for a question for robust matching
+    function normalizedQuestionKey(text) {
+        if (!text) return '';
+        try {
+            const cleaned = cleanQuestionText(text);
+            const core = extractCoreQuestion(cleaned);
+            return normalizeText(core);
+        } catch (e) {
+            return normalizeText(text || '');
+        }
     }
 
     // Merge duplicate questions (only merge if both question AND answer are the same)
@@ -273,16 +292,21 @@
         const allQuestions = extractQuestionsFromPage();
         console.log(`Found ${allQuestions.length} questions on page`);
 
-        // Filter new questions only and clean question text
+        // Clean extracted questions first then filter new ones
         let newQuestions = allQuestions
-            .filter(q => isQuestionNew(q.question))
             .map(q => ({
                 ...q,
                 question: cleanQuestionText(q.question)
-            }));
+            }))
+            // Remove invalid/empty cleaned questions
+            .filter(q => q.question && q.question.length > 0)
+            // Keep only questions that do not exist in DB
+            .filter(q => isQuestionNew(q.question));
         
         // Merge duplicate questions
         scannedQuestions = mergeDuplicateQuestions(newQuestions);
+    // Ensure none of the merged questions are already in DB (extra safety)
+    scannedQuestions = scannedQuestions.filter(q => isQuestionNew(q.question));
         
         console.log(`Found ${scannedQuestions.length} new questions (after merging duplicates)`);
 
@@ -352,9 +376,10 @@
 
         // Header
         const header = document.createElement('div');
+        // Blue/white theme to match main questions popup
         header.style.cssText = `
             padding: 16px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
             color: white;
             border-radius: 12px 12px 0 0;
             display: flex;
@@ -406,155 +431,158 @@
             background: #f5f5f5;
         `;
 
-        // Render list from the merged `scannedQuestions` array so numbering follows merged order
-        function renderList() {
-            // Clear container
-            listContainer.innerHTML = '';
+        // Add questions to list
+        scannedQuestions.forEach((item, index) => {
+            const questionItem = document.createElement('div');
+            questionItem.style.cssText = `
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                transition: transform 0.2s, box-shadow 0.2s;
+            `;
+            questionItem.onmouseover = () => {
+                questionItem.style.transform = 'translateY(-2px)';
+                questionItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            };
+            questionItem.onmouseout = () => {
+                questionItem.style.transform = 'translateY(0)';
+                questionItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            };
 
-            scannedQuestions.forEach((item, index) => {
-                const questionItem = document.createElement('div');
-                questionItem.style.cssText = `
-                    background: white;
-                    border-radius: 8px;
-                    padding: 16px;
-                    margin-bottom: 12px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                    transition: transform 0.2s, box-shadow 0.2s;
-                `;
-                questionItem.onmouseover = () => {
-                    questionItem.style.transform = 'translateY(-2px)';
-                    questionItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                };
-                questionItem.onmouseout = () => {
-                    questionItem.style.transform = 'translateY(0)';
-                    questionItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                };
-
-                const questionNumber = document.createElement('div');
-                questionNumber.style.cssText = `
-                    font-size: 12px;
-                    color: #667eea;
-                    font-weight: bold;
-                    margin-bottom: 8px;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                `;
-                const numberText = document.createElement('span');
-                numberText.textContent = `Câu ${index + 1}`;
-                questionNumber.appendChild(numberText);
-
-                // Delete button for removing scanned item
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Xóa';
-                deleteBtn.title = 'Xóa câu hỏi khỏi danh sách quét';
-                deleteBtn.style.cssText = `
-                    margin-left: 8px;
-                    background: #f44336;
-                    color: white;
-                    border: none;
-                    padding: 4px 8px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-size: 12px;
-                `;
-                deleteBtn.onmouseover = () => deleteBtn.style.opacity = '0.9';
-                deleteBtn.onmouseout = () => deleteBtn.style.opacity = '1';
-                deleteBtn.onclick = () => {
-                    try {
-                        if (!confirm('Xóa câu hỏi này khỏi danh sách quét?')) return;
-                        // Remove by index (from current merged order)
-                        scannedQuestions.splice(index, 1);
-                        // Update header/sub text
-                        titleSub.textContent = `${scannedQuestions.length} câu hỏi chưa có trong database`;
-                        // Re-render list so numbering reflects merged order
-                        renderList();
-                        // If no more items, remove popup
-                        if (scannedQuestions.length === 0) {
-                            popup.remove();
-                            showNotification('Không còn câu hỏi trong danh sách quét', 'info', 2500);
-                        }
-                    } catch (e) {
-                        console.error('Error deleting scanned item', e);
+            const questionNumber = document.createElement('div');
+            questionNumber.style.cssText = `
+                font-size: 12px;
+                color: #667eea;
+                font-weight: bold;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            `;
+            const numberText = document.createElement('span');
+            numberText.textContent = `Câu ${index + 1}`;
+            questionNumber.appendChild(numberText);
+            // Delete button for removing scanned item
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Xóa';
+            deleteBtn.title = 'Xóa câu hỏi khỏi danh sách quét';
+            deleteBtn.style.cssText = `
+                margin-left: 8px;
+                background: #f44336;
+                color: white;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            deleteBtn.onmouseover = () => deleteBtn.style.opacity = '0.9';
+            deleteBtn.onmouseout = () => deleteBtn.style.opacity = '1';
+            deleteBtn.onclick = () => {
+                try {
+                    if (!confirm('Xóa câu hỏi này khỏi danh sách quét?')) return;
+                    const idx = scannedQuestions.indexOf(item);
+                    if (idx !== -1) {
+                        scannedQuestions.splice(idx, 1);
                     }
-                };
-                questionNumber.appendChild(deleteBtn);
-
-                // Add merge badge if this question was merged from duplicates
-                if (item.duplicateCount && item.duplicateCount > 1) {
-                    const mergeBadge = document.createElement('span');
-                    mergeBadge.style.cssText = `
-                        background: #FF9800;
-                        color: white;
-                        padding: 2px 8px;
-                        border-radius: 12px;
-                        font-size: 11px;
-                        font-weight: bold;
-                    `;
-                    mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
-                    questionNumber.appendChild(mergeBadge);
+                    questionItem.remove();
+                    // Update numbering and header count
+                    updateListNumbers();
+                    titleSub.textContent = `${scannedQuestions.length} câu hỏi chưa có trong database`;
+                    // If no more items, remove popup
+                    if (scannedQuestions.length === 0) {
+                        popup.remove();
+                        showNotification('Không còn câu hỏi trong danh sách quét', 'info', 2500);
+                    }
+                } catch (e) {
+                    console.error('Error deleting scanned item', e);
                 }
-
-                const questionText = document.createElement('div');
-                questionText.style.cssText = `
-                    font-size: 14px;
-                    color: #333;
-                    line-height: 1.6;
-                    margin-bottom: 8px;
-                    font-weight: 500;
+            };
+            questionNumber.appendChild(deleteBtn);
+            
+            // Add merge badge if this question was merged from duplicates
+            if (item.duplicateCount && item.duplicateCount > 1) {
+                const mergeBadge = document.createElement('span');
+                mergeBadge.style.cssText = `
+                    background: #FF9800;
+                    color: white;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: bold;
                 `;
-                questionText.textContent = item.question;
+                mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
+                questionNumber.appendChild(mergeBadge);
+            }
 
-                questionItem.appendChild(questionNumber);
-                questionItem.appendChild(questionText);
+            const questionText = document.createElement('div');
+            questionText.style.cssText = `
+                font-size: 14px;
+                color: #333;
+                line-height: 1.6;
+                margin-bottom: 8px;
+                font-weight: 500;
+            `;
+            questionText.textContent = item.question;
 
-                // Add answer if found
-                if (item.answer) {
-                    const answerLabel = document.createElement('div');
-                    answerLabel.style.cssText = `
-                        font-size: 12px;
-                        color: #4CAF50;
-                        font-weight: bold;
-                        margin-top: 12px;
-                        margin-bottom: 4px;
-                    `;
-                    answerLabel.textContent = '✓ Đáp án:';
+            questionItem.appendChild(questionNumber);
+            questionItem.appendChild(questionText);
 
-                    const answerText = document.createElement('div');
-                    answerText.style.cssText = `
-                        font-size: 13px;
-                        color: #2E7D32;
-                        padding: 8px 12px;
-                        background: #E8F5E9;
-                        border-radius: 6px;
-                        border-left: 3px solid #4CAF50;
-                    `;
-                    answerText.textContent = item.answer;
+            // Add answer if found
+            if (item.answer) {
+                const answerLabel = document.createElement('div');
+                answerLabel.style.cssText = `
+                    font-size: 12px;
+                    color: #4CAF50;
+                    font-weight: bold;
+                    margin-top: 12px;
+                    margin-bottom: 4px;
+                `;
+                answerLabel.textContent = '✓ Đáp án:';
 
-                    questionItem.appendChild(answerLabel);
-                    questionItem.appendChild(answerText);
-                } else {
-                    const noAnswer = document.createElement('div');
-                    noAnswer.style.cssText = `
-                        font-size: 12px;
-                        color: #FF9800;
-                        font-style: italic;
-                        margin-top: 8px;
-                        padding: 6px 10px;
-                        background: #FFF3E0;
-                        border-radius: 6px;
-                        border-left: 3px solid #FF9800;
-                    `;
-                    noAnswer.textContent = '⚠ Chưa quét được đáp án';
-                    questionItem.appendChild(noAnswer);
-                }
+                const answerText = document.createElement('div');
+                answerText.style.cssText = `
+                    font-size: 13px;
+                    color: #2E7D32;
+                    padding: 8px 12px;
+                    background: #E8F5E9;
+                    border-radius: 6px;
+                    border-left: 3px solid #4CAF50;
+                `;
+                answerText.textContent = item.answer;
 
-                listContainer.appendChild(questionItem);
+                questionItem.appendChild(answerLabel);
+                questionItem.appendChild(answerText);
+            } else {
+                const noAnswer = document.createElement('div');
+                noAnswer.style.cssText = `
+                    font-size: 12px;
+                    color: #FF9800;
+                    font-style: italic;
+                    margin-top: 8px;
+                    padding: 6px 10px;
+                    background: #FFF3E0;
+                    border-radius: 6px;
+                    border-left: 3px solid #FF9800;
+                `;
+                noAnswer.textContent = '⚠ Chưa quét được đáp án';
+                questionItem.appendChild(noAnswer);
+            }
+
+            listContainer.appendChild(questionItem);
+        });
+
+        // Helper to re-number visible items after deletion
+        function updateListNumbers() {
+            const items = listContainer.querySelectorAll('div');
+            // Find question-number spans and update their textContent
+            const numberSpans = listContainer.querySelectorAll('div > div:first-child > span');
+            numberSpans.forEach((span, i) => {
+                span.textContent = `Câu ${i + 1}`;
             });
         }
-
-        // Initial render
-        renderList();
 
         // Footer with actions
         const footer = document.createElement('div');
@@ -572,7 +600,7 @@
         exportBtn.textContent = '📥 Xuất JSON';
         exportBtn.style.cssText = `
             padding: 10px 20px;
-            background: #2196F3;
+            background: #1976D2;
             color: white;
             border: none;
             border-radius: 6px;
@@ -589,7 +617,7 @@
         copyBtn.textContent = '📋 Copy';
         copyBtn.style.cssText = `
             padding: 10px 20px;
-            background: #4CAF50;
+            background: #4CAF50; /* keep copy green for clarity */
             color: white;
             border: none;
             border-radius: 6px;
@@ -723,17 +751,17 @@
         button.title = 'Quét câu hỏi mới';
         button.style.cssText = `
             position: fixed;
-            bottom: 80px;
-            right: 20px;
+            top: 20px;
+            left: 20px;
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
             color: white;
             border: none;
             font-size: 24px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.35);
             z-index: 10001;
             transition: all 0.3s;
             display: flex;
@@ -751,7 +779,15 @@
             button.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
         };
 
-        button.onclick = scanQuestions;
+        // When clicking scan: first minimize external questions popup (if any), then start scan
+        button.onclick = () => {
+            try {
+                minimizeQuestionsPopup();
+            } catch (e) {
+                console.error('Error minimizing questions popup', e);
+            }
+            scanQuestions();
+        };
 
         document.body.appendChild(button);
     }
@@ -769,6 +805,51 @@
 
     // Start scanner
     initScanner();
+
+    // Minimize an existing extension questions popup (#tailieu-questions-popup) into a small floating button
+    function minimizeQuestionsPopup() {
+        try {
+            const existingPopup = document.getElementById('tailieu-questions-popup');
+            if (!existingPopup) return;
+
+            // If already minimized, do nothing
+            if (document.getElementById('tailieu-questions-min-btn')) return;
+
+            // Hide the popup
+            existingPopup.style.display = 'none';
+
+            // Create a small restore button (blue/white theme)
+            const restoreBtn = document.createElement('button');
+            restoreBtn.id = 'tailieu-questions-min-btn';
+            restoreBtn.title = 'Mở lại danh sách câu hỏi';
+            restoreBtn.textContent = '📚';
+            restoreBtn.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 20px;
+                width: 44px;
+                height: 44px;
+                border-radius: 8px;
+                background: linear-gradient(135deg, #2196F3, #1976D2);
+                color: white;
+                border: none;
+                font-size: 18px;
+                z-index: 10005;
+                cursor: pointer;
+                box-shadow: 0 4px 12px rgba(25,118,210,0.25);
+            `;
+
+            restoreBtn.onclick = () => {
+                const popup = document.getElementById('tailieu-questions-popup');
+                if (popup) popup.style.display = '';
+                restoreBtn.remove();
+            };
+
+            document.body.appendChild(restoreBtn);
+        } catch (e) {
+            console.error('minimizeQuestionsPopup error', e);
+        }
+    }
 
     // Listen for messages from popup/background
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
