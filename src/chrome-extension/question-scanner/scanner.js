@@ -363,10 +363,16 @@
         `;
         
         const title = document.createElement('div');
-        title.innerHTML = `
-            <div style="font-size: 18px; font-weight: bold;">📝 Câu hỏi mới</div>
-            <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">${scannedQuestions.length} câu hỏi chưa có trong database</div>
-        `;
+        const titleMain = document.createElement('div');
+        titleMain.style.cssText = 'font-size: 18px; font-weight: bold;';
+        titleMain.textContent = '📝 Câu hỏi mới';
+
+        const titleSub = document.createElement('div');
+        titleSub.style.cssText = 'font-size: 12px; opacity: 0.9; margin-top: 4px;';
+        titleSub.textContent = `${scannedQuestions.length} câu hỏi chưa có trong database`;
+
+        title.appendChild(titleMain);
+        title.appendChild(titleSub);
         
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = '✕';
@@ -400,111 +406,155 @@
             background: #f5f5f5;
         `;
 
-        // Add questions to list
-        scannedQuestions.forEach((item, index) => {
-            const questionItem = document.createElement('div');
-            questionItem.style.cssText = `
-                background: white;
-                border-radius: 8px;
-                padding: 16px;
-                margin-bottom: 12px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                transition: transform 0.2s, box-shadow 0.2s;
-            `;
-            questionItem.onmouseover = () => {
-                questionItem.style.transform = 'translateY(-2px)';
-                questionItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-            };
-            questionItem.onmouseout = () => {
-                questionItem.style.transform = 'translateY(0)';
-                questionItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-            };
+        // Render list from the merged `scannedQuestions` array so numbering follows merged order
+        function renderList() {
+            // Clear container
+            listContainer.innerHTML = '';
 
-            const questionNumber = document.createElement('div');
-            questionNumber.style.cssText = `
-                font-size: 12px;
-                color: #667eea;
-                font-weight: bold;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            `;
-            const numberText = document.createElement('span');
-            numberText.textContent = `Câu ${index + 1}`;
-            questionNumber.appendChild(numberText);
-            
-            // Add merge badge if this question was merged from duplicates
-            if (item.duplicateCount && item.duplicateCount > 1) {
-                const mergeBadge = document.createElement('span');
-                mergeBadge.style.cssText = `
-                    background: #FF9800;
+            scannedQuestions.forEach((item, index) => {
+                const questionItem = document.createElement('div');
+                questionItem.style.cssText = `
+                    background: white;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    transition: transform 0.2s, box-shadow 0.2s;
+                `;
+                questionItem.onmouseover = () => {
+                    questionItem.style.transform = 'translateY(-2px)';
+                    questionItem.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                };
+                questionItem.onmouseout = () => {
+                    questionItem.style.transform = 'translateY(0)';
+                    questionItem.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                };
+
+                const questionNumber = document.createElement('div');
+                questionNumber.style.cssText = `
+                    font-size: 12px;
+                    color: #667eea;
+                    font-weight: bold;
+                    margin-bottom: 8px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                `;
+                const numberText = document.createElement('span');
+                numberText.textContent = `Câu ${index + 1}`;
+                questionNumber.appendChild(numberText);
+
+                // Delete button for removing scanned item
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Xóa';
+                deleteBtn.title = 'Xóa câu hỏi khỏi danh sách quét';
+                deleteBtn.style.cssText = `
+                    margin-left: 8px;
+                    background: #f44336;
                     color: white;
-                    padding: 2px 8px;
-                    border-radius: 12px;
-                    font-size: 11px;
-                    font-weight: bold;
-                `;
-                mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
-                questionNumber.appendChild(mergeBadge);
-            }
-
-            const questionText = document.createElement('div');
-            questionText.style.cssText = `
-                font-size: 14px;
-                color: #333;
-                line-height: 1.6;
-                margin-bottom: 8px;
-                font-weight: 500;
-            `;
-            questionText.textContent = item.question;
-
-            questionItem.appendChild(questionNumber);
-            questionItem.appendChild(questionText);
-
-            // Add answer if found
-            if (item.answer) {
-                const answerLabel = document.createElement('div');
-                answerLabel.style.cssText = `
-                    font-size: 12px;
-                    color: #4CAF50;
-                    font-weight: bold;
-                    margin-top: 12px;
-                    margin-bottom: 4px;
-                `;
-                answerLabel.textContent = '✓ Đáp án:';
-
-                const answerText = document.createElement('div');
-                answerText.style.cssText = `
-                    font-size: 13px;
-                    color: #2E7D32;
-                    padding: 8px 12px;
-                    background: #E8F5E9;
+                    border: none;
+                    padding: 4px 8px;
                     border-radius: 6px;
-                    border-left: 3px solid #4CAF50;
-                `;
-                answerText.textContent = item.answer;
-
-                questionItem.appendChild(answerLabel);
-                questionItem.appendChild(answerText);
-            } else {
-                const noAnswer = document.createElement('div');
-                noAnswer.style.cssText = `
+                    cursor: pointer;
                     font-size: 12px;
-                    color: #FF9800;
-                    font-style: italic;
-                    margin-top: 8px;
-                    padding: 6px 10px;
-                    background: #FFF3E0;
-                    border-radius: 6px;
-                    border-left: 3px solid #FF9800;
                 `;
-                noAnswer.textContent = '⚠ Chưa quét được đáp án';
-                questionItem.appendChild(noAnswer);
-            }
+                deleteBtn.onmouseover = () => deleteBtn.style.opacity = '0.9';
+                deleteBtn.onmouseout = () => deleteBtn.style.opacity = '1';
+                deleteBtn.onclick = () => {
+                    try {
+                        if (!confirm('Xóa câu hỏi này khỏi danh sách quét?')) return;
+                        // Remove by index (from current merged order)
+                        scannedQuestions.splice(index, 1);
+                        // Update header/sub text
+                        titleSub.textContent = `${scannedQuestions.length} câu hỏi chưa có trong database`;
+                        // Re-render list so numbering reflects merged order
+                        renderList();
+                        // If no more items, remove popup
+                        if (scannedQuestions.length === 0) {
+                            popup.remove();
+                            showNotification('Không còn câu hỏi trong danh sách quét', 'info', 2500);
+                        }
+                    } catch (e) {
+                        console.error('Error deleting scanned item', e);
+                    }
+                };
+                questionNumber.appendChild(deleteBtn);
 
-            listContainer.appendChild(questionItem);
-        });
+                // Add merge badge if this question was merged from duplicates
+                if (item.duplicateCount && item.duplicateCount > 1) {
+                    const mergeBadge = document.createElement('span');
+                    mergeBadge.style.cssText = `
+                        background: #FF9800;
+                        color: white;
+                        padding: 2px 8px;
+                        border-radius: 12px;
+                        font-size: 11px;
+                        font-weight: bold;
+                    `;
+                    mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
+                    questionNumber.appendChild(mergeBadge);
+                }
+
+                const questionText = document.createElement('div');
+                questionText.style.cssText = `
+                    font-size: 14px;
+                    color: #333;
+                    line-height: 1.6;
+                    margin-bottom: 8px;
+                    font-weight: 500;
+                `;
+                questionText.textContent = item.question;
+
+                questionItem.appendChild(questionNumber);
+                questionItem.appendChild(questionText);
+
+                // Add answer if found
+                if (item.answer) {
+                    const answerLabel = document.createElement('div');
+                    answerLabel.style.cssText = `
+                        font-size: 12px;
+                        color: #4CAF50;
+                        font-weight: bold;
+                        margin-top: 12px;
+                        margin-bottom: 4px;
+                    `;
+                    answerLabel.textContent = '✓ Đáp án:';
+
+                    const answerText = document.createElement('div');
+                    answerText.style.cssText = `
+                        font-size: 13px;
+                        color: #2E7D32;
+                        padding: 8px 12px;
+                        background: #E8F5E9;
+                        border-radius: 6px;
+                        border-left: 3px solid #4CAF50;
+                    `;
+                    answerText.textContent = item.answer;
+
+                    questionItem.appendChild(answerLabel);
+                    questionItem.appendChild(answerText);
+                } else {
+                    const noAnswer = document.createElement('div');
+                    noAnswer.style.cssText = `
+                        font-size: 12px;
+                        color: #FF9800;
+                        font-style: italic;
+                        margin-top: 8px;
+                        padding: 6px 10px;
+                        background: #FFF3E0;
+                        border-radius: 6px;
+                        border-left: 3px solid #FF9800;
+                    `;
+                    noAnswer.textContent = '⚠ Chưa quét được đáp án';
+                    questionItem.appendChild(noAnswer);
+                }
+
+                listContainer.appendChild(questionItem);
+            });
+        }
+
+        // Initial render
+        renderList();
 
         // Footer with actions
         const footer = document.createElement('div');
