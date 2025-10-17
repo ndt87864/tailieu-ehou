@@ -318,6 +318,17 @@
             }
         });
 
+        // Also remove questions that contain the phrase "trang này" (or unaccented "trang nay")
+        // which is commonly page-label noise.
+        scannedQuestions = scannedQuestions.filter(q => {
+            try {
+                const txt = (q.question || '').toString().toLowerCase();
+                return !/(trang này|trang nay)/i.test(txt);
+            } catch (e) {
+                return true;
+            }
+        });
+
         // Ensure none of the merged questions are already in DB (extra safety)
         scannedQuestions = scannedQuestions.filter(q => isQuestionNew(q.question));
 
