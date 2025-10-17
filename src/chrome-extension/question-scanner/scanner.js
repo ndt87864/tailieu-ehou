@@ -781,16 +781,24 @@
 
             const modal = document.createElement('div');
             modal.className = 'tailieu-modal';
+            // Make the manual-add modal larger and responsive
+            modal.style.cssText = `
+                width: 720px;
+                max-width: calc(100vw - 40px);
+                max-height: 80vh;
+                overflow: auto;
+                padding: 18px;
+            `;
             modal.innerHTML = `
-                <h3 style="margin-top:0;">Thêm câu hỏi thủ công</h3>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    <label style="font-size:13px; color:#333;">Câu hỏi</label>
-                    <textarea id="tailieu-manual-question" rows="4" style="width:100%; padding:8px; font-size:13px;"></textarea>
-                    <label style="font-size:13px; color:#333;">Đáp án (tùy chọn)</label>
-                    <input id="tailieu-manual-answer" type="text" style="width:100%; padding:8px; font-size:13px;" />
+                <h3 style="margin-top:0; font-size:18px;">Thêm câu hỏi thủ công</h3>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <label style="font-size:14px; color:#333;">Câu hỏi</label>
+                    <textarea id="tailieu-manual-question" rows="6" style="width:100%; height:180px; padding:10px; font-size:14px; resize:vertical;"></textarea>
+                    <label style="font-size:14px; color:#333;">Đáp án (tùy chọn)</label>
+                    <textarea id="tailieu-manual-answer" rows="6" style="width:100%; height:180px; padding:10px; font-size:14px; resize:vertical;"></textarea>
                     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
-                        <button id="tailieu-manual-cancel" style="background:#eee; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Hủy</button>
-                        <button id="tailieu-manual-add" style="background:#1976D2; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Thêm</button>
+                        <button id="tailieu-manual-cancel" style="background:#eee; border:none; padding:10px 14px; border-radius:6px; cursor:pointer;">Hủy</button>
+                        <button id="tailieu-manual-add" style="background:#1976D2; color:white; border:none; padding:10px 14px; border-radius:6px; cursor:pointer;">Thêm</button>
                     </div>
                 </div>
             `;
