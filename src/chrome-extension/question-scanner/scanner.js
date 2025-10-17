@@ -1067,23 +1067,23 @@
         // use svg search icon inside floating button
         button.appendChild(svgIcon('search', 20));
         button.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-            color: white;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.35);
-            z-index: 1000001; /* ensure above popup (popup uses 999999) */
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed !important;
+            bottom: 80px !important;
+            right: 20px !important;
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 50% !important;
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%) !important;
+            color: white !important;
+            border: none !important;
+            font-size: 24px !important;
+            cursor: pointer !important;
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.35) !important;
+            transition: all 0.3s !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            z-index: 10001 !important;
         `;
 
         button.onmouseover = () => {
@@ -1108,34 +1108,87 @@
 
         document.body.appendChild(button);
 
+        // Ensure default position is bottom-right (use inline !important to override stylesheet if needed)
+        try {
+            button.style.removeProperty('left');
+            button.style.removeProperty('top');
+            button.style.setProperty('bottom', '80px', 'important');
+            button.style.setProperty('right', '20px', 'important');
+        } catch (e) {}
+
         // Position scanner above popup if popup exists; otherwise keep default
         function positionScannerRelativeToPopup() {
             try {
                 const popup = document.getElementById('tailieu-questions-popup');
+                const btnW = button.offsetWidth || 56;
+                const btnH = button.offsetHeight || 56;
                 if (popup && popup.style.display !== 'none') {
                     const rect = popup.getBoundingClientRect();
-                    const btnW = button.offsetWidth || 56;
-                    const btnH = button.offsetHeight || 56;
                     // align to the popup's top-right edge (sát mép phải)
                     const margin = 8; // small gap from popup edge
                     let left = Math.round(rect.left + rect.width - btnW - margin);
                     let top = Math.round(rect.top - btnH - 12);
                     if (left < 8) left = 8;
                     if (top < 8) top = 8;
-                    button.style.left = left + 'px';
-                    button.style.top = top + 'px';
+                    // remove bottom/right so left/top take effect
+                    button.style.removeProperty('right');
+                    button.style.removeProperty('bottom');
+                    button.style.setProperty('left', left + 'px', 'important');
+                    button.style.setProperty('top', top + 'px', 'important');
                 } else {
-                    // fallback to default location (top-left)
-                    button.style.left = '20px';
-                    button.style.top = '20px';
+                    // If there's a floating 'open popup' button, position scanner near it
+                    const floating = document.getElementById('tailieu-floating-btn');
+                    if (floating) {
+                        try {
+                            const fRect = floating.getBoundingClientRect();
+                            const distanceToBottom = window.innerHeight - (fRect.top + fRect.height);
+                            // Only align to floating if floating is near bottom area (so scanner won't jump to top-left)
+                            if (distanceToBottom >= 0 && distanceToBottom < 200) {
+                                // place scanner above floating button (align to its right edge)
+                                let left = Math.round(fRect.left + fRect.width - btnW);
+                                let top = Math.round(fRect.top - btnH - 8);
+                                // clamp to viewport
+                                const minLeft = 8;
+                                const maxLeft = Math.max(8, window.innerWidth - btnW - 8);
+                                if (left < minLeft) left = minLeft;
+                                if (left > maxLeft) left = maxLeft;
+                                if (isNaN(top) || top < 8) top = Math.max(8, Math.round(fRect.top - btnH - 8));
+                                // remove bottom/right and set left/top important
+                                button.style.removeProperty('right');
+                                button.style.removeProperty('bottom');
+                                button.style.setProperty('left', left + 'px', 'important');
+                                button.style.setProperty('top', top + 'px', 'important');
+                            } else {
+                                // default to bottom-right if floating is not near bottom
+                                button.style.removeProperty('left');
+                                button.style.removeProperty('top');
+                                button.style.setProperty('bottom', '80px', 'important');
+                                button.style.setProperty('right', '20px', 'important');
+                            }
+                        } catch (e) {
+                            // fallback to default bottom-right
+                            button.style.removeProperty('left');
+                            button.style.removeProperty('top');
+                            button.style.setProperty('bottom', '80px', 'important');
+                            button.style.setProperty('right', '20px', 'important');
+                        }
+                    } else {
+                        // fallback to default bottom-right
+                        button.style.removeProperty('left');
+                        button.style.removeProperty('top');
+                        button.style.setProperty('bottom', '80px', 'important');
+                        button.style.setProperty('right', '20px', 'important');
+                    }
                 }
             } catch (e) {
                 // ignore positioning errors
             }
         }
 
-        // Run initial positioning and keep it updated
-        positionScannerRelativeToPopup();
+    // Run initial positioning and keep it updated
+    positionScannerRelativeToPopup();
+    // run again shortly after to override any stylesheet race conditions
+    setTimeout(positionScannerRelativeToPopup, 120);
         window.addEventListener('resize', positionScannerRelativeToPopup);
         window.addEventListener('scroll', positionScannerRelativeToPopup, true);
 
