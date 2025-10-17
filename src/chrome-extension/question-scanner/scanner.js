@@ -24,6 +24,52 @@
             .replace(/[^\w\sáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]/gi, '');
     }
 
+    // Small SVG icon helper: returns an element for common icons
+    function svgIcon(name, size = 18) {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'currentColor');
+        svg.style.verticalAlign = 'middle';
+        svg.style.display = 'inline-block';
+
+        const path = document.createElementNS(ns, 'path');
+
+        switch (name) {
+            case 'save':
+                path.setAttribute('d', 'M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM12 19a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-14l3 3h-3V5z');
+                break;
+            case 'edit':
+                path.setAttribute('d', 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z');
+                break;
+            case 'search':
+                path.setAttribute('d', 'M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 14a4 4 0 1 1 0-8 4 4 0 0 1 0 8z');
+                break;
+            case 'copy':
+                path.setAttribute('d', 'M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1zM20 5H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h12v14z');
+                break;
+            case 'book':
+                path.setAttribute('d', 'M18 2H6a2 2 0 0 0-2 2v15a1 1 0 0 0 1.447.894L12 17l6.553 2.894A1 1 0 0 0 20 19V4a2 2 0 0 0-2-2z');
+                break;
+            case 'merge':
+                path.setAttribute('d', 'M10 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 7v6a6 6 0 0 0 6 6h4v-2h-4a4 4 0 0 1-4-4V7H6zM18 13v-2h-2v2h2z');
+                break;
+            case 'check':
+                path.setAttribute('d', 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z');
+                break;
+            case 'close':
+                path.setAttribute('d', 'M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.71 2.88 18.3 9.18 12 2.88 5.71 4.29 4.29 10.59 10.6 16.88 4.29z');
+                break;
+            default:
+                path.setAttribute('d', '');
+        }
+
+        svg.appendChild(path);
+        return svg;
+    }
+
     // Check if question is invalid/noise
     function isInvalidQuestion(text) {
         if (!text || text.length < 10) return true;
@@ -280,7 +326,7 @@
 
     // Scan and show new questions
     async function scanQuestions() {
-        console.log('🔍 Starting question scan...');
+    console.log('Starting question scan...');
         
         // Show loading notification
         showNotification('Đang quét câu hỏi...', 'info', 2000);
@@ -414,9 +460,13 @@
         `;
         
         const title = document.createElement('div');
-        const titleMain = document.createElement('div');
-        titleMain.style.cssText = 'font-size: 18px; font-weight: bold;';
-        titleMain.textContent = '📝 Câu hỏi mới';
+    const titleMain = document.createElement('div');
+    titleMain.style.cssText = 'font-size: 18px; font-weight: bold; display:flex; align-items:center; gap:8px;';
+    const titleIcon = svgIcon('search', 18);
+    titleMain.appendChild(titleIcon);
+    const titleTextNode = document.createElement('span');
+    titleTextNode.textContent = 'Câu hỏi mới';
+    titleMain.appendChild(titleTextNode);
 
         const titleSub = document.createElement('div');
         titleSub.style.cssText = 'font-size: 12px; opacity: 0.9; margin-top: 4px;';
@@ -426,7 +476,8 @@
         title.appendChild(titleSub);
         
         const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '✕';
+    closeBtn.innerHTML = '';
+    closeBtn.appendChild(svgIcon('close', 14));
         closeBtn.style.cssText = `
             background: rgba(255,255,255,0.2);
             border: none;
@@ -544,12 +595,18 @@
                 // Disable export/copy if none selected (visual cue)
             });
             questionNumber.appendChild(itemCheckbox);
-            const numberText = document.createElement('span');
-            numberText.textContent = `Câu ${index + 1}`;
+                const numberText = document.createElement('span');
+                numberText.textContent = `Câu ${index + 1}`;
             questionNumber.appendChild(numberText);
             // Delete button for removing scanned item
             const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Xóa';
+            // show a small close icon + text
+            deleteBtn.innerHTML = '';
+            const delIcon = svgIcon('close', 12);
+            deleteBtn.appendChild(delIcon);
+            const delText = document.createElement('span');
+            delText.textContent = ' Xóa';
+            deleteBtn.appendChild(delText);
             deleteBtn.title = 'Xóa câu hỏi khỏi danh sách quét';
             deleteBtn.style.cssText = `
                 margin-left: 8px;
@@ -600,7 +657,13 @@
                     font-size: 11px;
                     font-weight: bold;
                 `;
-                mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
+                // prepend merge svg
+                const mergeIcon = svgIcon('merge', 12);
+                mergeIcon.style.marginRight = '6px';
+                mergeBadge.appendChild(mergeIcon);
+                const mergeText = document.createElement('span');
+                mergeText.textContent = `Hợp nhất ${item.duplicateCount} câu`;
+                mergeBadge.appendChild(mergeText);
                 questionNumber.appendChild(mergeBadge);
             }
 
@@ -627,7 +690,14 @@
                     margin-top: 12px;
                     margin-bottom: 4px;
                 `;
-                answerLabel.textContent = '✓ Đáp án:';
+                // prepend check svg
+                const answerIcon = svgIcon('check', 14);
+                answerLabel.textContent = '';
+                answerLabel.appendChild(answerIcon);
+                const answerLabelText = document.createElement('span');
+                answerLabelText.style.marginLeft = '8px';
+                answerLabelText.textContent = 'Đáp án:';
+                answerLabel.appendChild(answerLabelText);
 
                 const answerText = document.createElement('div');
                 answerText.style.cssText = `
@@ -654,7 +724,8 @@
                     border-radius: 6px;
                     border-left: 3px solid #FF9800;
                 `;
-                noAnswer.textContent = '⚠ Chưa quét được đáp án';
+                // use plain text warning (no emoji)
+                noAnswer.textContent = 'Chưa quét được đáp án';
                 questionItem.appendChild(noAnswer);
             }
 
@@ -684,7 +755,12 @@
         `;
 
             const exportBtn = document.createElement('button');
-            exportBtn.textContent = '💾 Lưu vào DB';
+            exportBtn.textContent = '';
+            exportBtn.appendChild(svgIcon('save', 16));
+            const exportText = document.createElement('span');
+            exportText.style.marginLeft = '8px';
+            exportText.textContent = 'Lưu vào DB';
+            exportBtn.appendChild(exportText);
             exportBtn.title = 'Lưu các câu hỏi đã quét vào cơ sở dữ liệu (mở popup để đồng bộ)';
             exportBtn.style.cssText = `
                 padding: 10px 20px;
@@ -705,7 +781,12 @@
             
             // Manual add button - open a small modal to input question and answer
             const manualAddBtn = document.createElement('button');
-            manualAddBtn.textContent = '✍ Thêm thủ công';
+            manualAddBtn.textContent = '';
+            manualAddBtn.appendChild(svgIcon('edit', 16));
+            const manualAddText = document.createElement('span');
+            manualAddText.style.marginLeft = '8px';
+            manualAddText.textContent = 'Thêm thủ công';
+            manualAddBtn.appendChild(manualAddText);
             manualAddBtn.title = 'Thêm câu hỏi/đáp án mà scanner không quét được';
             manualAddBtn.style.cssText = `
                 padding: 10px 16px;
@@ -721,8 +802,13 @@
             manualAddBtn.onmouseout = () => manualAddBtn.style.opacity = '1';
             manualAddBtn.onclick = () => showManualAddDialog();
 
-        const copyBtn = document.createElement('button');
-        copyBtn.textContent = '📋 Copy';
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '';
+    copyBtn.appendChild(svgIcon('copy', 14));
+    const copyText = document.createElement('span');
+    copyText.style.marginLeft = '8px';
+    copyText.textContent = 'Copy';
+    copyBtn.appendChild(copyText);
         copyBtn.style.cssText = `
             padding: 10px 20px;
             background: #4CAF50; /* keep copy green for clarity */
@@ -928,25 +1014,25 @@
         const selectedItems = scannedQuestions.filter(i => i.selected);
         const toCopy = selectedItems.length > 0 ? selectedItems : scannedQuestions;
 
-        let text = `📝 CÂU HỎI MỚI (${toCopy.length})\n\n`;
+    let text = `CÂU HỎI MỚI (${toCopy.length})\n\n`;
 
         toCopy.forEach((item, index) => {
             text += `${index + 1}. ${item.question}\n`;
             
             // Add merge info if available
             if (item.duplicateCount && item.duplicateCount > 1) {
-                text += `   🔀 Hợp nhất ${item.duplicateCount} câu hỏi giống nhau\n`;
+                text += `   Hợp nhất ${item.duplicateCount} câu hỏi giống nhau\n`;
             }
-            
+
             if (item.answer) {
-                text += `   ✓ Đáp án: ${item.answer}\n`;
+                text += `   Đáp án: ${item.answer}\n`;
             } else {
-                text += `   ⚠ Chưa có đáp án\n`;
+                text += `   (Chưa có đáp án)\n`;
             }
-            
+
             // Add alternative answers if available
             if (item.answers && item.answers.length > 1) {
-                text += `   📋 Các đáp án khác: ${item.answers.slice(1).join(', ')}\n`;
+                text += `   Các đáp án khác: ${item.answers.slice(1).join(', ')}\n`;
             }
             
             text += '\n';
@@ -963,9 +1049,10 @@
     // Create floating scanner button
     function createScannerButton() {
         const button = document.createElement('button');
-        button.id = 'tailieu-scanner-btn';
-        button.innerHTML = '🔍';
-        button.title = 'Quét câu hỏi mới';
+    button.id = 'tailieu-scanner-btn';
+    button.title = 'Quét câu hỏi mới';
+    // use svg search icon inside floating button
+    button.appendChild(svgIcon('search', 20));
         button.style.cssText = `
             position: fixed;
             top: 20px;
@@ -1039,7 +1126,8 @@
             const restoreBtn = document.createElement('button');
             restoreBtn.id = 'tailieu-questions-min-btn';
             restoreBtn.title = 'Mở lại danh sách câu hỏi';
-            restoreBtn.textContent = '📚';
+            // use SVG book icon
+            restoreBtn.appendChild(svgIcon('book', 16));
             restoreBtn.style.cssText = `
                 position: fixed;
                 top: 80px;
