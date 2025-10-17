@@ -1116,8 +1116,9 @@
                     const rect = popup.getBoundingClientRect();
                     const btnW = button.offsetWidth || 56;
                     const btnH = button.offsetHeight || 56;
-                    // center horizontally above popup
-                    let left = Math.round(rect.left + (rect.width / 2) - (btnW / 2));
+                    // align to the popup's top-right edge (sát mép phải)
+                    const margin = 8; // small gap from popup edge
+                    let left = Math.round(rect.left + rect.width - btnW - margin);
                     let top = Math.round(rect.top - btnH - 12);
                     if (left < 8) left = 8;
                     if (top < 8) top = 8;
