@@ -23,6 +23,110 @@
             .replace(/[^\w\sáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]/gi, '');
     }
 
+    // Check if question is invalid/noise
+    function isInvalidQuestion(text) {
+        if (!text || text.length < 10) return true;
+        
+        const trimmedText = text.trim();
+        
+        // Pattern: "Question 1 Trang này", "Question 2 Trang này", etc.
+        if (/^Question\s+\d+\s+Trang\s+này$/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Pattern: "Mô tả câu hỏi" (exact match or starts with)
+        if (/^Mô tả câu hỏi/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Pattern: Contains only "Mô tả câu hỏi"
+        if (trimmedText.toLowerCase() === 'mô tả câu hỏi') {
+            return true;
+        }
+        
+        // Pattern: Just "Question N" or "Câu N"
+        if (/^(Question|Câu)\s+\d+$/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Pattern: "Trang này" alone
+        if (/^Trang\s+này$/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Pattern: Contains only "Question N Trang này" pattern repeatedly
+        if (/^(Question\s+\d+\s+Trang\s+này\s*)+$/i.test(trimmedText)) {
+            return true;
+        }
+        
+        // Pattern: Contains "Mô tả câu hỏi" followed by Question N Trang này
+        if (/Mô tả câu hỏi.*Question\s+\d+\s+Trang\s+này/i.test(trimmedText)) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    // Clean question text - remove "Mô tả câu hỏi" prefix and everything from "Chọn một câu trả lời:" onwards
+    function cleanQuestionText(text) {
+        if (!text) return '';
+        
+        let cleaned = text.trim();
+        
+        // Remove "Mô tả câu hỏi" prefix with optional whitespace
+        cleaned = cleaned.replace(/^Mô tả câu hỏi\s*/i, '');
+        
+        // Remove everything from "Chọn một câu trả lời:" onwards (and the phrase itself)
+        cleaned = cleaned.replace(/\s*Chọn một câu trả lời:[\s\S]*/i, '');
+        
+        // Remove "Choose one answer:" and everything after
+        cleaned = cleaned.replace(/\s*Choose one answer:[\s\S]*/i, '');
+        
+        // Remove "Select one:" and everything after
+        cleaned = cleaned.replace(/\s*Select one:[\s\S]*/i, '');
+        
+        // Remove other common patterns that indicate start of answer section
+        cleaned = cleaned.replace(/\s*(a|A)\.\s+/g, ' '); // Remove answer choices
+        cleaned = cleaned.replace(/\s+(b|B)\.\s+/g, ' ');
+        cleaned = cleaned.replace(/\s+(c|C)\.\s+/g, ' ');
+        cleaned = cleaned.replace(/\s+(d|D)\.\s+/g, ' ');
+        
+        // Clean up extra whitespace
+        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        
+        return cleaned;
+    }
+
+    // Extract core question (without answer choices)
+    function extractCoreQuestion(questionText) {
+        let core = cleanQuestionText(questionText);
+        
+        // Split by newline and get first meaningful line (actual question)
+        const lines = core.split('\n');
+        let firstLine = '';
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]?.trim();
+            if (!line) continue;
+            
+            // Skip if it looks like an answer choice (a. b. c. d.)
+            if (line.match(/^[a-d]\.\s*/i)) continue;
+            
+            firstLine = line;
+            break;
+        }
+        
+        return firstLine || core;
+    }
+
+    // Check if two questions are duplicates (same core question)
+    function isDuplicateQuestion(q1Text, q2Text) {
+        const core1 = normalizeText(extractCoreQuestion(q1Text));
+        const core2 = normalizeText(extractCoreQuestion(q2Text));
+        
+        return core1 === core2;
+    }
+
     // Extract questions from page
     function extractQuestionsFromPage() {
         const questions = [];
@@ -103,6 +207,58 @@
         });
     }
 
+    // Merge duplicate questions (only merge if both question AND answer are the same)
+    function mergeDuplicateQuestions(questions) {
+        if (questions.length === 0) return [];
+        
+        const merged = [];
+        const processed = new Set();
+        
+        for (let i = 0; i < questions.length; i++) {
+            if (processed.has(i)) continue;
+            
+            const currentQ = questions[i];
+            const duplicates = [currentQ];
+            
+            // Find all duplicates of current question (must have same question AND same answer)
+            for (let j = i + 1; j < questions.length; j++) {
+                if (processed.has(j)) continue;
+                
+                const otherQ = questions[j];
+                
+                // Only merge if both question and answer are the same
+                if (isDuplicateQuestion(currentQ.question, otherQ.question)) {
+                    // Check if answers are also the same (or both null)
+                    const currentAnswer = (currentQ.answer || '').trim().toLowerCase();
+                    const otherAnswer = (otherQ.answer || '').trim().toLowerCase();
+                    
+                    if (currentAnswer === otherAnswer) {
+                        duplicates.push(otherQ);
+                        processed.add(j);
+                    }
+                }
+            }
+            
+            // Merge duplicates only if we found actual duplicates
+            if (duplicates.length > 1) {
+                // Keep the first question
+                const mergedItem = {
+                    question: currentQ.question,
+                    answer: currentQ.answer || null,
+                    duplicateCount: duplicates.length
+                };
+                
+                merged.push(mergedItem);
+            } else {
+                merged.push(currentQ);
+            }
+            
+            processed.add(i);
+        }
+        
+        return merged;
+    }
+
     // Scan and show new questions
     async function scanQuestions() {
         console.log('🔍 Starting question scan...');
@@ -117,10 +273,18 @@
         const allQuestions = extractQuestionsFromPage();
         console.log(`Found ${allQuestions.length} questions on page`);
 
-        // Filter new questions only
-        scannedQuestions = allQuestions.filter(q => isQuestionNew(q.question));
+        // Filter new questions only and clean question text
+        let newQuestions = allQuestions
+            .filter(q => isQuestionNew(q.question))
+            .map(q => ({
+                ...q,
+                question: cleanQuestionText(q.question)
+            }));
         
-        console.log(`Found ${scannedQuestions.length} new questions`);
+        // Merge duplicate questions
+        scannedQuestions = mergeDuplicateQuestions(newQuestions);
+        
+        console.log(`Found ${scannedQuestions.length} new questions (after merging duplicates)`);
 
         if (scannedQuestions.length === 0) {
             showNotification('Không tìm thấy câu hỏi mới', 'info', 3000);
@@ -262,8 +426,28 @@
                 color: #667eea;
                 font-weight: bold;
                 margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
             `;
-            questionNumber.textContent = `Câu ${index + 1}`;
+            const numberText = document.createElement('span');
+            numberText.textContent = `Câu ${index + 1}`;
+            questionNumber.appendChild(numberText);
+            
+            // Add merge badge if this question was merged from duplicates
+            if (item.duplicateCount && item.duplicateCount > 1) {
+                const mergeBadge = document.createElement('span');
+                mergeBadge.style.cssText = `
+                    background: #FF9800;
+                    color: white;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                `;
+                mergeBadge.textContent = `🔀 Hợp nhất ${item.duplicateCount} câu`;
+                questionNumber.appendChild(mergeBadge);
+            }
 
             const questionText = document.createElement('div');
             questionText.style.cssText = `
@@ -409,12 +593,28 @@
     }
 
     // Export to JSON file
+    // Export to JSON file
     function exportToJSON() {
-        const data = scannedQuestions.map((item, index) => ({
-            id: index + 1,
-            question: item.question,
-            answer: item.answer || null
-        }));
+        const data = scannedQuestions.map((item, index) => {
+            const exported = {
+                id: index + 1,
+                question: item.question,
+                answer: item.answer || null
+            };
+            
+            // Add merge info if this question was merged
+            if (item.duplicateCount && item.duplicateCount > 1) {
+                exported.duplicateCount = item.duplicateCount;
+                exported.mergedFrom = `${item.duplicateCount} câu hỏi giống nhau`;
+            }
+            
+            // Add other answers if available
+            if (item.answers && item.answers.length > 1) {
+                exported.alternativeAnswers = item.answers.slice(1);
+            }
+            
+            return exported;
+        });
 
         const jsonStr = JSON.stringify(data, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -437,11 +637,23 @@
         
         scannedQuestions.forEach((item, index) => {
             text += `${index + 1}. ${item.question}\n`;
+            
+            // Add merge info if available
+            if (item.duplicateCount && item.duplicateCount > 1) {
+                text += `   🔀 Hợp nhất ${item.duplicateCount} câu hỏi giống nhau\n`;
+            }
+            
             if (item.answer) {
                 text += `   ✓ Đáp án: ${item.answer}\n`;
             } else {
                 text += `   ⚠ Chưa có đáp án\n`;
             }
+            
+            // Add alternative answers if available
+            if (item.answers && item.answers.length > 1) {
+                text += `   📋 Các đáp án khác: ${item.answers.slice(1).join(', ')}\n`;
+            }
+            
             text += '\n';
         });
 
