@@ -292,47 +292,49 @@
         const allQuestions = extractQuestionsFromPage();
         console.log(`Found ${allQuestions.length} questions on page`);
 
-        // Clean extracted questions first then filter new ones
-        let newQuestions = allQuestions
+        // Clean extracted questions first
+        let cleanedQuestions = allQuestions
             .map(q => ({
                 ...q,
                 question: cleanQuestionText(q.question)
             }))
             // Remove invalid/empty cleaned questions
-            .filter(q => q.question && q.question.length > 0)
-            // Keep only questions that do not exist in DB
-            .filter(q => isQuestionNew(q.question));
-        
+            .filter(q => q.question && q.question.length > 0);
+
         // Merge duplicate questions
-        scannedQuestions = mergeDuplicateQuestions(newQuestions);
+        scannedQuestions = mergeDuplicateQuestions(cleanedQuestions);
 
-        // After merging, remove any questions that contain the phrase "Đáp án" in the question text
-        // (case-insensitive). This avoids storing noisy entries where the question text itself
-        // includes the answer indicator.
+        // Initialize selection state for UI (selected by default)
+        scannedQuestions.forEach(q => { try { q.selected = true; } catch (e) {} });
+
+        // After merging, remove noisy phrases
         scannedQuestions = scannedQuestions.filter(q => {
             try {
                 const txt = (q.question || '').toString().toLowerCase();
-                return !/đáp án/.test(txt);
+                if (/đáp án/.test(txt)) return false;
+                if (/(trang này|trang nay)/i.test(txt)) return false;
+                return true;
             } catch (e) {
                 return true;
             }
         });
 
-        // Also remove questions that contain the phrase "trang này" (or unaccented "trang nay")
-        // which is commonly page-label noise.
-        scannedQuestions = scannedQuestions.filter(q => {
+        // Include question if it's not in DB OR if it exists in DB but has no answer yet
+        function shouldIncludeQuestion(q) {
             try {
-                const txt = (q.question || '').toString().toLowerCase();
-                return !/(trang này|trang nay)/i.test(txt);
+                const key = normalizedQuestionKey(q.question);
+                const existing = (existingQuestions || []).find(e => normalizedQuestionKey(e.question || e) === key);
+                if (!existing) return true; // not in DB -> include
+                const existingAnswer = (existing && existing.answer) ? String(existing.answer).trim() : '';
+                return existingAnswer.length === 0; // include only if DB answer is empty
             } catch (e) {
                 return true;
             }
-        });
+        }
 
-        // Ensure none of the merged questions are already in DB (extra safety)
-        scannedQuestions = scannedQuestions.filter(q => isQuestionNew(q.question));
+        scannedQuestions = scannedQuestions.filter(shouldIncludeQuestion);
 
-        console.log(`Found ${scannedQuestions.length} new questions (after merging duplicates)`);
+        console.log(`Found ${scannedQuestions.length} questions (new or missing answer in DB, after merging duplicates)`);
 
         if (scannedQuestions.length === 0) {
             showNotification('Không tìm thấy câu hỏi mới', 'info', 3000);
@@ -455,6 +457,46 @@
             background: #f5f5f5;
         `;
 
+        // Selection controls (select all)
+        const selectionBar = document.createElement('div');
+        selectionBar.style.cssText = 'display:flex; align-items:center; gap:12px; padding: 12px 16px;';
+
+        const selectAllWrapper = document.createElement('label');
+        selectAllWrapper.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:13px; color:#333; cursor:pointer;';
+        const selectAllCheckbox = document.createElement('input');
+        selectAllCheckbox.type = 'checkbox';
+        selectAllCheckbox.id = 'tailieu-scanner-select-all';
+        selectAllCheckbox.checked = scannedQuestions.length > 0 && scannedQuestions.every(i => i.selected);
+        const selectAllText = document.createElement('span');
+        selectAllText.textContent = 'Chọn tất cả';
+        selectAllWrapper.appendChild(selectAllCheckbox);
+        selectAllWrapper.appendChild(selectAllText);
+        selectionBar.appendChild(selectAllWrapper);
+
+        // Add a small counter of selected items
+        const selectedCounter = document.createElement('div');
+        selectedCounter.id = 'tailieu-scanner-selected-count';
+        selectedCounter.style.cssText = 'font-size:13px; color:#666; margin-left:auto;';
+        const updateSelectedCounter = () => {
+            const c = scannedQuestions.filter(i => i.selected).length;
+            selectedCounter.textContent = `${c} đã chọn`;
+        };
+        updateSelectedCounter();
+        selectionBar.appendChild(selectedCounter);
+
+        // Toggle all
+        selectAllCheckbox.addEventListener('change', () => {
+            const val = selectAllCheckbox.checked;
+            scannedQuestions.forEach(i => { i.selected = val; });
+            // Update item checkboxes in list
+            const itemCheckboxes = listContainer.querySelectorAll('.tailieu-scanner-item-checkbox');
+            itemCheckboxes.forEach(cb => { cb.checked = val; });
+            updateSelectedCounter();
+        });
+
+        // Insert selection bar above list
+        listContainer.appendChild(selectionBar);
+
         // Add questions to list
         scannedQuestions.forEach((item, index) => {
             const questionItem = document.createElement('div');
@@ -485,6 +527,23 @@
                 align-items: center;
                 gap: 8px;
             `;
+            // Checkbox for selecting this scanned item
+            const itemCheckbox = document.createElement('input');
+            itemCheckbox.type = 'checkbox';
+            itemCheckbox.className = 'tailieu-scanner-item-checkbox';
+            itemCheckbox.style.cssText = 'width:16px; height:16px; cursor:pointer;';
+            itemCheckbox.checked = !!item.selected;
+            itemCheckbox.addEventListener('change', () => {
+                item.selected = itemCheckbox.checked;
+                // Update selectAll state
+                const allSelected = scannedQuestions.length > 0 && scannedQuestions.every(i => i.selected);
+                const anySelected = scannedQuestions.some(i => i.selected);
+                const selectAllEl = document.getElementById('tailieu-scanner-select-all');
+                if (selectAllEl) selectAllEl.checked = allSelected;
+                updateSelectedCounter();
+                // Disable export/copy if none selected (visual cue)
+            });
+            questionNumber.appendChild(itemCheckbox);
             const numberText = document.createElement('span');
             numberText.textContent = `Câu ${index + 1}`;
             questionNumber.appendChild(numberText);
@@ -515,6 +574,10 @@
                     // Update numbering and header count
                     updateListNumbers();
                     titleSub.textContent = `${scannedQuestions.length} câu hỏi chưa có trong database`;
+                    // Update selected counter and select-all state
+                    updateSelectedCounter();
+                    const selectAllEl = document.getElementById('tailieu-scanner-select-all');
+                    if (selectAllEl) selectAllEl.checked = scannedQuestions.length > 0 && scannedQuestions.every(i => i.selected);
                     // If no more items, remove popup
                     if (scannedQuestions.length === 0) {
                         popup.remove();
@@ -608,7 +671,7 @@
             });
         }
 
-        // Footer with actions
+    // Footer with actions
         const footer = document.createElement('div');
         footer.style.cssText = `
             padding: 16px 20px;
@@ -620,24 +683,43 @@
             justify-content: flex-end;
         `;
 
-        const exportBtn = document.createElement('button');
-        exportBtn.textContent = '📥 Xuất JSON';
-        exportBtn.style.cssText = `
-            padding: 10px 20px;
-            background: #1976D2;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background 0.2s;
-        `;
-        exportBtn.onmouseover = () => exportBtn.style.background = '#1976D2';
-        exportBtn.onmouseout = () => exportBtn.style.background = '#2196F3';
-    exportBtn.textContent = '💾 Lưu vào DB';
-    exportBtn.title = 'Lưu các câu hỏi đã quét vào cơ sở dữ liệu (mở popup để đồng bộ)';
-    exportBtn.onclick = () => saveScannedToLocalAndNotify();
+            const exportBtn = document.createElement('button');
+            exportBtn.textContent = '💾 Lưu vào DB';
+            exportBtn.title = 'Lưu các câu hỏi đã quét vào cơ sở dữ liệu (mở popup để đồng bộ)';
+            exportBtn.style.cssText = `
+                padding: 10px 20px;
+                background: #1976D2;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+                transition: background 0.2s;
+            `;
+            exportBtn.onmouseover = () => exportBtn.style.background = '#1976D2';
+            exportBtn.onmouseout = () => exportBtn.style.background = '#2196F3';
+            exportBtn.onclick = () => saveScannedToLocalAndNotify();
+
+        // (Direct add-now button removed)
+            
+            // Manual add button - open a small modal to input question and answer
+            const manualAddBtn = document.createElement('button');
+            manualAddBtn.textContent = '✍ Thêm thủ công';
+            manualAddBtn.title = 'Thêm câu hỏi/đáp án mà scanner không quét được';
+            manualAddBtn.style.cssText = `
+                padding: 10px 16px;
+                background: #FFB300;
+                color: #222;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            manualAddBtn.onmouseover = () => manualAddBtn.style.opacity = '0.9';
+            manualAddBtn.onmouseout = () => manualAddBtn.style.opacity = '1';
+            manualAddBtn.onclick = () => showManualAddDialog();
 
         const copyBtn = document.createElement('button');
         copyBtn.textContent = '📋 Copy';
@@ -654,12 +736,15 @@
         `;
         copyBtn.onmouseover = () => copyBtn.style.background = '#45a049';
         copyBtn.onmouseout = () => copyBtn.style.background = '#4CAF50';
-        copyBtn.onclick = () => copyToClipboard();
+    copyBtn.onclick = () => copyToClipboard();
 
         // Save scanned questions into chrome.storage.local for the popup to pick up and sync to Firestore
         function saveScannedToLocalAndNotify() {
             try {
-                const payload = scannedQuestions.map((item) => ({
+                const selectedItems = scannedQuestions.filter(i => i.selected);
+                const toSave = selectedItems.length > 0 ? selectedItems : scannedQuestions;
+
+                const payload = toSave.map((item) => ({
                     question: item.question || null,
                     answer: item.answer || null,
                     duplicateCount: item.duplicateCount || 0
@@ -688,8 +773,68 @@
             }
         }
 
-        footer.appendChild(exportBtn);
-        footer.appendChild(copyBtn);
+        // Show a small modal to add a question manually
+        function showManualAddDialog() {
+            // Create overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'tailieu-overlay';
+
+            const modal = document.createElement('div');
+            modal.className = 'tailieu-modal';
+            modal.innerHTML = `
+                <h3 style="margin-top:0;">Thêm câu hỏi thủ công</h3>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <label style="font-size:13px; color:#333;">Câu hỏi</label>
+                    <textarea id="tailieu-manual-question" rows="4" style="width:100%; padding:8px; font-size:13px;"></textarea>
+                    <label style="font-size:13px; color:#333;">Đáp án (tùy chọn)</label>
+                    <input id="tailieu-manual-answer" type="text" style="width:100%; padding:8px; font-size:13px;" />
+                    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
+                        <button id="tailieu-manual-cancel" style="background:#eee; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Hủy</button>
+                        <button id="tailieu-manual-add" style="background:#1976D2; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">Thêm</button>
+                    </div>
+                </div>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const cancelBtn = document.getElementById('tailieu-manual-cancel');
+            const addBtn = document.getElementById('tailieu-manual-add');
+
+            cancelBtn.onclick = () => overlay.remove();
+
+            addBtn.onclick = () => {
+                const qEl = document.getElementById('tailieu-manual-question');
+                const aEl = document.getElementById('tailieu-manual-answer');
+                const qText = qEl.value && qEl.value.trim();
+                const aText = aEl.value && aEl.value.trim();
+
+                if (!qText || qText.length < 5) {
+                    alert('Vui lòng nhập câu hỏi hợp lệ (ít nhất 5 ký tự)');
+                    return;
+                }
+
+                const newItem = {
+                    question: qText,
+                    answer: aText || null,
+                    duplicateCount: 1,
+                    selected: true
+                };
+
+                // Add to scannedQuestions and refresh popup
+                scannedQuestions.unshift(newItem);
+                overlay.remove();
+                // Re-render popup: remove and recreate
+                const existingPopup = document.getElementById('tailieu-scanner-popup');
+                if (existingPopup) existingPopup.remove();
+                showScannerPopup();
+            };
+        }
+
+    // Append action buttons: Manual Add, Save (local), Copy
+    footer.appendChild(manualAddBtn);
+    footer.appendChild(exportBtn);
+    footer.appendChild(copyBtn);
 
         // Assemble popup
         popup.appendChild(header);
@@ -731,7 +876,10 @@
     // Export to JSON file
     // Export to JSON file
     function exportToJSON() {
-        const data = scannedQuestions.map((item, index) => {
+        const selectedItems = scannedQuestions.filter(i => i.selected);
+        const toExport = selectedItems.length > 0 ? selectedItems : scannedQuestions;
+
+        const data = toExport.map((item, index) => {
             const exported = {
                 id: index + 1,
                 question: item.question,
@@ -769,9 +917,12 @@
 
     // Copy to clipboard
     function copyToClipboard() {
-        let text = `📝 CÂU HỎI MỚI (${scannedQuestions.length})\n\n`;
-        
-        scannedQuestions.forEach((item, index) => {
+        const selectedItems = scannedQuestions.filter(i => i.selected);
+        const toCopy = selectedItems.length > 0 ? selectedItems : scannedQuestions;
+
+        let text = `📝 CÂU HỎI MỚI (${toCopy.length})\n\n`;
+
+        toCopy.forEach((item, index) => {
             text += `${index + 1}. ${item.question}\n`;
             
             // Add merge info if available

@@ -919,6 +919,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     checkScannerPending();
     sendResponse({ success: true });
   }
+  
+  // Handle direct save-now requests from content script
+  if (request && request.action === 'tailieu_scanner_save_now') {
+    (async () => {
+      try {
+        const items = request.items || [];
+        if (!items || items.length === 0) {
+          sendResponse({ success: false, message: 'No items' });
+          return;
+        }
+
+        // Ensure Firebase is initialized
+        await waitForFirebase();
+
+        // Determine a target documentId: prefer selectedDocuments, otherwise use first document loaded
+        let targetDocumentId = selectedDocuments && selectedDocuments.length > 0 ? selectedDocuments[0] : null;
+        if (!targetDocumentId && documents && documents.length > 0) targetDocumentId = documents[0].id;
+        if (!targetDocumentId) {
+          // Try to load documents for first category
+          if (categories && categories.length > 0) {
+            await loadDocuments(categories[0].id);
+            if (documents && documents.length > 0) targetDocumentId = documents[0].id;
+          }
+        }
+
+        if (!targetDocumentId) {
+          sendResponse({ success: false, message: 'No target document selected' });
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const it of items) {
+          try {
+            const q = { question: it.question || '', answer: it.answer || null, documentId: targetDocumentId };
+            await addQuestion(q);
+            successCount++;
+          } catch (e) {
+            console.error('Error adding scanner question to Firestore', e);
+            failCount++;
+          }
+        }
+
+        sendResponse({ success: true, successCount, failCount });
+      } catch (e) {
+        console.error('tailieu_scanner_save_now handler error', e);
+        sendResponse({ success: false, message: e.message || String(e) });
+      }
+    })();
+
+    // Keep the message channel open for async response
+    return true;
+  }
 });
 
 // On popup open, check pending scanner items
