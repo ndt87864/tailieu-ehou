@@ -635,7 +635,9 @@
         `;
         exportBtn.onmouseover = () => exportBtn.style.background = '#1976D2';
         exportBtn.onmouseout = () => exportBtn.style.background = '#2196F3';
-        exportBtn.onclick = () => exportToJSON();
+    exportBtn.textContent = '💾 Lưu vào DB';
+    exportBtn.title = 'Lưu các câu hỏi đã quét vào cơ sở dữ liệu (mở popup để đồng bộ)';
+    exportBtn.onclick = () => saveScannedToLocalAndNotify();
 
         const copyBtn = document.createElement('button');
         copyBtn.textContent = '📋 Copy';
@@ -653,6 +655,38 @@
         copyBtn.onmouseover = () => copyBtn.style.background = '#45a049';
         copyBtn.onmouseout = () => copyBtn.style.background = '#4CAF50';
         copyBtn.onclick = () => copyToClipboard();
+
+        // Save scanned questions into chrome.storage.local for the popup to pick up and sync to Firestore
+        function saveScannedToLocalAndNotify() {
+            try {
+                const payload = scannedQuestions.map((item) => ({
+                    question: item.question || null,
+                    answer: item.answer || null,
+                    duplicateCount: item.duplicateCount || 0
+                }));
+
+                // Save to local storage under a specific key
+                chrome.storage.local.set({ tailieu_scanner_pending: payload }, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error saving scanned questions to storage:', chrome.runtime.lastError);
+                        showNotification('Lỗi lưu tạm: ' + (chrome.runtime.lastError.message || ''), 'error', 4000);
+                        return;
+                    }
+
+                    // Send a message so other parts (popup) can react immediately if open
+                    try {
+                        chrome.runtime.sendMessage({ action: 'tailieu_scanner_saved_local', count: payload.length });
+                    } catch (e) {
+                        // ignore - runtime may not be available in some contexts
+                    }
+
+                    showNotification('Đã lưu tạm vào bộ nhớ tiện ích. Mở popup để đồng bộ vào DB.', 'success', 3500);
+                });
+            } catch (e) {
+                console.error('saveScannedToLocalAndNotify error', e);
+                showNotification('Lỗi khi lưu câu hỏi', 'error', 3000);
+            }
+        }
 
         footer.appendChild(exportBtn);
         footer.appendChild(copyBtn);

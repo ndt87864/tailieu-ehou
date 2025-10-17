@@ -744,3 +744,186 @@ function hideCacheSection() {
     cacheSection.style.display = 'none';
   }
 }
+
+// ---------------------- Scanner pending sync ----------------------
+// Show a small UI in the popup header when there are scanned questions saved by the content script
+async function checkScannerPending() {
+  try {
+    const result = await chrome.storage.local.get('tailieu_scanner_pending');
+    const pending = result.tailieu_scanner_pending || [];
+    renderScannerPendingUI(pending);
+  } catch (e) {
+    console.error('checkScannerPending error', e);
+  }
+}
+
+function renderScannerPendingUI(pending) {
+  // Remove existing scanner UI if present
+  const existing = document.getElementById('scannerPendingContainer');
+  if (existing) existing.remove();
+
+  if (!pending || pending.length === 0) return;
+
+  const container = document.createElement('div');
+  container.id = 'scannerPendingContainer';
+  container.style.cssText = 'display:flex; gap:8px; align-items:center; margin:10px 0;';
+
+  const info = document.createElement('div');
+  info.textContent = `Có ${pending.length} câu hỏi chờ đồng bộ`;
+  info.style.cssText = 'font-size:13px; color:#333;';
+
+  const syncBtn = document.createElement('button');
+  syncBtn.textContent = '⬆ Đồng bộ vào DB';
+  syncBtn.style.cssText = `
+    background: #1976D2; color: white; border: none; padding: 8px 12px; border-radius:6px; cursor:pointer;
+  `;
+  syncBtn.onclick = () => syncPendingScannerToDB(syncBtn);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = '🗑 Xóa tạm';
+  clearBtn.style.cssText = `
+    background: #f44336; color: white; border: none; padding: 8px 12px; border-radius:6px; cursor:pointer;
+  `;
+  clearBtn.onclick = async () => {
+    await chrome.storage.local.remove('tailieu_scanner_pending');
+    renderScannerPendingUI([]);
+    showSuccessMessage('Đã xóa tạm các câu hỏi quét');
+  };
+
+  container.appendChild(info);
+  container.appendChild(syncBtn);
+  container.appendChild(clearBtn);
+
+  const header = document.querySelector('.header');
+  if (header) {
+    header.insertAdjacentElement('afterend', container);
+  }
+}
+
+async function syncPendingScannerToDB(button) {
+  try {
+    button.disabled = true;
+
+    // Ensure Firebase is ready
+    try {
+      await waitForFirebase();
+    } catch (e) {
+      console.error('Firebase not ready for sync:', e);
+      showError('Firebase chưa sẵn sàng. Vui lòng thử lại.');
+      button.disabled = false;
+      return;
+    }
+
+    const res = await chrome.storage.local.get('tailieu_scanner_pending');
+    const pending = res.tailieu_scanner_pending || [];
+
+    if (!pending || pending.length === 0) {
+      showSuccessMessage('Không có câu hỏi để đồng bộ');
+      button.disabled = false;
+      return;
+    }
+
+    showLoading(true);
+
+    // Determine target documentId robustly
+    let targetDocumentId = selectedDocuments && selectedDocuments.length > 0 ? selectedDocuments[0] : null;
+
+    // If no selectedDocuments and documents list empty, try to load categories/documents to pick a default
+    if (!targetDocumentId) {
+      if (!documents || documents.length === 0) {
+        // Load categories and documents so we can pick a sensible target
+        try {
+          await loadCategories();
+          if (categories && categories.length > 0) {
+            // Attempt to load documents for the previously selected category or first category
+            const selectedCategoryId = categorySelect ? categorySelect.value : null;
+            const catToLoad = selectedCategoryId || (categories[0] && categories[0].id);
+            if (catToLoad) {
+              await loadDocuments(catToLoad);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not load categories/documents automatically:', e);
+        }
+      }
+
+      if (documents && documents.length > 0) {
+        targetDocumentId = documents[0].id;
+      }
+    }
+
+    if (!targetDocumentId) {
+      showError('Vui lòng chọn ít nhất 1 tài liệu trên popup trước khi đồng bộ.');
+      button.disabled = false;
+      showLoading(false);
+      return;
+    }
+
+    // Confirm chosen document (for debugging/logging)
+    let targetDocTitle = 'unknown';
+    try {
+      const docObj = documents.find(d => d.id === targetDocumentId);
+      if (docObj) targetDocTitle = docObj.title || targetDocTitle;
+    } catch (e) {}
+
+    console.log(`Syncing ${pending.length} scanned questions into documentId=${targetDocumentId} title="${targetDocTitle}"`);
+
+    // Upload each pending question to Firestore using addQuestion(questionData)
+    const addedIds = [];
+    let failCount = 0;
+
+    for (const item of pending) {
+      try {
+        const questionData = {
+          question: (item.question || '').toString(),
+          answer: item.answer || null,
+          documentId: targetDocumentId
+        };
+
+        // addQuestion returns the new ID
+        const newId = await addQuestion(questionData);
+        addedIds.push(newId);
+        console.log('Added question id:', newId, 'data:', questionData);
+      } catch (e) {
+        console.error('Failed to add question from scanner:', e);
+        failCount++;
+      }
+    }
+
+    // Clear pending storage on success (or partial success)
+    await chrome.storage.local.remove('tailieu_scanner_pending');
+    renderScannerPendingUI([]);
+
+    showSuccessMessage(`Đồng bộ xong: ${addedIds.length} thành công, ${failCount} lỗi`);
+
+    // Extra verification: log current question count for the target document
+    try {
+      const currentQs = await getQuestionsByDocument(targetDocumentId);
+      console.log(`Document ${targetDocumentId} now has ${currentQs.length} questions (sample 5):`, currentQs.slice(0,5));
+    } catch (e) {
+      console.warn('Could not fetch questions for verification:', e);
+    }
+
+  } catch (e) {
+    console.error('syncPendingScannerToDB error', e);
+    showError('Lỗi khi đồng bộ: ' + (e.message || e));
+  } finally {
+    if (button) button.disabled = false;
+    showLoading(false);
+  }
+}
+
+// Listen for message from content script that scanner saved items
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request && request.action === 'tailieu_scanner_saved_local') {
+    checkScannerPending();
+    sendResponse({ success: true });
+  }
+});
+
+// On popup open, check pending scanner items
+document.addEventListener('DOMContentLoaded', () => {
+  // small delay to ensure DOM header is available
+  setTimeout(() => checkScannerPending(), 300);
+});
+
