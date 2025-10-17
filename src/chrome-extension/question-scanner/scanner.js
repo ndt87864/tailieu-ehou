@@ -305,9 +305,22 @@
         
         // Merge duplicate questions
         scannedQuestions = mergeDuplicateQuestions(newQuestions);
-    // Ensure none of the merged questions are already in DB (extra safety)
-    scannedQuestions = scannedQuestions.filter(q => isQuestionNew(q.question));
-        
+
+        // After merging, remove any questions that contain the phrase "Đáp án" in the question text
+        // (case-insensitive). This avoids storing noisy entries where the question text itself
+        // includes the answer indicator.
+        scannedQuestions = scannedQuestions.filter(q => {
+            try {
+                const txt = (q.question || '').toString().toLowerCase();
+                return !/đáp án/.test(txt);
+            } catch (e) {
+                return true;
+            }
+        });
+
+        // Ensure none of the merged questions are already in DB (extra safety)
+        scannedQuestions = scannedQuestions.filter(q => isQuestionNew(q.question));
+
         console.log(`Found ${scannedQuestions.length} new questions (after merging duplicates)`);
 
         if (scannedQuestions.length === 0) {
