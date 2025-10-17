@@ -132,6 +132,39 @@ function initializeElements() {
   });
 }
 
+// Small SVG icon helper used by popup UI
+function svgIcon(name, size = 16) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'currentColor');
+  svg.style.verticalAlign = 'middle';
+  svg.style.display = 'inline-block';
+
+  const path = document.createElementNS(ns, 'path');
+  switch (name) {
+    case 'upload':
+      path.setAttribute('d', 'M5 20h14v-2H5v2zm7-18L5.33 9h3.67v6h6V9h3.67L12 2z');
+      break;
+    case 'trash':
+      path.setAttribute('d', 'M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z');
+      break;
+    case 'close':
+      path.setAttribute('d', 'M18.3 5.71L12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.71 2.88 18.3 9.18 12 2.88 5.71 4.29 4.29 10.59 10.6 16.88 4.29z');
+      break;
+    case 'check':
+      path.setAttribute('d', 'M9 16.17L4.83 12l-1.42 1.41L9 19l12-12-1.41-1.41z');
+      break;
+    default:
+      path.setAttribute('d', '');
+  }
+
+  svg.appendChild(path);
+  return svg;
+}
+
 function setupEventListeners() {
   categorySelect.addEventListener('change', onCategoryChange);
   documentSearchInput.addEventListener('input', onDocumentSearch);
@@ -555,7 +588,7 @@ function showQuestionsStatus(count) {
           cursor: pointer;
           padding: 5px;
           margin-left: 5px;
-        ">✕</button>
+        "></button>
       </div>
       <div style="padding: 15px; text-align: center; color: #666; font-size: 13px;">
         Extension sẽ tự động tìm và highlight câu hỏi trên trang web
@@ -574,6 +607,10 @@ function showQuestionsStatus(count) {
     
     if (closeBannerBtn && notificationBanner) {
       closeBannerBtn.addEventListener('click', () => notificationBanner.style.display = 'none');
+      // Insert close svg into closeBannerBtn
+      try {
+        closeBannerBtn.appendChild(svgIcon('close', 14));
+      } catch (e) {}
     }
     
     document.getElementById('questionsCount').textContent = `${count} câu hỏi sẵn sàng`;
@@ -773,14 +810,24 @@ function renderScannerPendingUI(pending) {
   info.style.cssText = 'font-size:13px; color:#333;';
 
   const syncBtn = document.createElement('button');
-  syncBtn.textContent = '⬆ Đồng bộ vào DB';
+  syncBtn.textContent = '';
+  syncBtn.appendChild(svgIcon('upload', 14));
+  const syncText = document.createElement('span');
+  syncText.style.marginLeft = '8px';
+  syncText.textContent = 'Đồng bộ lên DB';
+  syncBtn.appendChild(syncText);
   syncBtn.style.cssText = `
     background: #1976D2; color: white; border: none; padding: 8px 12px; border-radius:6px; cursor:pointer;
   `;
   syncBtn.onclick = () => syncPendingScannerToDB(syncBtn);
 
   const clearBtn = document.createElement('button');
-  clearBtn.textContent = '🗑 Xóa tạm';
+  clearBtn.textContent = '';
+  clearBtn.appendChild(svgIcon('trash', 14));
+  const clearText = document.createElement('span');
+  clearText.style.marginLeft = '8px';
+  clearText.textContent = 'Xóa tạm';
+  clearBtn.appendChild(clearText);
   clearBtn.style.cssText = `
     background: #f44336; color: white; border: none; padding: 8px 12px; border-radius:6px; cursor:pointer;
   `;

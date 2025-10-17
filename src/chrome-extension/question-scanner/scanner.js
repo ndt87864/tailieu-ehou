@@ -194,6 +194,11 @@
                 const questionText = element.innerText?.trim();
                 if (!questionText || questionText.length < 10) return;
 
+                // DEBUG: log raw extracted question snippet (first 200 chars)
+                try {
+                    console.debug('[scanner] extracted raw question:', (questionText || '').slice(0, 200));
+                } catch (e) {}
+
                 // Tìm đáp án theo pattern "Đáp án đúng là: ..."
                 let answer = null;
                 
@@ -247,7 +252,12 @@
             existingQuestions = result.tailieu_questions || [];
             // Build normalized key set for fast lookup
             existingQuestionKeys = new Set((existingQuestions || []).map(q => normalizedQuestionKey(q.question || q)));
-            console.log(`Loaded ${existingQuestions.length} existing questions from storage`);
+            console.log(`[scanner] Loaded ${existingQuestions.length} existing questions from storage`);
+            // DEBUG: show a few sample keys
+            try {
+                const sample = Array.from(existingQuestionKeys).slice(0, 8);
+                console.debug('[scanner] existingQuestionKeys sample:', sample);
+            } catch (e) {}
         } catch (error) {
             console.error('Error loading existing questions:', error);
             existingQuestions = [];
@@ -368,11 +378,14 @@
         // Include question if it's not in DB OR if it exists in DB but has no answer yet
         function shouldIncludeQuestion(q) {
             try {
-                const key = normalizedQuestionKey(q.question);
-                const existing = (existingQuestions || []).find(e => normalizedQuestionKey(e.question || e) === key);
-                if (!existing) return true; // not in DB -> include
-                const existingAnswer = (existing && existing.answer) ? String(existing.answer).trim() : '';
-                return existingAnswer.length === 0; // include only if DB answer is empty
+                    const key = normalizedQuestionKey(q.question);
+                    const existing = (existingQuestions || []).find(e => normalizedQuestionKey(e.question || e) === key);
+                    // DEBUG: show key and whether match found
+                    console.debug('[scanner] shouldIncludeQuestion key=', key, 'foundExisting=', !!existing);
+                    if (!existing) return true; // not in DB -> include
+                    const existingAnswer = (existing && existing.answer) ? String(existing.answer).trim() : '';
+                    console.debug('[scanner] existingAnswer length=', existingAnswer.length ? existingAnswer.length : 0);
+                    return existingAnswer.length === 0; // include only if DB answer is empty
             } catch (e) {
                 return true;
             }
