@@ -12,32 +12,12 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
-// Monitor for network errors (non-blocking)
-chrome.webRequest.onErrorOccurred.addListener(
-    (details) => {
-        if (details.error === 'net::ERR_CERT_COMMON_NAME_INVALID') {
-            console.log('SSL certificate error detected for:', details.url);
-            
-            // Notify content script about the error
-            chrome.tabs.sendMessage(details.tabId, {
-                action: 'sslError',
-                url: details.url,
-                error: details.error
-            }).catch(() => {
-                // Ignore if tab doesn't have content script
-            });
-        }
-        
-        // Log other common mixed content errors
-        if (details.error.includes('ERR_BLOCKED_BY_CLIENT') || 
-            details.error.includes('ERR_INSECURE_RESPONSE')) {
-            console.log('Mixed content or security error:', details.url, details.error);
-        }
-    },
-    {
-        urls: ["<all_urls>"]
-    }
-);
+// Note: removed chrome.webRequest.onErrorOccurred usage to avoid requesting the
+// powerful "webRequest" permission which increases Chrome Web Store review risk.
+// If you need to detect network errors in the future, consider using:
+// - chrome.declarativeNetRequest rules for blocking/redirecting, or
+// - try/catch and network error handling within extension pages (popup/content scripts)
+// The DNR rules remain enabled below for declared blocking behavior.
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
