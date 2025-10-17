@@ -3172,7 +3172,7 @@ function createQuestionsPopup() {
         font-size: 24px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         transition: transform 0.2s;
-        z-index: 1;
+        z-index: 999998; /* below scanner (1000001) but above popup content */
     `;
     minimizedOverlay.title = 'Nhấn để mở rộng';
     minimizedOverlay.innerHTML = `

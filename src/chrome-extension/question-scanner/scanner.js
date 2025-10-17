@@ -1062,10 +1062,10 @@
     // Create floating scanner button
     function createScannerButton() {
         const button = document.createElement('button');
-    button.id = 'tailieu-scanner-btn';
-    button.title = 'Quét câu hỏi mới';
-    // use svg search icon inside floating button
-    button.appendChild(svgIcon('search', 20));
+        button.id = 'tailieu-scanner-btn';
+        button.title = 'Quét câu hỏi mới';
+        // use svg search icon inside floating button
+        button.appendChild(svgIcon('search', 20));
         button.style.cssText = `
             position: fixed;
             top: 20px;
@@ -1079,7 +1079,7 @@
             font-size: 24px;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(25, 118, 210, 0.35);
-            z-index: 10001;
+            z-index: 1000001; /* ensure above popup (popup uses 999999) */
             transition: all 0.3s;
             display: flex;
             align-items: center;
@@ -1107,6 +1107,42 @@
         };
 
         document.body.appendChild(button);
+
+        // Position scanner above popup if popup exists; otherwise keep default
+        function positionScannerRelativeToPopup() {
+            try {
+                const popup = document.getElementById('tailieu-questions-popup');
+                if (popup && popup.style.display !== 'none') {
+                    const rect = popup.getBoundingClientRect();
+                    const btnW = button.offsetWidth || 56;
+                    const btnH = button.offsetHeight || 56;
+                    // center horizontally above popup
+                    let left = Math.round(rect.left + (rect.width / 2) - (btnW / 2));
+                    let top = Math.round(rect.top - btnH - 12);
+                    if (left < 8) left = 8;
+                    if (top < 8) top = 8;
+                    button.style.left = left + 'px';
+                    button.style.top = top + 'px';
+                } else {
+                    // fallback to default location (top-left)
+                    button.style.left = '20px';
+                    button.style.top = '20px';
+                }
+            } catch (e) {
+                // ignore positioning errors
+            }
+        }
+
+        // Run initial positioning and keep it updated
+        positionScannerRelativeToPopup();
+        window.addEventListener('resize', positionScannerRelativeToPopup);
+        window.addEventListener('scroll', positionScannerRelativeToPopup, true);
+
+        // Observe DOM changes to reposition when popup is created/removed or its style changes
+        const mo = new MutationObserver(() => {
+            positionScannerRelativeToPopup();
+        });
+        mo.observe(document.body, { childList: true, subtree: true, attributes: true });
     }
 
     // Initialize scanner when page is ready
@@ -1128,8 +1164,27 @@
         try {
             const existingPopup = document.getElementById('tailieu-questions-popup');
             if (!existingPopup) return;
+            // Prefer using the popup's own minimize button if available (so it preserves data)
+            try {
+                const minimizeBtn = existingPopup.querySelector('button');
+                // Heuristic: find the minimize button by looking for a button with '−' text
+                let found = null;
+                const buttons = existingPopup.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent && btn.textContent.trim() === '−') {
+                        found = btn;
+                    }
+                });
+                if (found) {
+                    // If already minimized via popup internal state, clicking will toggle
+                    found.click();
+                    return;
+                }
+            } catch (e) {
+                // ignore and fallback
+            }
 
-            // If already minimized, do nothing
+            // Fallback: If popup does not expose minimize button, hide popup and create a small restore button
             if (document.getElementById('tailieu-questions-min-btn')) return;
 
             // Hide the popup
@@ -1152,7 +1207,7 @@
                 color: white;
                 border: none;
                 font-size: 18px;
-                z-index: 10005;
+                z-index: 99999; /* lower than scanner button but above most page content */
                 cursor: pointer;
                 box-shadow: 0 4px 12px rgba(25,118,210,0.25);
             `;
