@@ -457,7 +457,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // Clear localStorage cache
             localStorage.removeItem(QUESTIONS_CACHE_KEY);
             localStorage.removeItem('tailieu-questions-popup-visible');
-            localStorage.removeItem('tailieu-questions-popup-minimized');
             localStorage.removeItem('tailieu-questions-popup-position');
             
             // Clear chrome storage cache
@@ -3155,10 +3154,65 @@ function createQuestionsPopup() {
     let originalHeight = '500px';
     let originalMaxHeight = '500px';
 
+    // Tạo overlay icon để hiển thị khi thu nhỏ (thay vì thay thế innerHTML)
+    const minimizedOverlay = document.createElement('div');
+    minimizedOverlay.id = 'tailieu-minimized-overlay';
+    minimizedOverlay.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        background: linear-gradient(135deg, #42A5F5, #1E88E5);
+        border-radius: 50%;
+        font-size: 24px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        transition: transform 0.2s;
+        z-index: 1;
+    `;
+    minimizedOverlay.title = 'Nhấn để mở rộng';
+    minimizedOverlay.innerHTML = `
+        <?xml version="1.0" encoding="utf-8"?>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+        </svg>
+    `;
+    popup.appendChild(minimizedOverlay);
+
+    // Event listeners cho overlay
+    minimizedOverlay.addEventListener('click', () => {
+        if (isMinimized) {
+            minimizeBtn.click(); // Mở rộng lại
+        }
+    });
+
+    minimizedOverlay.addEventListener('mouseenter', () => {
+        minimizedOverlay.style.transform = 'scale(1.1)';
+    });
+
+    minimizedOverlay.addEventListener('mouseleave', () => {
+        minimizedOverlay.style.transform = 'scale(1)';
+    });
+
     minimizeBtn.addEventListener('click', () => {
         isMinimized = !isMinimized;
         if (isMinimized) {
-            // Thu gọn thành icon
+            // Thu gọn thành icon - CHỈ thay đổi style, KHÔNG thay đổi innerHTML
             originalWidth = popup.style.width;
             originalHeight = popup.style.height;
             originalMaxHeight = popup.style.maxHeight;
@@ -3170,73 +3224,27 @@ function createQuestionsPopup() {
             popup.style.right = '20px';
             popup.style.left = 'auto';
             popup.style.top = 'auto';
+            
+            // Ẩn content và header, hiển thị overlay
             content.style.display = 'none';
             header.style.display = 'none';
-
-            // Thêm icon vào popup khi thu gọn
-            popup.innerHTML = `
-                <div style="
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    cursor: pointer;
-                    background: linear-gradient(135deg, #42A5F5, #1E88E5);
-                    border-radius: 50%;
-                    font-size: 24px;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                    transition: transform 0.2s;
-                " title="Nhấn để mở rộng">
-                    <?xml version="1.0" encoding="utf-8"?>
-                    <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#ffffff"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                </div>
-            `;
-
-            // Thêm event listener cho icon thu gọn
-            const iconContainer = popup.querySelector('div');
-            iconContainer.addEventListener('click', () => {
-                minimizeBtn.click(); // Mô phỏng click minimize button
-            });
-
-            iconContainer.addEventListener('mouseenter', () => {
-                iconContainer.style.transform = 'scale(1.1)';
-            });
-
-            iconContainer.addEventListener('mouseleave', () => {
-                iconContainer.style.transform = 'scale(1)';
-            });
+            minimizedOverlay.style.display = 'flex';
 
         } else {
-            // Mở rộng lại
+            // Mở rộng lại - CHỈ thay đổi style
             popup.style.width = originalWidth;
             popup.style.height = originalHeight;
             popup.style.maxHeight = originalMaxHeight;
             popup.style.bottom = '20px';
             popup.style.right = '20px';
+            
+            // Hiển thị content và header, ẩn overlay
             content.style.display = 'block';
             header.style.display = 'flex';
-
-            // Khôi phục header và content
-            popup.innerHTML = '';
-            popup.appendChild(header);
-            popup.appendChild(content);
+            minimizedOverlay.style.display = 'none';
         }
-        localStorage.setItem('tailieu-questions-popup-minimized', isMinimized.toString());
+        // KHÔNG lưu trạng thái minimized vào localStorage
+        // Trạng thái minimized chỉ duy trì trong phiên làm việc hiện tại
     });
 
     // Make header draggable
@@ -3275,71 +3283,12 @@ function createQuestionsPopup() {
 
     // Restore saved state
     const savedVisible = localStorage.getItem('tailieu-questions-popup-visible');
-    const savedMinimized = localStorage.getItem('tailieu-questions-popup-minimized');
     
     // Initially hide popup - only show when there are questions
     popup.style.display = 'none';
 
-    if (savedMinimized === 'true') {
-        isMinimized = true;
-        // Thực hiện minimize ngay lập tức
-        popup.style.width = '60px';
-        popup.style.height = '60px';
-        popup.style.maxHeight = '60px';
-        popup.style.bottom = '20px';
-        popup.style.right = '20px';
-        popup.style.left = 'auto';
-        popup.style.top = 'auto';
-        content.style.display = 'none';
-        header.style.display = 'none';
-
-        popup.innerHTML = `
-            <div style="
-                width: 100%;
-                height: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                background: linear-gradient(135deg, #42A5F5, #1E88E5);
-                border-radius: 50%;
-                font-size: 24px;
-                box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                transition: transform 0.2s;
-            " title="Nhấn để mở rộng">
-                <?xml version="1.0" encoding="utf-8"?>
-                <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#ffffff"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-            </div>
-        `;
-
-        // Thêm event listener cho icon thu gọn
-        const iconContainer = popup.querySelector('div');
-        iconContainer.addEventListener('click', () => {
-            minimizeBtn.click();
-        });
-
-        iconContainer.addEventListener('mouseenter', () => {
-            iconContainer.style.transform = 'scale(1.1)';
-        });
-
-        iconContainer.addEventListener('mouseleave', () => {
-            iconContainer.style.transform = 'scale(1)';
-        });
-    }
+    // KHÔNG restore trạng thái minimized từ localStorage
+    // Popup luôn bắt đầu ở trạng thái mở rộng khi reload trang
 
     const savedPosition = localStorage.getItem('tailieu-questions-popup-position');
     if (savedPosition) {
