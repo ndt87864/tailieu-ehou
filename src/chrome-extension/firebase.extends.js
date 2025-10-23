@@ -37,12 +37,12 @@ function initializeFirebase() {
   console.log('📊 App name:', extendsApp.name);
   console.log('📊 Project ID:', extendsApp.options.projectId);
   
-  // Analytics (optional)
-  try {
-    extendsAnalytics = firebase.analytics(extendsApp);
-  } catch (e) {
-    console.log('Analytics not initialized:', e.message);
-  }
+  // Analytics intentionally disabled for Manifest V3 compliance.
+  // Firebase Analytics (gtag) dynamically injects remote code (gtag.js)
+  // which is not allowed in Chrome Web Store Manifest V3 submissions.
+  // If you need analytics, implement an explicit opt-in and a server-side
+  // solution; do NOT call `firebase.analytics()` from extension pages.
+  extendsAnalytics = null;
   
   return { extendsApp, extendsDb, extendsAnalytics };
 }

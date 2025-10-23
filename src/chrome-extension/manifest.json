@@ -11,7 +11,8 @@
     "declarativeNetRequest"
   ],
   "host_permissions": [
-    "https://learning.ehou.edu.vn/*"
+    "https://learning.ehou.edu.vn/*",
+    "https://docs.google.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -19,10 +20,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://learning.ehou.edu.vn/*"],
+      "matches": [
+        "https://learning.ehou.edu.vn/*",
+        "https://docs.google.com/document/*",
+        "https://docs.google.com/document/u/*/*"
+      ],
       "js": ["content.js", "question-scanner/scanner.js"],
       "css": ["styles.css", "question-scanner/scanner.css"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ],
   "background": {

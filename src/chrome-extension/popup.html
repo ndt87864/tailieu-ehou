@@ -579,7 +579,11 @@
     <!-- Firebase SDK (local files - compat mode) -->
     <script src="firebase-app-compat.js"></script>
     <script src="firebase-firestore-compat.js"></script>
-    <script src="firebase-analytics-compat.js"></script>
+    <!-- Note: firebase-analytics-compat.js intentionally removed to comply with
+        Chrome Web Store Manifest V3 policies (remote script loading / analytics
+        that attempts to load gtag.js can cause rejection). If you need
+        analytics, use a server-side solution or request explicit guidance.
+    -->
 
     <!-- Extension scripts -->
     <script src="firebase.extends.js"></script>
