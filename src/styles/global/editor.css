@@ -1,0 +1,72 @@
+/* Basic styles for the lightweight editor page */
+.editor-page {
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.editor-toolbar-button {
+  border: 1px solid #ddd;
+  background: #fff;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.editor-toolbar-button.active {
+  background: #eef;
+}
+
+.editor-body {
+  display: flex;
+  gap: 18px;
+}
+
+.editor-pane {
+  flex: 1 1 60%;
+  min-height: 60vh;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  border-radius: 6px;
+  background: #fff;
+  overflow: auto;
+}
+
+.preview-pane {
+  flex: 1 1 40%;
+  min-height: 60vh;
+  border: 1px solid #f0f0f0;
+  padding: 12px;
+  border-radius: 6px;
+  background: #fafafa;
+  overflow: auto;
+}
+
+.preview-inner h1, .preview-inner h2, .preview-inner p {
+  margin: 0 0 12px 0;
+}
+
+.preview-inner img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .editor-body {
+    flex-direction: column;
+  }
+}

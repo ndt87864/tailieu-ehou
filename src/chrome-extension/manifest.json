@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tailieu Questions - Tự động tìm đáp án câu hỏi",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Tự động tìm và highlight đáp án đúng cho câu hỏi trắc nghiệm từ cơ sở dữ liệu Tailieu. Hỗ trợ học tập hiệu quả.",
   "homepage_url": "https://tailieuehou.id.vn",
   "privacy_policy": "https://tailieuehou.id.vn/privacy-policy",
@@ -12,7 +12,7 @@
   ],
   "host_permissions": [
     "https://learning.ehou.edu.vn/*",
-    "https://docs.google.com/*"
+    "https://tailieuehou.id.vn/editor"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -22,8 +22,7 @@
     {
       "matches": [
         "https://learning.ehou.edu.vn/*",
-        "https://docs.google.com/document/*",
-        "https://docs.google.com/document/u/*/*"
+        "https://tailieuehou.id.vn/editor"
       ],
       "js": ["content.js", "question-scanner/scanner.js"],
       "css": ["styles.css", "question-scanner/scanner.css"],

@@ -24,6 +24,7 @@ import DocumentManagement from "./pages/admin/DocumentManagement";
 import QuestionManagement from "./pages/admin/question/QuestionManagement";
 import HomePage from "./pages/HomePage";
 import Pricing from "./pages/Pricing";
+import EditorPage from "./pages/EditorPage";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase/firebase";
 import { useUserRole } from "./context/UserRoleContext";
@@ -542,6 +543,7 @@ function App() {
                 <Route path="/admin" element={<AdminDashboardPage />} />
 
                 <Route path="/pricing" element={<Pricing />} />
+                <Route path="/editor" element={<EditorPage />} />
                 <Route
                   path="/admin/pricing-content-management"
                   element={<PricingContentManagementPage />}
