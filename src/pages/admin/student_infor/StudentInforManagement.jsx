@@ -67,6 +67,7 @@ const StudentInforManagement = () => {
   const [form, setForm] = useState(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState([]);
   const [lastRawHeaders, setLastRawHeaders] = useState(null);
@@ -324,6 +325,44 @@ const StudentInforManagement = () => {
       setError("Lưu thất bại");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExportLoading(true);
+    try {
+      const XLSX = await ensureXLSX();
+      const rows = (filteredStudentInfors && filteredStudentInfors.length > 0) ? filteredStudentInfors : studentInfors;
+      if (!rows || rows.length === 0) {
+        alert('Không có dữ liệu để xuất');
+        return;
+      }
+
+      // Build header and row data according to columns order
+      const header = columns.map((c) => c.label);
+      const data = rows.map((r) =>
+        columns.map((c) => {
+          const v = r[c.key];
+          if (c.key === 'dob') {
+            // prefer YYYY-MM-DD for dob export
+            return parseDateToYMD(v) || '';
+          }
+          return v ?? '';
+        })
+      );
+
+      const aoa = [header, ...data];
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      const now = new Date();
+      const fn = `student_infor_export_${now.toISOString().slice(0,19).replace(/[:T]/g,'_')}.xlsx`;
+      XLSX.writeFile(wb, fn);
+    } catch (err) {
+      console.error('Export error', err);
+      setError('Xuất Excel thất bại: ' + (err?.message || String(err)));
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -695,6 +734,14 @@ const StudentInforManagement = () => {
                     className="ml-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
                   >
                     Import Excel
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    disabled={exportLoading}
+                    className={`ml-2 ${exportLoading ? 'bg-gray-400' : 'bg-yellow-600 hover:bg-yellow-700'} text-white px-4 py-2 rounded-md`}
+                    title="Xuất Excel các bản ghi đang hiển thị"
+                  >
+                    {exportLoading ? `Đang xuất...` : 'Export Excel'}
                   </button>
                   <input
                     id="student-import-input"

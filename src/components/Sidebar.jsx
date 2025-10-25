@@ -1090,7 +1090,9 @@ function Sidebar({
                   ></path>
                 </svg>
                 {showFullContent && (
-                  <span className="text-white font-medium">Quản lý thông tin sinh viên</span>
+                  <span className="text-white font-medium">
+                    Quản lý thông tin sinh viên
+                  </span>
                 )}
               </Link>
               <Link
