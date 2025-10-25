@@ -1096,6 +1096,33 @@ function Sidebar({
                 )}
               </Link>
               <Link
+                to="/admin/room-infor"
+                onClick={(e) => handleAdminRefresh(e, "/admin/room-infor")}
+                className={`flex items-center px-4 py-3 transition-colors ${
+                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                }`}
+              >
+                <svg
+                  className="w-5 h-5 mr-3 text-white flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 7h18M3 12h18M3 17h18"
+                  />
+                </svg>
+                {showFullContent && (
+                  <span className="text-white font-medium">
+                    Quản lý phòng thi
+                  </span>
+                )}
+              </Link>
+              <Link
                 to="/admin/calendar-notes"
                 onClick={(e) => handleAdminRefresh(e, "/admin/calendar-notes")}
                 className={`flex items-center px-4 py-3 transition-colors ${

@@ -32,7 +32,8 @@ import {
 const columns = [
   { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
-  { key: "dob", label: "Ngày sinh" },
+    { key: "dob", label: "Ngày sinh" },
+    { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },
   { key: "examTime", label: "Thời gian" },
@@ -47,6 +48,7 @@ const emptyForm = {
   studentId: "",
   fullName: "",
   dob: "",
+  examDate: "",
   subject: "",
   examSession: "",
   examTime: "",
@@ -543,9 +545,8 @@ const StudentInforManagement = () => {
         console.info("Import - ignored headers (will not be used):", ignored);
 
       // Prepare objects
-      let toImport = [];
+      const allRows = [];
       for (const r of rows) {
-        // Skip empty rows: require at least studentId or fullName
         const vals = r;
         const studentId = headerMap.studentId
           ? String(vals[headerMap.studentId]).trim()
@@ -562,12 +563,12 @@ const StudentInforManagement = () => {
           ? lastName + (lastName && firstName ? " " : "") + firstName
           : "";
 
-        if (!studentId && !fullName) continue; // skip row
-
-          const item = {
+        const item = {
           studentId: studentId || "",
           fullName: fullName || "",
           dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
+          // examDate may be present in some excel files (Ngày thi)
+          examDate: headerMap.examDate ? parseExcelDateToYMD(vals[headerMap.examDate]) : "",
           subject: headerMap.subject
             ? String(vals[headerMap.subject]).trim()
             : "",
@@ -591,9 +592,89 @@ const StudentInforManagement = () => {
             ? String(vals[headerMap.examLink]).trim()
             : "",
         };
-        toImport.push(item);
+
+        // Keep all rows for further processing. We will separate identity-rows
+        // (rows that can be imported as student records) from link-only rows
+        // (rows that only contain exam metadata + examLink and should be used
+        // to update existing DB records' examLink).
+        allRows.push(item);
       }
 
+      // Split rows into import candidates (have student identity) and
+      // link candidates (have examLink + at least one exam-metadata field).
+      let toImport = allRows.filter((it) => (it.studentId || it.fullName));
+      const linkCandidates = allRows.filter((it) => {
+        const hasLink = it.examLink && it.examLink.trim();
+        const hasExamMeta = (it.examDate && it.examDate.trim()) || (it.subject && it.subject.trim()) || (it.examSession && it.examSession.trim()) || (it.examTime && it.examTime.trim()) || (it.examRoom && it.examRoom.trim());
+        return hasLink && hasExamMeta;
+      });
+
+
+      // If the Excel contains an exam link and rows that match existing records by
+      // exam fields (examDate, subject, examSession, examTime, examRoom), then
+      // overwrite the existing records' examLink with the one from Excel.
+      // This happens regardless of student identity — the admin requested that
+      // link nhóm (group link) be applied to matching exam records in the DB.
+      try {
+        const linkUpdates = [];
+        const normalize = (v) => (v == null ? "" : String(v).trim().toLowerCase());
+        for (const item of linkCandidates) {
+          if (!item.examLink) continue;
+          // build match predicate values
+          const ed = (item.examDate && item.examDate !== "") ? item.examDate : null;
+          const subj = normalize(item.subject);
+          const sess = normalize(item.examSession);
+          const etime = normalize(item.examTime);
+          const room = normalize(item.examRoom);
+          if (!subj && !sess && !etime && !room && !ed) continue;
+
+          // find matching records in current studentInfors
+          const matches = (studentInfors || []).filter((s) => {
+            const sEd = parseDateToYMD(s.examDate || "") || null;
+            // if imported row specifies examDate, require DB to have same examDate
+            if (ed) {
+              if (!sEd || ed !== sEd) return false;
+            }
+            if (subj && normalize(s.subject) !== subj) return false;
+            if (sess && normalize(s.examSession) !== sess) return false;
+            if (etime && normalize(s.examTime) !== etime) return false;
+            if (room && normalize(s.examRoom) !== room) return false;
+            return true;
+          });
+
+          for (const m of matches) {
+            // if existing link is different, schedule update
+            if ((m.examLink || "").trim() !== (item.examLink || "").trim()) {
+              linkUpdates.push({ id: m.id, link: item.examLink });
+            }
+          }
+        }
+
+        if (linkUpdates.length > 0) {
+          console.info(`Applying ${linkUpdates.length} link updates from Excel`);
+          for (const u of linkUpdates) {
+            try {
+              await updateStudentInfor(u.id, { examLink: u.link });
+              // update local state
+              setStudentInfors((prev) => prev.map((p) => (p.id === u.id ? { ...p, examLink: u.link } : p)));
+            } catch (e) {
+              console.error('Failed to update examLink for', u.id, e);
+            }
+          }
+        }
+
+        // If we applied link updates and there are no identity rows to import,
+        // surface a success message and stop the import flow gracefully.
+        if ((linkUpdates.length > 0) && (!toImport || toImport.length === 0)) {
+          const msg = `Áp dụng ${linkUpdates.length} cập nhật link phòng từ file Excel thành công.`;
+          console.info(msg);
+          setError(null);
+          alert(msg);
+          return;
+        }
+      } catch (e) {
+        console.error('Error while applying link updates from Excel', e);
+      }
       // Deduplicate against existing DB records: skip imports that already exist in `studentInfors`.
       // New rule: treat a row as duplicate only if there exists an existing record with the same
       // studentId OR same (fullName + dob) AND all exam fields also match:

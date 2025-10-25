@@ -39,6 +39,7 @@ export const mapHeaderToKey = (h) => {
   if (n === "ho") return "lastName";
   if (n === "ten") return "firstName";
   if (n.includes("tenmon") || n.includes("mon") || n.includes("monhoc")) return "subject";
+  if (n.includes("ngaythi") || (n.includes("ngay") && n.includes("thi"))) return "examDate";
   if (n.includes("cathi") || (n.includes("ca") && n.includes("thi"))) return "examSession";
   if (n.includes("thoigian") || n.includes("thoi") || n.includes("gian")) return "examTime";
   if (n.includes("phong")) return "examRoom";

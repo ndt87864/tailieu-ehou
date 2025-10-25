@@ -19,6 +19,7 @@ const columns = [
   { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
   { key: "dob", label: "Ngày sinh" },
+  { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },
   { key: "examTime", label: "Thời gian" },
@@ -292,6 +293,9 @@ const StudentPage = () => {
                             <div className="text-xs text-gray-500 truncate">
                               Mã sv: {r.studentId || "-"}
                             </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              Ngày thi: {formatDate(r.examDate) || (<span className="text-sm text-gray-500">chưa cập nhật</span>)}
+                            </div>
                           </div>
                           <div className="text-xs text-gray-400 ml-3">
                             {formatDate(r.dob) || ""}
@@ -387,7 +391,10 @@ const StudentPage = () => {
                             {r.fullName || ""}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                            {formatDate(r.dob) || ""}
+                            {formatDate(r.dob) || (<span className="text-sm text-gray-500">chưa cập nhật</span>)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {formatDate(r.examDate) || (<span className="text-sm text-gray-500">chưa cập nhật</span>)}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.subject || ""}

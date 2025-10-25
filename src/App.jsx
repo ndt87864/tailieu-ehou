@@ -27,6 +27,7 @@ import StudentPage from "./pages/StudentPage";
 import Pricing from "./pages/Pricing";
 import EditorPage from "./pages/EditorPage";
 import StudentInforManagement from "./pages/admin/student_infor/StudentInforManagement";
+import RoomInforManagement from "./pages/admin/room_infor/RoomInforManagement";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase/firebase";
 import { useUserRole } from "./context/UserRoleContext";
@@ -160,6 +161,12 @@ const AdminDashboardPage = () => (
 const AdminStudentInforManagementPage = () => (
   <ProtectedAdminRoute>
     <StudentInforManagement />
+  </ProtectedAdminRoute>
+);
+
+const AdminRoomInforManagementPage = () => (
+  <ProtectedAdminRoute>
+    <RoomInforManagement />
   </ProtectedAdminRoute>
 );
 
@@ -535,6 +542,10 @@ function App() {
                 <Route
                   path="/admin/calendar-notes"
                   element={<AdminCalendarNoteManagementPage />}
+                />
+                <Route
+                  path="/admin/room-infor"
+                  element={<AdminRoomInforManagementPage />}
                 />
                 <Route
                   path="/admin/premium-users"
