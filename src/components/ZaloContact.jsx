@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useUserRole } from '../context/UserRoleContext';
 
@@ -6,18 +8,26 @@ const ZaloContact = () => {
   const { isDarkMode } = useTheme();
   const { isAdmin } = useUserRole();
   const [visible, setVisible] = useState(true);
+  const location = useLocation();
   
   // Reset visibility when page changes
   useEffect(() => {
     setVisible(true);
-  }, [window.location.pathname]);
+  }, [location.pathname]);
   
   // Don't render for admin users
   if (isAdmin) return null;
 
+  // Don't render on the editor page to avoid overlay during editing
+  if (typeof window !== 'undefined' && location && location.pathname && location.pathname.startsWith('/editor')) {
+    return null;
+  }
+
   if (!visible) return null;
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
       <div className={`flex items-center p-2 rounded-lg shadow-lg ${isDarkMode ? 'bg-gray-800' : 'bg-white'} mb-2`}>
         <a 
@@ -47,7 +57,8 @@ const ZaloContact = () => {
           </svg>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

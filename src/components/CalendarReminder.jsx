@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../context/ThemeContext';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 const CalendarReminder = () => {
+  const location = useLocation();
   const { isDarkMode } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -36,8 +39,14 @@ const CalendarReminder = () => {
     fetchCalendarNotes();
   }, []);
 
+  // Don't show calendar when on the editor route
+  // (prevents overlay/controls appearing while editing)
+  if (typeof window !== 'undefined' && location && location.pathname && location.pathname.startsWith('/editor')) {
+    return null;
+  }
+
   // Fetch calendar notes from Firestore
-  const fetchCalendarNotes = async () => {
+  async function fetchCalendarNotes() {
     try {
       setLoading(true);
       const notesQuery = query(
@@ -58,10 +67,10 @@ const CalendarReminder = () => {
       console.error('Error fetching calendar notes:', error);
       setLoading(false);
     }
-  };
+  }
 
   // Generate calendar days for a given date's month
-  const generateCalendarDays = (date) => {
+  function generateCalendarDays(date) {
     const year = date.getFullYear();
     const month = date.getMonth();
     
@@ -87,7 +96,7 @@ const CalendarReminder = () => {
     }
     
     setCalendarDays(days);
-  };
+  }
 
   // Handle selecting a day to show notes
   const handleDayClick = (day) => {
@@ -202,7 +211,9 @@ const CalendarReminder = () => {
     const hasImportantNotesToday = todayHasImportantNotes();
     const hasRegularNotesToday = todayHasNotes() && !hasImportantNotesToday;
     
-    return (
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
       <button 
         onClick={handleOpen}
         className={`fixed right-4 bottom-24 z-40 p-2 rounded-full shadow-lg ${
@@ -219,7 +230,8 @@ const CalendarReminder = () => {
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-      </button>
+      </button>,
+      document.body
     );
   }
 
