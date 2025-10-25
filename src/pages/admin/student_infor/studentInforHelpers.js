@@ -100,6 +100,34 @@ export const parseDateToYMD = (v) => {
     return "";
   }
 };
+// Convert Excel serial (number) to JS Date
+export const excelSerialToDate = (serial) => {
+  if (serial === null || serial === undefined) return null;
+  const s = Number(serial);
+  if (isNaN(s)) return null;
+  // Excel stores days since 1899-12-31; convert to JS timestamp (ms)
+  // Note: using 25569 as offset (days between 1899-12-31 and 1970-01-01)
+  const ms = Math.round((s - 25569) * 86400 * 1000);
+  return new Date(ms);
+};
+
+// Parse an Excel cell value (which may be number serial, Date, Firestore Timestamp, or string)
+// and return YYYY-MM-DD or empty string when not parseable
+export const parseExcelDateToYMD = (v) => {
+  if (v === null || v === undefined || v === "") return "";
+  try {
+    if (v && typeof v.toDate === "function") return parseDateToYMD(v);
+    if (v instanceof Date) return parseDateToYMD(v);
+    if (typeof v === "number") {
+      const d = excelSerialToDate(v);
+      return d ? parseDateToYMD(d) : "";
+    }
+    // fallback to parseDateToYMD which attempts new Date(string)
+    return parseDateToYMD(v);
+  } catch (e) {
+    return "";
+  }
+};
 
 export const computePendingLinkUpdates = (records) => {
   const groups = {};

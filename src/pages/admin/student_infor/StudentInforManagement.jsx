@@ -15,6 +15,7 @@ import UserHeader from "../../../components/UserHeader";
 import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import StudentFormModal from "./StudentFormModal";
+import Modal from "../../../components/Modal";
 import StudentTable from "./StudentTable";
 import {
   ensureXLSX,
@@ -23,6 +24,7 @@ import {
   formatDate,
   isValidUrl,
   parseDateToYMD,
+  parseExcelDateToYMD,
   computePendingLinkUpdates,
 } from "./studentInforHelpers";
 
@@ -382,7 +384,7 @@ const StudentInforManagement = () => {
     try {
       const XLSX = await ensureXLSX();
       const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
       // Always read sheet số 1 (first sheet). sheetIndex is 0-based.
       const sheetIndex = 0;
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -449,10 +451,10 @@ const StudentInforManagement = () => {
 
         if (!studentId && !fullName) continue; // skip row
 
-        const item = {
+          const item = {
           studentId: studentId || "",
           fullName: fullName || "",
-          dob: headerMap.dob ? String(vals[headerMap.dob]).trim() : "",
+          dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
           subject: headerMap.subject
             ? String(vals[headerMap.subject]).trim()
             : "",
@@ -576,39 +578,55 @@ const StudentInforManagement = () => {
 
       const errors = [];
       let done = 0;
-      for (const row of toImport) {
-        try {
-          // Basic validation: studentId and fullName required
-          if (!row.studentId || !row.fullName) {
-            errors.push({ row, error: "Thiếu mã sinh viên hoặc họ tên" });
-            done += 1;
-            setImportProgress({ done, total: toImport.length });
-            continue;
-          }
 
-          // Validate link if present
-          if (
-            row.examLink &&
-            row.examLink.trim() &&
-            !isValidUrl(row.examLink.trim())
-          ) {
-            errors.push({ row, error: "Link phòng không hợp lệ" });
-            done += 1;
-            setImportProgress({ done, total: toImport.length });
-            continue;
-          }
+      // Process import with limited concurrency (5 at a time)
+      const concurrency = Math.min(5, toImport.length);
 
-          // Insert into Firestore via service
-          await addStudentInfor(row);
-          done += 1;
-          setImportProgress({ done, total: toImport.length });
-        } catch (err) {
-          console.error("Row import error", err, row);
-          errors.push({ row, error: err?.message || String(err) });
-          done += 1;
-          setImportProgress({ done, total: toImport.length });
-        }
-      }
+      let idx = 0;
+      const workers = new Array(concurrency).fill(null).map(() =>
+        (async () => {
+          while (true) {
+            const current = idx;
+            idx += 1;
+            if (current >= toImport.length) break;
+            const row = toImport[current];
+            try {
+              // Basic validation: studentId and fullName required
+              if (!row.studentId || !row.fullName) {
+                errors.push({ row, error: "Thiếu mã sinh viên hoặc họ tên" });
+                done += 1;
+                setImportProgress({ done, total: toImport.length });
+                continue;
+              }
+
+              // Validate link if present
+              if (
+                row.examLink &&
+                row.examLink.trim() &&
+                !isValidUrl(row.examLink.trim())
+              ) {
+                errors.push({ row, error: "Link phòng không hợp lệ" });
+                done += 1;
+                setImportProgress({ done, total: toImport.length });
+                continue;
+              }
+
+              // Insert into Firestore via service
+              await addStudentInfor(row);
+              done += 1;
+              setImportProgress({ done, total: toImport.length });
+            } catch (err) {
+              console.error("Row import error", err, row);
+              errors.push({ row, error: err?.message || String(err) });
+              done += 1;
+              setImportProgress({ done, total: toImport.length });
+            }
+          }
+        })()
+      );
+
+      // wait for all workers to finish
+      await Promise.all(workers);
 
       setImportErrors(errors);
       if (errors.length > 0) {
@@ -624,6 +642,12 @@ const StudentInforManagement = () => {
       setImportLoading(false);
     }
   };
+
+  const importPercent = (() => {
+    const { done, total } = importProgress || { done: 0, total: 0 };
+    if (!total || total <= 0) return 0;
+    return Math.min(100, Math.round((done / total) * 100));
+  })();
 
   return (
     <div
@@ -800,6 +824,45 @@ const StudentInforManagement = () => {
         onClose={() => setIsThemePickerOpen(false)}
         isDarkMode={isDarkMode}
       />
+
+      {/* Import progress modal */}
+      <Modal
+        isOpen={importLoading}
+        onClose={() => {
+          /* prevent closing while importing */
+        }}
+        title={importProgress.total ? `Import dữ liệu (${importPercent}%)` : "Import dữ liệu"}
+        className="max-w-md"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-gray-700 dark:text-gray-200">
+            {importProgress.total > 0 ? (
+              <>
+                Đã xử lý <strong>{importProgress.done}</strong> / <strong>{importProgress.total}</strong> bản ghi.
+              </>
+            ) : (
+              <>Đang chuẩn bị dữ liệu...</>
+            )}
+          </div>
+
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+            <div
+              className="h-4 bg-green-500 dark:bg-green-400 transition-all"
+              style={{ width: `${importPercent}%` }}
+            />
+          </div>
+
+          <div className="text-sm text-gray-600 dark:text-gray-300">
+            {importPercent}%
+          </div>
+
+          {importErrors && importErrors.length > 0 && (
+            <div className="text-sm text-red-600 dark:text-red-400">
+              Có {importErrors.length} lỗi xảy ra (xem console để biết chi tiết).
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <StudentFormModal
         isOpen={isModalOpen}

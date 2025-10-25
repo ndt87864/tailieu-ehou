@@ -1402,42 +1402,44 @@ function Sidebar({
           </ul>
         </nav>
 
-        {/* User-facing Students page link */}
-        <div className="mt-4 px-2">
-          <ul className="space-y-1">
-            <li className="rounded-md overflow-hidden">
-              <Link
-                to="/students"
-                className={`${linkBaseClass} ${
-                  isCollapsed && windowWidth >= 770 ? "justify-center" : ""
-                } ${
-                  location.pathname === "/students" ? activeClass : linkHoverClass
-                }`}
-                onClick={() => {
-                  if (windowWidth < 770) setIsOpen(false);
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="w-5 h-5 text-gray-100"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+        {/* User-facing Students page link (hide in admin sidebar) */}
+        {!isAdmin && (
+          <div className="mt-4 px-2">
+            <ul className="space-y-1">
+              <li className="rounded-md overflow-hidden">
+                <Link
+                  to="/students"
+                  className={`${linkBaseClass} ${
+                    isCollapsed && windowWidth >= 770 ? "justify-center" : ""
+                  } ${
+                    location.pathname === "/students" ? activeClass : linkHoverClass
+                  }`}
+                  onClick={() => {
+                    if (windowWidth < 770) setIsOpen(false);
+                  }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5.121 17.804A13.937 13.937 0 0112 15c2.21 0 4.32.5 6.121 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zM21 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"
-                  />
-                </svg>
-                {showFullContent && (
-                  <span className="ml-3 flex-1 text-white">Danh sách thí sinh</span>
-                )}
-              </Link>
-            </li>
-          </ul>
-        </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-5 h-5 text-gray-100"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5.121 17.804A13.937 13.937 0 0112 15c2.21 0 4.32.5 6.121 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zM21 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"
+                    />
+                  </svg>
+                  {showFullContent && (
+                    <span className="ml-3 flex-1 text-white">Danh sách thí sinh</span>
+                  )}
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
 
         {/* Theme Color Picker Modal */}
         <ThemeColorPicker
