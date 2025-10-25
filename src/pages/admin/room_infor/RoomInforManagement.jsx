@@ -48,6 +48,17 @@ const RoomInforManagement = () => {
   const [editingKey, setEditingKey] = useState(null);
   const [form, setForm] = useState(emptyRoom);
   const [isSaving, setIsSaving] = useState(false);
+  // Excel import modal / progress
+  const [importModal, setImportModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    processed: 0,
+    total: 0,
+    updatedCount: 0,
+    studentUpdatedCount: 0,
+    done: false,
+  });
   // filters for searching
   const [filterSubject, setFilterSubject] = useState("");
   const [filterRoom, setFilterRoom] = useState("");
@@ -333,7 +344,16 @@ const RoomInforManagement = () => {
       const sheet = wb.Sheets[firstSheet];
       const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
       if (!Array.isArray(json) || json.length === 0) {
-        alert("File Excel không có dữ liệu.");
+        setImportModal({
+          open: true,
+          title: "Lỗi file Excel",
+          message: "File Excel không có dữ liệu.",
+          processed: 0,
+          total: 0,
+          updatedCount: 0,
+          studentUpdatedCount: 0,
+          done: true,
+        });
         return;
       }
 
@@ -344,10 +364,33 @@ const RoomInforManagement = () => {
         const mapped = mapHeaderToKey(h);
         if (mapped) headerMap[h] = mapped;
       });
+      // Debug: log header map so admins can verify Excel headers map to expected fields
+      console.info('handleExcelImport: headerMap', headerMap);
 
       // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
-      let updatedCount = 0;
-      let rowCount = 0;
+  let updatedCount = 0;
+  let studentUpdatedCount = 0;
+  let rowCount = 0;
+  // additional counters for debugging/reporting
+  let rowsSkippedNoKey = 0; // rows with no matching key fields
+  let rowsWithNoMatches = 0; // rows that had key but no matching room docs
+  let rowsWithMatches = 0; // rows that had at least one matching room doc
+  // collect rows for display in the result modal so admin can inspect failures
+  const skippedRowsList = [];
+  const noMatchRowsList = [];
+
+      // open import progress modal
+      setImportModal((m) => ({
+        ...m,
+        open: true,
+        title: "Đang nhập Excel",
+        message: "Đang xử lý...",
+        processed: 0,
+        total: json.length,
+        updatedCount: 0,
+        studentUpdatedCount: 0,
+        done: false,
+      }));
 
       for (const row of json) {
         rowCount++;
@@ -370,20 +413,107 @@ const RoomInforManagement = () => {
           !keyObj.examSession &&
           !keyObj.examTime &&
           !keyObj.examRoom
-        )
+        ) {
+          rowsSkippedNoKey++;
+          // Log the skipped row for debugging: show mapped keys so we can see which headers were missing
+          console.warn(`handleExcelImport: skipped row ${rowCount} (missing key fields)`, {
+            mapped,
+            keyObj,
+            raw: row,
+          });
+          // store a lightweight representation for the modal
+          skippedRowsList.push({
+            rowIndex: rowCount,
+            mapped,
+            keyObj,
+          });
+          // update processed counter so progress advances
+          setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
           continue;
+        }
 
-        const matches = await getMatchingRoomDocs(keyObj);
-        if (!matches || matches.length === 0) continue;
+        // Normalize keys for more robust matching (remove diacritics, lowercase)
+        const normKeyObj = {
+          subject: normalizeForSearch(keyObj.subject || "").trim(),
+          examSession: normalizeForSearch(keyObj.examSession || "").trim(),
+          examTime: normalizeForSearch(keyObj.examTime || "").trim(),
+          examRoom: normalizeForSearch(keyObj.examRoom || "").trim(),
+        };
 
-        // normalize date value if present
+        // normalize date value if present (we'll need this whether room docs exist or not)
         let rowDate = "";
         if (mapped.examDate) {
           rowDate = parseExcelDateToYMD(mapped.examDate);
         }
         const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
 
-        for (const doc of matches) {
+        const matches = await getMatchingRoomDocs(normKeyObj);
+        if (!matches || matches.length === 0) {
+          rowsWithNoMatches++;
+          // Log the no-match case with the key used so we can diagnose why rooms weren't found
+          console.warn(`handleExcelImport: no matching rooms for row ${rowCount}`, {
+            keyObj,
+            mapped,
+            raw: row,
+          });
+          // Also log a sample of existing room normalized keys to help debugging
+          try {
+            const allRooms = await getAllRoomInfor();
+            const norm = (v) => normalizeForSearch(String(v || "")).trim();
+            console.warn(
+              `handleExcelImport: available rooms (sample ${Math.min(50, allRooms.length)}):`,
+              allRooms.slice(0, 50).map((r) => ({
+                id: r.id,
+                subject: norm(r.subject),
+                examSession: norm(r.examSession),
+                examTime: norm(r.examTime),
+                examRoom: norm(r.examRoom),
+              }))
+            );
+          } catch (e) {
+            console.warn('handleExcelImport: failed to fetch all rooms for debug', e);
+          }
+          // If there are no room_infor docs, but excel provides date/link, update student_infor directly
+          const updatesFallback = {};
+          if (rowDate) updatesFallback.examDate = rowDate;
+          if (rowLink) updatesFallback.examLink = rowLink;
+
+          if (Object.keys(updatesFallback).length > 0) {
+            try {
+              const criteria = {
+                subject: keyObj.subject,
+                examSession: keyObj.examSession,
+                examTime: keyObj.examTime,
+                examRoom: keyObj.examRoom,
+              };
+              // attempt to update students directly
+              const res = await updateStudentsByMatch(criteria, updatesFallback);
+              if (res && typeof res.updated === 'number' && res.updated > 0) {
+                studentUpdatedCount += res.updated;
+                setImportModal((m) => ({
+                  ...m,
+                  processed: (m.processed || 0) + 1,
+                  studentUpdatedCount: (m.studentUpdatedCount || 0) + (res.updated || 0),
+                }));
+              } else {
+                // nothing updated
+                setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+              }
+            } catch (e) {
+              console.error('handleExcelImport: fallback updateStudentsByMatch failed', e);
+              setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+            }
+          } else {
+            // store for modal review
+            noMatchRowsList.push({ rowIndex: rowCount, keyObj, mapped });
+            // advance processed for this row
+            setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+          }
+          continue;
+        }
+        rowsWithMatches++;
+
+  for (const doc of matches) {
           const updates = {};
           // update date if present in excel and missing in db
           const docDate = parseDateToYMD(doc.examDate || "");
@@ -395,16 +525,75 @@ const RoomInforManagement = () => {
           if (Object.keys(updates).length > 0) {
             await updateRoomInfor(doc.id, { ...doc, ...updates });
             updatedCount++;
+
+            // Also update matching student_infor records so UI (which derives rooms from students)
+            // reflects the imported examDate/examLink. Use the student service helper.
+            try {
+              const criteria = {
+                subject: doc.subject,
+                examSession: doc.examSession,
+                examTime: doc.examTime,
+                examRoom: doc.examRoom,
+              };
+              // include examDate in criteria if room doc has a date (prefer stricter match)
+              if (doc.examDate) criteria.examDate = doc.examDate;
+
+              const res = await updateStudentsByMatch(criteria, updates);
+              if (res && typeof res.updated === "number") {
+                studentUpdatedCount += res.updated;
+                // update modal progress after each room update
+                setImportModal((m) => ({
+                  ...m,
+                  processed: (m.processed || 0) + 1,
+                  updatedCount: (m.updatedCount || 0) + 1,
+                  studentUpdatedCount: (m.studentUpdatedCount || 0) + (res.updated || 0),
+                }));
+            } else {
+              // still increment processed for a room updated even if no students changed
+              setImportModal((m) => ({
+                ...m,
+                processed: (m.processed || 0) + 1,
+                updatedCount: (m.updatedCount || 0) + 1,
+              }));
+            }
+            } catch (e) {
+              console.error("handleExcelImport: failed to update student records", e);
+              // ensure processed count advances so progress continues
+              setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+            }
           }
         }
+        // finished processing this row (even if multiple matching room docs)
+        setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
       }
 
-      alert(
-        `Đã xử lý ${rowCount} dòng. Cập nhật ${updatedCount} bản ghi phòng.`
-      );
+      // finalize modal with results (include more counters)
+      setImportModal((m) => ({
+        ...m,
+        open: true,
+        title: "Hoàn tất nhập Excel",
+        message: `Đã xử lý ${rowCount} dòng. Phát hiện: ${rowsWithMatches} dòng có phòng khớp, ${rowsWithNoMatches} dòng không tìm thấy phòng khớp, ${rowsSkippedNoKey} dòng thiếu dữ liệu để đối chiếu. Cập nhật ${updatedCount} phòng. Cập nhật ${studentUpdatedCount} bản ghi thí sinh.`,
+        processed: rowCount,
+        total: json.length,
+        updatedCount,
+        studentUpdatedCount,
+        // attach lists for inspection in modal
+        noMatchRows: noMatchRowsList,
+        skippedRows: skippedRowsList,
+        done: true,
+      }));
     } catch (err) {
       console.error("handleExcelImport error", err);
-      alert("Lỗi khi đọc file Excel. Xem console để biết chi tiết.");
+      setImportModal({
+        open: true,
+        title: "Lỗi nhập Excel",
+        message: "Lỗi khi đọc file Excel. Xem console để biết chi tiết.",
+        processed: 0,
+        total: 0,
+        updatedCount: 0,
+        studentUpdatedCount: 0,
+        done: true,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -720,9 +909,9 @@ const RoomInforManagement = () => {
                                   href={r.examLink}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="hover:underline"
+                                  className="hover:underline break-words"
                                 >
-                                  Mở link
+                                  {r.examLink}
                                 </a>
                               ) : (
                                 <span className="text-sm text-gray-500">
@@ -776,6 +965,85 @@ const RoomInforManagement = () => {
                   Tiếp tục
                 </button>
               </div>
+            </div>
+          </Modal>
+
+          {/* Excel import progress / result modal */}
+          <Modal
+            isOpen={importModal.open}
+            onClose={() => {
+              // only allow closing when done
+              if (importModal.done) setImportModal((m) => ({ ...m, open: false }));
+            }}
+            title={importModal.title || "Nhập Excel"}
+          >
+            <div className="space-y-4">
+              <div className="text-sm text-gray-700 dark:text-gray-200">
+                {importModal.message}
+              </div>
+              {!importModal.done && (
+                <div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-2"
+                      style={{
+                        width:
+                          importModal.total > 0
+                            ? `${Math.round((importModal.processed / importModal.total) * 100)}%`
+                            : "0%",
+                      }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2">
+                    Đã xử lý: {importModal.processed}/{importModal.total}
+                    {importModal.updatedCount ? ` — phòng cập nhật: ${importModal.updatedCount}` : ""}
+                    {importModal.studentUpdatedCount ? ` — thí sinh cập nhật: ${importModal.studentUpdatedCount}` : ""}
+                  </div>
+                </div>
+              )}
+
+              {importModal.done && (
+                <div className="space-y-4">
+                  {/* Show lists of problematic rows for admin inspection */}
+                  {importModal.noMatchRows && importModal.noMatchRows.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Dòng không tìm thấy phòng khớp ({importModal.noMatchRows.length})</div>
+                      <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
+                        {importModal.noMatchRows.map((r, i) => (
+                          <div key={`nomatch-${i}`} className="mb-2 text-xs text-gray-800 dark:text-gray-200">
+                            <div className="font-semibold">Dòng {r.rowIndex}</div>
+                            <div>subject: {r.mapped?.subject || r.keyObj?.subject || "(trống)"} — ca: {r.mapped?.examSession || r.keyObj?.examSession || "(trống)"} — thời gian: {r.mapped?.examTime || r.keyObj?.examTime || "(trống)"} — phòng: {r.mapped?.examRoom || r.keyObj?.examRoom || "(trống)"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {importModal.skippedRows && importModal.skippedRows.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Dòng bị bỏ qua do thiếu trường để đối chiếu ({importModal.skippedRows.length})</div>
+                      <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
+                        {importModal.skippedRows.map((r, i) => (
+                          <div key={`skipped-${i}`} className="mb-2 text-xs text-gray-800 dark:text-gray-200">
+                            <div className="font-semibold">Dòng {r.rowIndex}</div>
+                            <div>Mapped keys: {Object.keys(r.mapped || {}).length > 0 ? Object.entries(r.mapped).map(([k,v]) => `${k}:${String(v)}`).join(' | ') : '(không có trường)'} </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setImportModal((m) => ({ ...m, open: false }))}
+                      className="px-4 py-2 rounded bg-blue-600 text-white text-sm"
+                    >
+                      Đóng
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </Modal>
 

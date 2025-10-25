@@ -123,7 +123,8 @@ export const updateStudentsByMatch = async (criteria = {}, updates = {}) => {
     let updated = 0;
     for (const s of matches) {
       try {
-        await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, s.id), { ...s, ...payload });
+        // Only update the explicit payload fields to avoid overwriting other student data
+        await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, s.id), { ...payload });
         updated++;
       } catch (e) {
         console.warn('updateStudentsByMatch: failed to update', s.id, e);
