@@ -41,7 +41,9 @@ const StudentPage = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024
+  );
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [user] = useAuthState(auth);
 
@@ -107,17 +109,26 @@ const StudentPage = () => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className={`flex flex-col min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-slate-100"}`}>
+    <div
+      className={`flex flex-col min-h-screen ${
+        isDarkMode ? "bg-gray-900" : "bg-slate-100"
+      }`}
+    >
       {/* Mobile Header */}
       {windowWidth < 770 && (
-        <HomeMobileHeader setIsSidebarOpen={setIsSidebarOpen} isDarkMode={isDarkMode} />
+        <HomeMobileHeader
+          setIsSidebarOpen={setIsSidebarOpen}
+          isDarkMode={isDarkMode}
+        />
       )}
 
       <div className="flex min-h-screen w-full">
         <div
           className={`theme-sidebar ${
             windowWidth < 770
-              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`
+              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${
+                  isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                }`
               : "sticky top-0 h-screen z-10"
           }`}
         >
@@ -137,19 +148,28 @@ const StudentPage = () => {
         </div>
 
         {isSidebarOpen && windowWidth < 770 && (
-          <div className="fixed inset-0 z-10 bg-black/50" onClick={() => setIsSidebarOpen(false)} />
+          <div
+            className="fixed inset-0 z-10 bg-black/50"
+            onClick={() => setIsSidebarOpen(false)}
+          />
         )}
 
-  <div className="theme-content-container flex-1 min-w-0 shadow-sm flex flex-col">
+        <div className="theme-content-container flex-1 min-w-0 shadow-sm flex flex-col">
           {windowWidth >= 770 && (
             <div className="w-full">
-              <UserHeader title="Danh sách thí sinh" setIsSidebarOpen={setIsSidebarOpen} setIsThemePickerOpen={setIsThemePickerOpen} />
+              <UserHeader
+                title="Danh sách thí sinh"
+                setIsSidebarOpen={setIsSidebarOpen}
+                setIsThemePickerOpen={setIsThemePickerOpen}
+              />
             </div>
           )}
 
           <div className="flex-1 p-6 min-w-0">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-semibold text-white">Danh sách thí sinh</h1>
+              <h1 className="text-2xl font-semibold text-white">
+                Danh sách thí sinh
+              </h1>
               <div className="w-80">
                 <input
                   value={search}
@@ -164,9 +184,11 @@ const StudentPage = () => {
               </div>
             </div>
 
-            {error && <div className="mb-4 text-red-600">Có lỗi: {String(error)}</div>}
+            {error && (
+              <div className="mb-4 text-red-600">Có lỗi: {String(error)}</div>
+            )}
 
-            <div className="mx-auto w-full md:w-[90%] max-w-full bg-white dark:bg-gray-800 rounded shadow">
+            <div className="mx-auto w-full md:w-[90%] max-w-full">
               {/* Mobile optimized view: stacked cards for small screens */}
               {windowWidth < 770 ? (
                 <div className="p-3 space-y-3">
@@ -176,35 +198,67 @@ const StudentPage = () => {
                     filtered.map((r) => (
                       <div
                         key={r.id}
-                        className="p-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-lg shadow-sm"
+                        className={`p-3 bg-transparent border rounded-lg  bg-white dark:bg-gray-800 rounded shadow shadow-sm ${
+                          isDarkMode ? "border-gray-800" : "border-gray-200"
+                        }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
                               {r.fullName || "-"}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">Mã sv: {r.studentId || "-"}</div>
+                            <div className="text-xs text-gray-500 truncate">
+                              Mã sv: {r.studentId || "-"}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-400 ml-3">{formatDate(r.dob) || ""}</div>
+                          <div className="text-xs text-gray-400 ml-3">
+                            {formatDate(r.dob) || ""}
+                          </div>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
-                          <div><span className="font-medium">Môn:</span> {r.subject || "-"}</div>
-                          <div><span className="font-medium">Ca:</span> {r.examSession || "-"}</div>
-                          <div><span className="font-medium">Giờ:</span> {r.examTime || "-"}</div>
-                          <div><span className="font-medium">Phòng:</span> {r.examRoom || "-"}</div>
-                          <div><span className="font-medium">Khóa:</span> {r.course || "-"}</div>
-                          <div><span className="font-medium">Mã ngành:</span> {r.majorCode || "-"}</div>
-                          <div className="col-span-2"><span className="font-medium">Hình thức:</span> {r.examType || "-"}</div>
+                          <div>
+                            <span className="font-medium">Môn:</span>{" "}
+                            {r.subject || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Ca:</span>{" "}
+                            {r.examSession || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Giờ:</span>{" "}
+                            {r.examTime || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Phòng:</span>{" "}
+                            {r.examRoom || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Khóa:</span>{" "}
+                            {r.course || "-"}
+                          </div>
+                          <div>
+                            <span className="font-medium">Mã ngành:</span>{" "}
+                            {r.majorCode || "-"}
+                          </div>
+                          <div className="col-span-2">
+                            <span className="font-medium">Hình thức:</span>{" "}
+                            {r.examType || "-"}
+                          </div>
 
                           <div className="col-span-2">
-                            <span className="font-medium">Link phòng:</span>{' '}
+                            <span className="font-medium">Link phòng:</span>{" "}
                             {r.examLink ? (
-                              <a href={r.examLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">
+                              <a
+                                href={r.examLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:underline break-all"
+                              >
                                 {r.examLink}
                               </a>
                             ) : (
-                              '-'
+                              "-"
                             )}
                           </div>
                         </div>
@@ -230,27 +284,58 @@ const StudentPage = () => {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={columns.length} className="p-4 text-center">
+                          <td
+                            colSpan={columns.length}
+                            className="p-4 text-center"
+                          >
                             Không có bản ghi nào
                           </td>
                         </tr>
                       )}
 
                       {filtered.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.studentId || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.fullName || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{formatDate(r.dob) || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.subject || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.examSession || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.examTime || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.examRoom || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.course || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.majorCode || ""}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">{r.examType || ""}</td>
+                        <tr
+                          key={r.id}
+                          className="hover:bg-gray-50 dark:hover:bg-gray-900"
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.studentId || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.fullName || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {formatDate(r.dob) || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.subject || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.examSession || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.examTime || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.examRoom || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.course || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.majorCode || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.examType || ""}
+                          </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.examLink ? (
-                              <a href={r.examLink} target="_blank" rel="noreferrer" className="text-green-600 hover:underline break-all">
+                              <a
+                                href={r.examLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-green-600 hover:underline break-all"
+                              >
                                 {r.examLink}
                               </a>
                             ) : (
@@ -270,7 +355,10 @@ const StudentPage = () => {
         </div>
       </div>
 
-      <ThemeColorPicker isOpen={isThemePickerOpen} onClose={() => setIsThemePickerOpen(false)} />
+      <ThemeColorPicker
+        isOpen={isThemePickerOpen}
+        onClose={() => setIsThemePickerOpen(false)}
+      />
     </div>
   );
 };
