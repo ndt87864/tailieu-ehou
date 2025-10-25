@@ -1,5 +1,5 @@
 // studentInforService.js - CRUD cho collection student_infor
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { app } from './firebase';
 
 const db = getFirestore(app);
@@ -27,12 +27,32 @@ export const subscribeStudentInfor = (onChange, onError) => {
 };
 
 export const addStudentInfor = async (data) => {
-  const docRef = await addDoc(collection(db, STUDENT_INFOR_COLLECTION), data);
-  return { id: docRef.id, ...data };
+  const payload = { ...data };
+  // Convert dob to Firestore Timestamp if it's a parseable date string or Date
+  if (payload.dob) {
+    try {
+      const d = (payload.dob instanceof Date) ? payload.dob : new Date(payload.dob);
+      if (!isNaN(d.getTime())) payload.dob = Timestamp.fromDate(d);
+    } catch (e) {
+      // leave as-is if conversion fails
+      console.warn('addStudentInfor: failed to convert dob to Timestamp', e);
+    }
+  }
+  const docRef = await addDoc(collection(db, STUDENT_INFOR_COLLECTION), payload);
+  return { id: docRef.id, ...payload };
 };
 
 export const updateStudentInfor = async (id, data) => {
-  await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), data);
+  const payload = { ...data };
+  if (payload.dob) {
+    try {
+      const d = (payload.dob instanceof Date) ? payload.dob : new Date(payload.dob);
+      if (!isNaN(d.getTime())) payload.dob = Timestamp.fromDate(d);
+    } catch (e) {
+      console.warn('updateStudentInfor: failed to convert dob to Timestamp', e);
+    }
+  }
+  await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), payload);
 };
 
 export const deleteStudentInfor = async (id) => {
