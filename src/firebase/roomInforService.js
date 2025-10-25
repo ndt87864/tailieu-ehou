@@ -1,5 +1,5 @@
 // roomInforService.js - CRUD cho collection room_infor
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { app } from './firebase';
 
 const db = getFirestore(app);
@@ -30,7 +30,24 @@ export const addRoomInfor = async (data) => {
 };
 
 export const updateRoomInfor = async (id, data) => {
-  await updateDoc(doc(db, ROOM_INFOR_COLLECTION, id), { ...data });
+  try {
+    await updateDoc(doc(db, ROOM_INFOR_COLLECTION, id), { ...data });
+  } catch (err) {
+    // If the document does not exist, updateDoc throws an error "No document to update".
+    // In that case, create the document instead so callers who expect the record to exist
+    // (for example when IDs are derived elsewhere) still succeed.
+    const msg = String(err?.message || "");
+    if (msg.includes("No document to update") || (err && err.code === "not-found")) {
+      try {
+        await setDoc(doc(db, ROOM_INFOR_COLLECTION, id), { ...data });
+        return;
+      } catch (e) {
+        console.error("updateRoomInfor: failed to create missing doc", id, e);
+        throw e;
+      }
+    }
+    throw err;
+  }
 };
 
 export const deleteRoomInfor = async (id) => {
