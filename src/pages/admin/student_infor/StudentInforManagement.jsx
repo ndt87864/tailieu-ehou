@@ -32,6 +32,7 @@ import {
 const columns = [
   { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
+  { key: "username", label: "Tài khoản" },
   { key: "dob", label: "Ngày sinh" },
   { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
@@ -47,6 +48,7 @@ const columns = [
 const emptyForm = {
   studentId: "",
   fullName: "",
+  username: "",
   dob: "",
   examDate: "",
   subject: "",
@@ -87,6 +89,8 @@ const StudentInforManagement = () => {
     "studentId",
     "fullName",
     "dob",
+    "examDate",
+    "username",
     "subject",
     "examSession",
     "examTime",
@@ -369,6 +373,13 @@ const StudentInforManagement = () => {
         normalized.dob = d.toISOString().substring(0, 10);
       } catch (e) {}
     }
+    // normalize examDate to YYYY-MM-DD if it's a Timestamp
+    if (item && item.examDate && item.examDate.toDate) {
+      try {
+        const ed = item.examDate.toDate();
+        normalized.examDate = ed.toISOString().substring(0, 10);
+      } catch (e) {}
+    }
     setForm(normalized);
     setIsModalOpen(true);
   };
@@ -475,6 +486,10 @@ const StudentInforManagement = () => {
           const v = r[c.key];
           if (c.key === "dob") {
             // prefer YYYY-MM-DD for dob export
+            return parseDateToYMD(v) || "";
+          }
+          if (c.key === "examDate") {
+            // prefer YYYY-MM-DD for examDate export
             return parseDateToYMD(v) || "";
           }
           return v ?? "";
@@ -600,6 +615,7 @@ const StudentInforManagement = () => {
         const item = {
           studentId: studentId || "",
           fullName: fullName || "",
+          username: headerMap.username ? String(vals[headerMap.username]).trim() : "",
           dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
           // examDate may be present in some excel files (Ngày thi)
           examDate: headerMap.examDate
@@ -729,6 +745,8 @@ const StudentInforManagement = () => {
       // subject, examSession, examTime, examRoom, course, majorCode, examType.
       const makeComposite = (obj) => {
         const fields = [
+          // include examDate in composite so duplicates consider the exam date
+          obj.examDate,
           obj.subject,
           obj.examSession,
           obj.examTime,
@@ -752,8 +770,10 @@ const StudentInforManagement = () => {
           .trim()
           .toLowerCase();
         const dob = parseDateToYMD(s.dob || "");
+        const sExamDate = parseDateToYMD(s.examDate || "");
         const nameDobKey = name && dob ? `${name}||${dob}` : null;
-        const comp = makeComposite(s);
+        // build composite using normalized examDate
+        const comp = makeComposite({ ...s, examDate: sExamDate });
         if (idKey) {
           const set = existingById.get(idKey) || new Set();
           set.add(comp);
@@ -766,6 +786,124 @@ const StudentInforManagement = () => {
         }
       });
 
+      // If imported rows contain examDate but the DB record for the same
+      // studentId or (fullName+dob) (or matching username) has an empty
+      // examDate, apply the examDate update to the existing DB record
+      // instead of creating a duplicate. We'll collect updates and apply
+      // them immediately. Use more robust normalization to avoid misses.
+      const dateUpdates = [];
+      const handledImportIndexes = new Set();
+      const normalizeId = (s) => (s == null ? "" : String(s).replace(/[^a-z0-9]/gi, "").trim().toLowerCase());
+      const normalizeName = (s) => normalizeForSearch(String(s || "").trim());
+
+      for (let i = 0; i < toImport.length; i++) {
+        const item = toImport[i];
+        const importedExamDate = parseDateToYMD(item.examDate || "");
+        if (!importedExamDate) continue; // nothing to apply
+
+        // attempt matching by studentId (normalized)
+        const importedIdNorm = normalizeId(item.studentId || "");
+        if (importedIdNorm) {
+          const matches = (studentInfors || []).filter((s) => {
+            const sIdNorm = normalizeId(s.studentId || "");
+            return sIdNorm && sIdNorm === importedIdNorm;
+          });
+          for (const m of matches) {
+            const mExam = parseDateToYMD(m.examDate || "");
+            if (!mExam) {
+              dateUpdates.push({ id: m.id, examDate: importedExamDate });
+              handledImportIndexes.add(i);
+            }
+          }
+          if (handledImportIndexes.has(i)) continue;
+        }
+
+        // try username match if provided
+        const importedUsername = String(item.username || "").trim().toLowerCase();
+        if (importedUsername) {
+          const matches = (studentInfors || []).filter((s) => {
+            return String(s.username || "").trim().toLowerCase() === importedUsername;
+          });
+          for (const m of matches) {
+            const mExam = parseDateToYMD(m.examDate || "");
+            if (!mExam) {
+              dateUpdates.push({ id: m.id, examDate: importedExamDate });
+              handledImportIndexes.add(i);
+            }
+          }
+          if (handledImportIndexes.has(i)) continue;
+        }
+
+        // fallback: fullName + dob
+        const importedNameNorm = normalizeName(item.fullName || "");
+        const importedDob = parseDateToYMD(item.dob || "");
+        if (importedNameNorm && importedDob) {
+          const matches = (studentInfors || []).filter((s) => {
+            const sNameNorm = normalizeName(s.fullName || "");
+            const sDob = parseDateToYMD(s.dob || "");
+            return sNameNorm === importedNameNorm && sDob && sDob === importedDob;
+          });
+          for (const m of matches) {
+            const mExam = parseDateToYMD(m.examDate || "");
+            if (!mExam) {
+              dateUpdates.push({ id: m.id, examDate: importedExamDate });
+              handledImportIndexes.add(i);
+            }
+          }
+        }
+      }
+
+      if (dateUpdates.length > 0) {
+        console.info(`Applying ${dateUpdates.length} examDate updates from Excel to existing records`, { dateUpdates });
+
+        // Show progress in the import modal while applying date updates
+        setImportProgress({ done: 0, total: dateUpdates.length });
+
+        const errors = [];
+        let done = 0;
+
+        // process updates with limited concurrency to avoid blocking UI
+        const concurrency = Math.min(8, dateUpdates.length);
+        let idxWorker = 0;
+        const workers = new Array(concurrency).fill(null).map(() =>
+          (async () => {
+            while (true) {
+              const current = idxWorker;
+              idxWorker += 1;
+              if (current >= dateUpdates.length) break;
+              const u = dateUpdates[current];
+              try {
+                await updateStudentInfor(u.id, { examDate: u.examDate });
+                setStudentInfors((prev) =>
+                  prev.map((p) => (p.id === u.id ? { ...p, examDate: u.examDate } : p))
+                );
+              } catch (e) {
+                console.error("Failed to apply examDate update", u, e);
+                errors.push({ id: u.id, error: e?.message || String(e) });
+              } finally {
+                done += 1;
+                // update import progress so UI reflects work being done
+                setImportProgress({ done, total: dateUpdates.length });
+              }
+            }
+          })()
+        );
+
+        await Promise.all(workers);
+
+        if (errors.length > 0) {
+          console.warn(`Completed examDate updates with ${errors.length} errors`);
+          // attach to importErrors for admin to inspect
+          setImportErrors((prev) => [...(prev || []), ...errors]);
+          setError(`Áp dụng ngày thi hoàn tất nhưng có ${errors.length} lỗi (xem console).`);
+        } else {
+          setError(null);
+        }
+
+        // remove handled imports so they won't be re-created
+        toImport = toImport.filter((_, idx) => !handledImportIndexes.has(idx));
+      }
+
       const originalCount = toImport.length;
       const filtered = [];
       let skippedExisting = 0;
@@ -777,18 +915,57 @@ const StudentInforManagement = () => {
           .trim()
           .toLowerCase();
         const dob = parseDateToYMD(item.dob || "");
+        const itemExamDate = parseDateToYMD(item.examDate || "");
         const nameDobKey = name && dob ? `${name}||${dob}` : null;
-        const comp = makeComposite(item);
+        const comp = makeComposite({ ...item, examDate: itemExamDate });
 
-        let isDuplicate = false;
-        if (idKey && existingById.has(idKey)) {
-          const set = existingById.get(idKey);
-          if (set && set.has(comp)) isDuplicate = true;
-        }
-        if (!isDuplicate && nameDobKey && existingByNameDob.has(nameDobKey)) {
-          const set = existingByNameDob.get(nameDobKey);
-          if (set && set.has(comp)) isDuplicate = true;
-        }
+          let isDuplicate = false;
+          const normalize = (v) => (v == null ? "" : String(v).trim().toLowerCase());
+
+          // Helper to compare exam-related fields between an existing record and the imported item
+          const fieldsEqual = (existing, imported) => {
+            const eExamDate = parseDateToYMD(existing.examDate || "") || "";
+            const iExamDate = parseDateToYMD(imported.examDate || "") || "";
+            if (eExamDate !== iExamDate) return false;
+            if (normalize(existing.subject) !== normalize(imported.subject)) return false;
+            if (normalize(existing.examSession) !== normalize(imported.examSession)) return false;
+            if (normalize(existing.examTime) !== normalize(imported.examTime)) return false;
+            if (normalize(existing.examRoom) !== normalize(imported.examRoom)) return false;
+            if (normalize(existing.course) !== normalize(imported.course)) return false;
+            if (normalize(existing.majorCode) !== normalize(imported.majorCode)) return false;
+            if (normalize(existing.examType) !== normalize(imported.examType)) return false;
+            return true;
+          };
+
+          // Check duplicates by studentId: only if there's an existing record with same id
+          // and all exam-related fields match exactly (including examDate). If DB examDate
+          // is empty but imported has a value, fieldsEqual will return false so it's NOT a duplicate.
+          if (idKey) {
+            const matches = (studentInfors || []).filter(
+              (s) => String(s.studentId || "").trim().toLowerCase() === idKey
+            );
+            for (const m of matches) {
+              if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
+                isDuplicate = true;
+                break;
+              }
+            }
+          }
+
+          // If not duplicate by id, check by fullName+dob
+          if (!isDuplicate && nameDobKey) {
+            const matches = (studentInfors || []).filter((s) => {
+              const sName = String(s.fullName || "").trim().toLowerCase();
+              const sDob = parseDateToYMD(s.dob || "");
+              return sName === name && sDob === dob;
+            });
+            for (const m of matches) {
+              if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
+                isDuplicate = true;
+                break;
+              }
+            }
+          }
 
         if (isDuplicate) {
           skippedExisting += 1;

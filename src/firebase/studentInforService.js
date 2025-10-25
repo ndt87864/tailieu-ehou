@@ -38,6 +38,15 @@ export const addStudentInfor = async (data) => {
       console.warn('addStudentInfor: failed to convert dob to Timestamp', e);
     }
   }
+  // Convert examDate to Firestore Timestamp if provided and parseable
+  if (payload.examDate) {
+    try {
+      const ed = (payload.examDate instanceof Date) ? payload.examDate : new Date(payload.examDate);
+      if (!isNaN(ed.getTime())) payload.examDate = Timestamp.fromDate(ed);
+    } catch (e) {
+      console.warn('addStudentInfor: failed to convert examDate to Timestamp', e);
+    }
+  }
   const docRef = await addDoc(collection(db, STUDENT_INFOR_COLLECTION), payload);
   return { id: docRef.id, ...payload };
 };
@@ -50,6 +59,14 @@ export const updateStudentInfor = async (id, data) => {
       if (!isNaN(d.getTime())) payload.dob = Timestamp.fromDate(d);
     } catch (e) {
       console.warn('updateStudentInfor: failed to convert dob to Timestamp', e);
+    }
+  }
+  if (payload.examDate) {
+    try {
+      const ed = (payload.examDate instanceof Date) ? payload.examDate : new Date(payload.examDate);
+      if (!isNaN(ed.getTime())) payload.examDate = Timestamp.fromDate(ed);
+    } catch (e) {
+      console.warn('updateStudentInfor: failed to convert examDate to Timestamp', e);
     }
   }
   await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), payload);

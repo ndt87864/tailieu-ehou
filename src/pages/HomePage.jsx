@@ -652,7 +652,7 @@ const HomePage = () => {
                         onChange={handleSearchChange}
                         placeholder={
                           searchType === "exam"
-                            ? "Tìm kiếm theo Mã sinh viên, Họ và tên ...."
+                            ? "Tìm kiếm lịch thi theo Mã sinh viên, Họ và tên ...."
                             : "Tìm kiếm tài liệu..."
                         }
                         className={`w-full px-4 py-3 pr-10 ${

@@ -36,6 +36,7 @@ export const mapHeaderToKey = (h) => {
   if (/(masv|mssv|msv|sbd|sobadanh|sobd|sobaodanh|sinhvien|mssinhvien)/.test(n))
     return "studentId";
   if (n === "hoten" || n === "hovaten" || n === "hotenvaten") return "fullName";
+  if (n.includes("tentaikhoan") || n.includes("taikhoan") || n === "username" || n === "account") return "username";
   if (n === "ho") return "lastName";
   if (n === "ten") return "firstName";
   if (n.includes("tenmon") || n.includes("mon") || n.includes("monhoc")) return "subject";
@@ -122,6 +123,28 @@ export const parseExcelDateToYMD = (v) => {
     if (typeof v === "number") {
       const d = excelSerialToDate(v);
       return d ? parseDateToYMD(d) : "";
+    }
+    // If it's a string, try to robustly parse common formats like
+    // dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, etc., because `new Date(str)`
+    // can be unreliable across environments.
+    if (typeof v === "string") {
+      const s = v.trim().replace(/\u00A0/g, " ");
+      // common DD/MM/YYYY or D/M/YYYY or DD-MM-YYYY
+      const dmMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (dmMatch) {
+        let dd = Number(dmMatch[1]);
+        let mm = Number(dmMatch[2]);
+        let yy = Number(dmMatch[3]);
+        if (yy < 100) yy += 2000; // treat 2-digit as 2000+
+        const dt = new Date(yy, mm - 1, dd);
+        if (!isNaN(dt.getTime())) return parseDateToYMD(dt);
+      }
+
+      // ISO-like or other parseable strings
+      const iso = new Date(s);
+      if (!isNaN(iso.getTime())) return parseDateToYMD(iso);
+      // last resort: return empty
+      return "";
     }
     // fallback to parseDateToYMD which attempts new Date(string)
     return parseDateToYMD(v);
