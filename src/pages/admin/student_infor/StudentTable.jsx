@@ -46,7 +46,12 @@ const StudentTable = ({
     if (!onBulkDelete) return;
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (!window.confirm(`Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`)) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`
+      )
+    )
+      return;
     await onBulkDelete(ids);
     // clear selection after delete attempt
     setSelectedIds(new Set());
@@ -88,13 +93,61 @@ const StudentTable = ({
         >
           <thead>
             <tr className={isDarkMode ? "bg-gray-700/30" : "bg-gray-50"}>
-              <th className={`px-4 py-3 ${isDarkMode ? "text-gray-300" : "text-gray-500"}`}>
-                <input
-                  type="checkbox"
-                  aria-label="select all"
-                  onChange={toggleSelectAll}
-                  checked={rows && rows.length > 0 && rows.every((r) => selectedIds.has(r.id))}
-                />
+              <th className={`px-4 py-3 text-red-500`}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    aria-label="select all"
+                    onChange={toggleSelectAll}
+                    checked={
+                      rows &&
+                      rows.length > 0 &&
+                      rows.every((r) => selectedIds.has(r.id))
+                    }
+                  />
+                  {/* Bulk delete icon button moved next to master checkbox */}
+                  <button
+                    onClick={handleBulkDeleteClick}
+                    disabled={selectedIds.size === 0}
+                    title={
+                      selectedIds.size === 0
+                        ? "Chưa có bản ghi được chọn"
+                        : `Xóa ${selectedIds.size} bản ghi đã chọn`
+                    }
+                    aria-label="Xóa các bản ghi đã chọn"
+                    className={`p-1 rounded-md inline-flex items-center justify-center ml-1 ${
+                      selectedIds.size === 0
+                        ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                        : isDarkMode
+                        ? "bg-red-700 hover:bg-red-600 text-white"
+                        : "bg-red-600 hover:bg-red-700 text-white"
+                    }`}
+                  >
+                    {/* Trash icon (SVG) */}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="w-4 h-4"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8 9a1 1 0 011 1v7a1 1 0 11-2 0V10a1 1 0 011-1zm6 0a1 1 0 011 1v7a1 1 0 11-2 0V10a1 1 0 011-1z"
+                        clipRule="evenodd"
+                      />
+                      <path d="M4 6h16v2H4V6z" />
+                      <path
+                        fillRule="evenodd"
+                        d="M9 4a1 1 0 00-1 1v1h8V5a1 1 0 00-1-1H9z"
+                        clipRule="evenodd"
+                      />
+                      <path
+                        d="M7 8h10l-1 12a2 2 0 01-2 2H10a2 2 0 01-2-2L7 8z"
+                        opacity="0.01"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </th>
               {columns.map((col) => (
                 <th
@@ -216,26 +269,12 @@ const StudentTable = ({
           </tbody>
         </table>
       </div>
-      {/* Bulk actions footer */}
+      {/* Bulk actions footer (selection count only; delete moved to header) */}
       <div className="px-6 py-3 border-t flex items-center justify-between">
         <div className="text-sm">
           Đã chọn: <strong>{selectedIds.size}</strong>
         </div>
-        <div>
-          <button
-            onClick={handleBulkDeleteClick}
-            disabled={selectedIds.size === 0}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ml-2 ${
-              selectedIds.size === 0
-                ? "bg-gray-400 text-white"
-                : isDarkMode
-                ? "bg-red-700 hover:bg-red-600 text-white"
-                : "bg-red-600 hover:bg-red-700 text-white"
-            }`}
-          >
-            Xóa các bản ghi đã chọn
-          </button>
-        </div>
+        <div />
       </div>
     </div>
   );
