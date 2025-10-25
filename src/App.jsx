@@ -25,6 +25,7 @@ import QuestionManagement from "./pages/admin/question/QuestionManagement";
 import HomePage from "./pages/HomePage";
 import Pricing from "./pages/Pricing";
 import EditorPage from "./pages/EditorPage";
+import StudentInforManagement from "./pages/admin/StudentInforManagement";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase/firebase";
 import { useUserRole } from "./context/UserRoleContext";
@@ -152,6 +153,12 @@ const AdminQuestionManagementPage = () => (
 const AdminDashboardPage = () => (
   <ProtectedAdminRoute>
     <AdminDashboard />
+  </ProtectedAdminRoute>
+);
+
+const AdminStudentInforManagementPage = () => (
+  <ProtectedAdminRoute>
+    <StudentInforManagement />
   </ProtectedAdminRoute>
 );
 
@@ -510,6 +517,10 @@ function App() {
                 <Route
                   path="/admin/categories"
                   element={<AdminCategoryManagementPage />}
+                />
+                <Route
+                  path="/admin/student-infor"
+                  element={<AdminStudentInforManagementPage />}
                 />
                 <Route
                   path="/admin/documents"
