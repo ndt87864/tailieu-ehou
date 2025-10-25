@@ -519,23 +519,38 @@ const StudentInforManagement = () => {
         type: "array",
         cellDates: true,
       });
-      // Always read sheet số 1 (first sheet). sheetIndex is 0-based.
-      const sheetIndex = 0;
+      // Only process the first sheet of the workbook (SheetNames[0]).
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
         setError("File không chứa sheet nào");
         setImportLoading(false);
         return;
       }
-      const firstSheet =
-        workbook.SheetNames[sheetIndex] ?? workbook.SheetNames[0];
-      console.info(
-        "Import - using sheet:",
-        firstSheet,
-        " (sheetIndex:",
-        sheetIndex,
-        ")"
-      );
-      const worksheet = workbook.Sheets[firstSheet];
+      // If workbook has a single sheet, just use it.
+      let worksheet;
+      if (workbook.SheetNames.length === 1) {
+        const only = workbook.SheetNames[0];
+        worksheet = workbook.Sheets[only];
+      } else {
+        // Multiple sheets: prefer exact " DATA"; otherwise accept trimmed/case-insensitive 'data' (e.g. 'Data', 'DATA').
+        const prefer = " DATA";
+        let chosen = workbook.SheetNames.find((s) => s === prefer);
+        if (!chosen) {
+          chosen = workbook.SheetNames.find(
+            (s) => typeof s === 'string' && s.trim().toLowerCase() === 'data'
+          );
+        }
+
+        if (!chosen) {
+          const available = workbook.SheetNames.join(', ');
+          const msg = `File phải chứa sheet có tên "${prefer}" (hoặc 'Data'). Sheet hiện có: ${available}`;
+          console.warn('Import aborted - required sheet missing', { availableSheets: workbook.SheetNames });
+          setError(msg);
+          setImportLoading(false);
+          return;
+        }
+
+        worksheet = workbook.Sheets[chosen];
+      }
       // Convert to JSON using headers from sheet
       const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
@@ -797,29 +812,42 @@ const StudentInforManagement = () => {
           return;
         }
 
-        // Provide diagnostic info in error message and console for other cases
-        const hr =
-          rawHeaders && rawHeaders.length
-            ? rawHeaders.join(", ")
-            : "(<no headers detected>)";
+        // Instead of failing because many headers are ignored, only check for
+        // presence of REQUIRED headers that we need to build an importable record.
+        // Minimal required headers for importing student records: studentId OR fullName
+        // For link-only imports we accept exam metadata + examLink (handled earlier).
+        const requiredPresent = Boolean(
+          headerMap.studentId || headerMap.fullName || headerMap.dob
+        );
+
+        if (!requiredPresent) {
+          // Tell admin which required headers are missing (concise)
+          const needed = [
+            { key: 'studentId', label: 'Mã sinh viên' },
+            { key: 'fullName', label: 'Họ và tên (hoặc Họ + Tên)' },
+            { key: 'dob', label: 'Ngày sinh (nếu dùng Họ+Ngày sinh để khớp)' },
+          ];
+          const found = needed.filter((n) => headerMap[n.key]).map((n) => n.label);
+          const missing = needed
+            .filter((n) => !headerMap[n.key])
+            .map((n) => n.label);
+
+          const shortMsg = `Không tìm thấy trường cần thiết để import bản ghi. Tìm thấy: ${found.length ? found.join(', ') : '(không có)'}; Thiếu: ${missing.join(', ')}. Vui lòng kiểm tra header dòng 1 (ví dụ: Mã sinh viên, Họ, Tên, Ngày sinh).`;
+          console.warn('Import aborted - missing required headers', { rawHeaders, headerMap, ignored });
+          setError(shortMsg);
+          return;
+        }
+
+        // If required headers are present but no rows passed deduplication/validation,
+        // provide a simpler diagnostic focused on mapped headers instead of listing all ignored headers.
         const mappedKeys = Object.keys(headerMap).length
           ? Object.entries(headerMap)
               .map(([k, v]) => `${k}<-"${v}"`)
               .join(", ")
           : "(no mapped headers)";
-        const ignoredMsg =
-          ignored && ignored.length
-            ? ` Ignored headers: ${ignored.join(", ")}.`
-            : "";
-        const msg = `Không tìm thấy bản ghi hợp lệ để import. Headers đọc được: ${hr}. Mapping: ${mappedKeys}.${ignoredMsg} Kiểm tra header dòng 1 của file (ví dụ: Mã sinh viên, Họ, Tên, ...).`;
-        console.warn(
-          "Import aborted - no valid rows to import. Raw headers:",
-          rawHeaders,
-          "Header map:",
-          headerMap,
-          "ignored:",
-          ignored
-        );
+
+        const msg = `Không tìm thấy bản ghi hợp lệ để import. Các trường được mapping: ${mappedKeys}. Có thể do tất cả bản ghi trong file đã tồn tại hoặc thiếu thông tin nhận dạng. Kiểm tra header dòng 1 (ví dụ: Mã sinh viên, Họ, Tên, ...).`;
+        console.warn("Import aborted - no valid rows to import", { originalCount, skippedExisting, headerMap, rawHeaders });
         setError(msg);
         return;
       }

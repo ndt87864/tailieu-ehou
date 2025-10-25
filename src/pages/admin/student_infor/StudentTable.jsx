@@ -22,7 +22,9 @@ const StudentTable = ({
     setSelectedIds((prev) => {
       if (!prev || prev.size === 0) return new Set();
       const allowed = new Set(
-        (allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id))
+        allRowIds && allRowIds.length
+          ? allRowIds
+          : (rows || []).map((r) => r.id)
       );
       const next = new Set();
       for (const id of prev) if (allowed.has(id)) next.add(id);
@@ -126,7 +128,10 @@ const StudentTable = ({
                     aria-label="select all"
                     onChange={handleMasterCheckbox}
                     checked={(() => {
-                      const targetIds = allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id);
+                      const targetIds =
+                        allRowIds && allRowIds.length
+                          ? allRowIds
+                          : (rows || []).map((r) => r.id);
                       if (!targetIds || targetIds.length === 0) return false;
                       return targetIds.every((id) => selectedIds.has(id));
                     })()}
@@ -319,7 +324,10 @@ const StudentTable = ({
         className="max-w-md"
       >
         <div className="space-y-4">
-          <p>Bạn muốn chọn chỉ những bản ghi đang hiển thị trên trang này, hay chọn tất cả bản ghi trong bộ lọc hiện tại?</p>
+          <p>
+            Bạn muốn chọn chỉ những bản ghi đang hiển thị trên trang này, hay
+            chọn tất cả bản ghi trong bộ lọc hiện tại?
+          </p>
           <div className="flex justify-end gap-2">
             <button
               onClick={() => {
@@ -335,7 +343,10 @@ const StudentTable = ({
             <button
               onClick={() => {
                 // choose all (from allRowIds)
-                const allIds = allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id);
+                const allIds =
+                  allRowIds && allRowIds.length
+                    ? allRowIds
+                    : (rows || []).map((r) => r.id);
                 setSelectedIds(new Set(allIds));
                 setShowSelectAllConfirm(false);
               }}
