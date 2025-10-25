@@ -23,6 +23,7 @@ import CategoryManagement from "./pages/admin/CategoryManagement";
 import DocumentManagement from "./pages/admin/DocumentManagement";
 import QuestionManagement from "./pages/admin/question/QuestionManagement";
 import HomePage from "./pages/HomePage";
+import StudentPage from "./pages/StudentPage";
 import Pricing from "./pages/Pricing";
 import EditorPage from "./pages/EditorPage";
 import StudentInforManagement from "./pages/admin/student_infor/StudentInforManagement";
@@ -508,6 +509,7 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/students" element={<StudentPage />} />
 
                 {/* Sử dụng các component bảo vệ riêng lẻ */}
                 <Route
