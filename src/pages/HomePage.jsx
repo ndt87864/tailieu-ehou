@@ -22,8 +22,8 @@ const toSlug = (str) => {
 const HomePage = () => {
   // Add search state
   const [searchQuery, setSearchQuery] = useState("");
-  // search type: 'doc' = tài liệu (default), 'exam' = lịch thi
-  const [searchType, setSearchType] = useState("doc");
+  // search type: 'doc' = tài liệu, 'exam' = lịch thi (default)
+  const [searchType, setSearchType] = useState("exam");
 
   // student schedule data used when searching lịch thi
   const [studentInfors, setStudentInfors] = useState(null);
@@ -689,26 +689,9 @@ const HomePage = () => {
                       <button
                         type="button"
                         role="tab"
-                        aria-pressed={searchType === "doc"}
-                        onClick={() => setSearchType("doc")}
-                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-l-md ${
-                          searchType === "doc"
-                            ? isDarkMode
-                              ? "bg-green-600 text-white border border-green-600"
-                              : "bg-green-50 text-green-700 border border-green-200"
-                            : isDarkMode
-                            ? "bg-gray-800 text-gray-300 border border-gray-700"
-                            : "bg-white text-gray-900 border border-gray-200"
-                        }`}
-                      >
-                        Tài liệu
-                      </button>
-                      <button
-                        type="button"
-                        role="tab"
                         aria-pressed={searchType === "exam"}
                         onClick={() => setSearchType("exam")}
-                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-r-md ${
+                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-l-md ${
                           searchType === "exam"
                             ? isDarkMode
                               ? "bg-green-600 text-white border border-green-600"
@@ -719,6 +702,23 @@ const HomePage = () => {
                         }`}
                       >
                         Lịch thi
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-pressed={searchType === "doc"}
+                        onClick={() => setSearchType("doc")}
+                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-r-md ${
+                          searchType === "doc"
+                            ? isDarkMode
+                              ? "bg-green-600 text-white border border-green-600"
+                              : "bg-green-50 text-green-700 border border-green-200"
+                            : isDarkMode
+                            ? "bg-gray-800 text-gray-300 border border-gray-700"
+                            : "bg-white text-gray-900 border border-gray-200"
+                        }`}
+                      >
+                        Tài liệu
                       </button>
                     </div>
                   </div>
