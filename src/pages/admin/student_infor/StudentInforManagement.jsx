@@ -72,6 +72,8 @@ const StudentInforManagement = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState({ done: 0, total: 0 });
   const [importErrors, setImportErrors] = useState([]);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [pendingImportInfo, setPendingImportInfo] = useState(null);
   const [lastRawHeaders, setLastRawHeaders] = useState(null);
   const [lastHeaderMap, setLastHeaderMap] = useState(null);
   const [lastIgnoredHeaders, setLastIgnoredHeaders] = useState(null);
@@ -114,6 +116,72 @@ const StudentInforManagement = () => {
       setError("Không thể tải dữ liệu");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Execute the actual import after user confirms
+  const executeImport = async (toImport) => {
+    if (!toImport || toImport.length === 0) return;
+    setShowImportConfirm(false);
+    setImportLoading(true);
+    setImportProgress({ done: 0, total: toImport.length });
+    const errors = [];
+    let done = 0;
+    try {
+      const concurrency = Math.min(5, toImport.length);
+      let idx = 0;
+      const workers = new Array(concurrency).fill(null).map(() =>
+        (async () => {
+          while (true) {
+            const current = idx;
+            idx += 1;
+            if (current >= toImport.length) break;
+            const row = toImport[current];
+            try {
+              if (!row.studentId || !row.fullName) {
+                errors.push({ row, error: "Thiếu mã sinh viên hoặc họ tên" });
+                done += 1;
+                setImportProgress({ done, total: toImport.length });
+                continue;
+              }
+
+              if (
+                row.examLink &&
+                row.examLink.trim() &&
+                !isValidUrl(row.examLink.trim())
+              ) {
+                errors.push({ row, error: "Link phòng không hợp lệ" });
+                done += 1;
+                setImportProgress({ done, total: toImport.length });
+                continue;
+              }
+
+              await addStudentInfor(row);
+              done += 1;
+              setImportProgress({ done, total: toImport.length });
+            } catch (err) {
+              console.error("Row import error", err, row);
+              errors.push({ row, error: err?.message || String(err) });
+              done += 1;
+              setImportProgress({ done, total: toImport.length });
+            }
+          }
+        })()
+      );
+
+      await Promise.all(workers);
+      setImportErrors(errors);
+      if (errors.length > 0) {
+        setError(
+          `Import hoàn tất với ${errors.length} lỗi. Kiểm tra console để biết chi tiết.`
+        );
+      } else {
+        setError(null);
+        alert(`Import thành công ${toImport.length} bản ghi`);
+      }
+    } finally {
+      setImportLoading(false);
+      setPendingImportInfo(null);
     }
   };
 
@@ -282,6 +350,27 @@ const StudentInforManagement = () => {
     } catch (e) {
       console.error(e);
       setError("Xóa thất bại");
+    }
+  };
+
+  const handleBulkDelete = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`)) return;
+    const errors = [];
+    for (const id of ids) {
+      try {
+        await deleteStudentInfor(id);
+        setStudentInfors((s) => s.filter((r) => r.id !== id));
+      } catch (e) {
+        console.error('Bulk delete error', e, id);
+        errors.push({ id, error: e?.message || String(e) });
+      }
+    }
+    if (errors.length > 0) {
+      setError(`Xóa hoàn tất nhưng có ${errors.length} lỗi.`);
+    } else {
+      setError(null);
+      alert(`Xóa thành công ${ids.length - errors.length} bản ghi`);
     }
   };
 
@@ -482,46 +571,69 @@ const StudentInforManagement = () => {
       }
 
       // Deduplicate against existing DB records: skip imports that already exist in `studentInfors`.
-      const existingIds = new Set(
-        (studentInfors || [])
-          .map((s) =>
-            String(s.studentId || "")
-              .trim()
-              .toLowerCase()
-          )
-          .filter(Boolean)
-      );
-      const existingNameDob = new Set(
-        (studentInfors || [])
-          .map((s) => {
-            const name = String(s.fullName || "")
-              .trim()
-              .toLowerCase();
-            const dob = parseDateToYMD(s.dob || "");
-            return name && dob ? `${name}||${dob}` : null;
-          })
-          .filter(Boolean)
-      );
+      // New rule: treat a row as duplicate only if there exists an existing record with the same
+      // studentId OR same (fullName + dob) AND all exam fields also match:
+      // subject, examSession, examTime, examRoom, course, majorCode, examType.
+      const makeComposite = (obj) => {
+        const fields = [
+          obj.subject,
+          obj.examSession,
+          obj.examTime,
+          obj.examRoom,
+          obj.course,
+          obj.majorCode,
+          obj.examType,
+        ];
+        return fields
+          .map((v) => (v == null ? "" : String(v).trim().toLowerCase()))
+          .join("||");
+      };
+
+      const existingById = new Map();
+      const existingByNameDob = new Map();
+      (studentInfors || []).forEach((s) => {
+        const idKey = String(s.studentId || "").trim().toLowerCase();
+        const name = String(s.fullName || "").trim().toLowerCase();
+        const dob = parseDateToYMD(s.dob || "");
+        const nameDobKey = name && dob ? `${name}||${dob}` : null;
+        const comp = makeComposite(s);
+        if (idKey) {
+          const set = existingById.get(idKey) || new Set();
+          set.add(comp);
+          existingById.set(idKey, set);
+        }
+        if (nameDobKey) {
+          const set2 = existingByNameDob.get(nameDobKey) || new Set();
+          set2.add(comp);
+          existingByNameDob.set(nameDobKey, set2);
+        }
+      });
 
       const originalCount = toImport.length;
       const filtered = [];
       let skippedExisting = 0;
       for (const item of toImport) {
-        const idKey = String(item.studentId || "")
-          .trim()
-          .toLowerCase();
-        const nameDobKey = `${String(item.fullName || "")
-          .trim()
-          .toLowerCase()}||${parseDateToYMD(item.dob || "")}`;
-        if (idKey) {
-          if (existingIds.has(idKey)) {
-            skippedExisting += 1;
-            continue;
-          }
-        } else if (nameDobKey && existingNameDob.has(nameDobKey)) {
+        const idKey = String(item.studentId || "").trim().toLowerCase();
+        const name = String(item.fullName || "").trim().toLowerCase();
+        const dob = parseDateToYMD(item.dob || "");
+        const nameDobKey = name && dob ? `${name}||${dob}` : null;
+        const comp = makeComposite(item);
+
+        let isDuplicate = false;
+        if (idKey && existingById.has(idKey)) {
+          const set = existingById.get(idKey);
+          if (set && set.has(comp)) isDuplicate = true;
+        }
+        if (!isDuplicate && nameDobKey && existingByNameDob.has(nameDobKey)) {
+          const set = existingByNameDob.get(nameDobKey);
+          if (set && set.has(comp)) isDuplicate = true;
+        }
+
+        if (isDuplicate) {
           skippedExisting += 1;
           continue;
         }
+
         filtered.push(item);
       }
       toImport = filtered;
@@ -566,78 +678,11 @@ const StudentInforManagement = () => {
         return;
       }
 
-      // Confirm with user, showing how many will be imported and how many were skipped
-      if (
-        !window.confirm(
-          `Tìm thấy ${originalCount} bản ghi trong file. Bỏ qua ${skippedExisting} bản ghi trùng đã có trên hệ thống. Bắt đầu import ${toImport.length} bản ghi?`
-        )
-      )
-        return;
-
-      setImportProgress({ done: 0, total: toImport.length });
-
-      const errors = [];
-      let done = 0;
-
-      // Process import with limited concurrency (5 at a time)
-      const concurrency = Math.min(5, toImport.length);
-
-      let idx = 0;
-      const workers = new Array(concurrency).fill(null).map(() =>
-        (async () => {
-          while (true) {
-            const current = idx;
-            idx += 1;
-            if (current >= toImport.length) break;
-            const row = toImport[current];
-            try {
-              // Basic validation: studentId and fullName required
-              if (!row.studentId || !row.fullName) {
-                errors.push({ row, error: "Thiếu mã sinh viên hoặc họ tên" });
-                done += 1;
-                setImportProgress({ done, total: toImport.length });
-                continue;
-              }
-
-              // Validate link if present
-              if (
-                row.examLink &&
-                row.examLink.trim() &&
-                !isValidUrl(row.examLink.trim())
-              ) {
-                errors.push({ row, error: "Link phòng không hợp lệ" });
-                done += 1;
-                setImportProgress({ done, total: toImport.length });
-                continue;
-              }
-
-              // Insert into Firestore via service
-              await addStudentInfor(row);
-              done += 1;
-              setImportProgress({ done, total: toImport.length });
-            } catch (err) {
-              console.error("Row import error", err, row);
-              errors.push({ row, error: err?.message || String(err) });
-              done += 1;
-              setImportProgress({ done, total: toImport.length });
-            }
-          }
-        })()
-      );
-
-      // wait for all workers to finish
-      await Promise.all(workers);
-
-      setImportErrors(errors);
-      if (errors.length > 0) {
-        setError(
-          `Import hoàn tất với ${errors.length} lỗi. Kiểm tra console để biết chi tiết.`
-        );
-      } else {
-        setError(null);
-        // success message briefly
-        alert(`Import thành công ${toImport.length} bản ghi`);
-      }
+      // Instead of browser confirm, show an in-app confirmation modal.
+      setPendingImportInfo({ toImport, originalCount, skippedExisting });
+      // stop importLoading while waiting for confirmation
+      setImportLoading(false);
+      setShowImportConfirm(true);
     } finally {
       setImportLoading(false);
     }
@@ -813,6 +858,7 @@ const StudentInforManagement = () => {
                 isDarkMode={isDarkMode}
                 openEditModal={openEditModal}
                 handleDelete={handleDelete}
+                onBulkDelete={handleBulkDelete}
               />
             </div>
           </main>
@@ -824,6 +870,61 @@ const StudentInforManagement = () => {
         onClose={() => setIsThemePickerOpen(false)}
         isDarkMode={isDarkMode}
       />
+
+      {/* Import confirmation modal (replace window.confirm) */}
+      <Modal
+        isOpen={showImportConfirm}
+        onClose={() => {
+          setShowImportConfirm(false);
+          setPendingImportInfo(null);
+          setImportLoading(false);
+        }}
+        title="Xác nhận import"
+        className="max-w-md"
+      >
+        {pendingImportInfo ? (
+          <div className="space-y-4">
+            <p>
+              Tìm thấy <strong>{pendingImportInfo.originalCount}</strong> bản ghi trong file.
+            </p>
+            <p>
+              Bỏ qua <strong>{pendingImportInfo.skippedExisting}</strong> bản ghi trùng đã có trên hệ thống.
+            </p>
+            <p>
+              Bắt đầu import <strong>{pendingImportInfo.toImport.length}</strong> bản ghi?
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowImportConfirm(false);
+                  setPendingImportInfo(null);
+                  setImportLoading(false);
+                }}
+                className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-800"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={async () => {
+                  // start import
+                  try {
+                    await executeImport(pendingImportInfo.toImport);
+                  } catch (err) {
+                    console.error('Execute import error', err);
+                    setError('Import thất bại: ' + (err?.message || String(err)));
+                  }
+                }}
+                className="px-3 py-1.5 rounded-md bg-green-600 text-white"
+              >
+                Xác nhận và bắt đầu
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>Đang chuẩn bị...</div>
+        )}
+      </Modal>
 
       {/* Import progress modal */}
       <Modal
