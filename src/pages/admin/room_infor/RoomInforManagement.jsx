@@ -4,6 +4,7 @@ import {
   getAllStudentInfor,
   subscribeStudentInfor,
 } from "../../../firebase/studentInforService";
+import { updateStudentsByMatch } from "../../../firebase/studentInforService";
 import {
   formatDate,
   normalizeForSearch,
@@ -439,6 +440,33 @@ const RoomInforManagement = () => {
           for (const doc of matches) {
             await updateRoomInfor(doc.id, { ...form });
           }
+        }
+        // Additionally, update student_infor documents where subject/session/time/room match the original
+        try {
+          const criteria = {
+            subject: editing.subject,
+            examSession: editing.examSession,
+            examTime: editing.examTime,
+            examRoom: editing.examRoom,
+          };
+          // include examDate in criteria if it was set originally
+          if (editing.examDate) criteria.examDate = editing.examDate;
+
+          const updates = {};
+          // only update fields that actually changed (avoid overwriting unintended values)
+          if ((form.subject || "") !== (editing.subject || "")) updates.subject = form.subject || "";
+          if ((form.examDate || "") !== (editing.examDate || "")) updates.examDate = form.examDate || "";
+          if ((form.examLink || "") !== (editing.examLink || "")) updates.examLink = form.examLink || "";
+
+          if (Object.keys(updates).length > 0) {
+            const res = await updateStudentsByMatch(criteria, updates);
+            if (res && typeof res.updated === 'number' && res.updated > 0) {
+              // Let the live subscription reflect changes; optionally notify admin
+              console.info(`Updated ${res.updated} student_infor records to reflect changes.`);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to update student records for room edit', e);
         }
       } else {
         await addRoomInfor(form);

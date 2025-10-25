@@ -58,3 +58,81 @@ export const updateStudentInfor = async (id, data) => {
 export const deleteStudentInfor = async (id) => {
   await deleteDoc(doc(db, STUDENT_INFOR_COLLECTION, id));
 };
+
+// Get student documents that match provided criteria.
+// criteria: { subject, examSession, examTime, examRoom, examDate? }
+export const getStudentsByMatch = async (criteria = {}) => {
+  try {
+    const { subject, examSession, examTime, examRoom, examDate } = criteria;
+    // Build a simple query by filtering client-side since compound queries require indexes.
+    // For now, fetch all and filter — acceptable for moderate dataset sizes.
+    const qSnap = await getDocs(collection(db, STUDENT_INFOR_COLLECTION));
+    const docs = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const norm = (v) => (v === undefined || v === null ? '' : String(v).trim());
+
+    return docs.filter((d) => {
+      if (examDate && norm(parseDateToYMD(d.examDate || '')) !== norm(examDate)) return false;
+      if (subject && norm(d.subject || '') !== norm(subject)) return false;
+      if (examSession && norm(d.examSession || '') !== norm(examSession)) return false;
+      if (examTime && norm(d.examTime || '') !== norm(examTime)) return false;
+      if (examRoom && norm(d.examRoom || '') !== norm(examRoom)) return false;
+      return true;
+    });
+  } catch (err) {
+    console.error('getStudentsByMatch error', err);
+    return [];
+  }
+};
+
+// Helper to normalize date fields saved as Timestamp or string to YYYY-MM-DD
+const parseDateToYMD = (val) => {
+  try {
+    if (!val) return '';
+    // Firestore Timestamp
+    if (val && typeof val === 'object' && typeof val.toDate === 'function') {
+      const d = val.toDate();
+      return d.toISOString().slice(0, 10);
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    return String(val).trim();
+  } catch (e) {
+    return String(val || '').trim();
+  }
+};
+
+// Update all student documents that match the criteria with provided updates object.
+// Uses batched writes for efficiency.
+export const updateStudentsByMatch = async (criteria = {}, updates = {}) => {
+  try {
+    if (!criteria || Object.keys(criteria).length === 0) return { updated: 0 };
+    const matches = await getStudentsByMatch(criteria);
+    if (!matches || matches.length === 0) return { updated: 0 };
+
+    // Only apply relevant fields
+    const allowed = ['subject', 'examDate', 'examSession', 'examTime', 'examRoom', 'examLink'];
+    const payload = {};
+    Object.keys(updates || {}).forEach((k) => {
+      if (allowed.includes(k)) payload[k] = updates[k];
+    });
+
+    if (Object.keys(payload).length === 0) return { updated: 0 };
+
+    // perform updates sequentially (could be batched if needed)
+    let updated = 0;
+    for (const s of matches) {
+      try {
+        await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, s.id), { ...s, ...payload });
+        updated++;
+      } catch (e) {
+        console.warn('updateStudentsByMatch: failed to update', s.id, e);
+      }
+    }
+
+    return { updated };
+  } catch (err) {
+    console.error('updateStudentsByMatch error', err);
+    return { updated: 0 };
+  }
+};

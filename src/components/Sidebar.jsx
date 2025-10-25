@@ -1439,7 +1439,9 @@ function Sidebar({
                   className={`${linkBaseClass} ${
                     isCollapsed && windowWidth >= 770 ? "justify-center" : ""
                   } ${
-                    location.pathname === "/students" ? activeClass : linkHoverClass
+                    location.pathname === "/students"
+                      ? activeClass
+                      : linkHoverClass
                   }`}
                   onClick={() => {
                     if (windowWidth < 770) setIsOpen(false);
@@ -1460,7 +1462,9 @@ function Sidebar({
                     />
                   </svg>
                   {showFullContent && (
-                    <span className="ml-3 flex-1 text-white">Danh sách thí sinh</span>
+                    <span className="ml-3 flex-1 text-white">
+                      Danh sách thí sinh
+                    </span>
                   )}
                 </Link>
               </li>

@@ -219,8 +219,17 @@ const StudentTable = ({
                       className="px-6 py-4 whitespace-nowrap text-sm"
                     >
                       {col.key === "dob" || col.key === "examDate" ? (
-                            (function(){ const v = formatDate(row[col.key]); return v ? v : (<span className="text-sm text-gray-500">chưa cập nhật</span>); })()
-                          ) : col.key === "examLink" ? (
+                        (function () {
+                          const v = formatDate(row[col.key]);
+                          return v ? (
+                            v
+                          ) : (
+                            <span className="text-sm text-gray-500">
+                              chưa cập nhật
+                            </span>
+                          );
+                        })()
+                      ) : col.key === "examLink" ? (
                         row[col.key] ? (
                           <a
                             href={row[col.key]}

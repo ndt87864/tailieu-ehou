@@ -32,8 +32,8 @@ import {
 const columns = [
   { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
-    { key: "dob", label: "Ngày sinh" },
-    { key: "examDate", label: "Ngày thi" },
+  { key: "dob", label: "Ngày sinh" },
+  { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },
   { key: "examTime", label: "Thời gian" },
@@ -334,7 +334,10 @@ const StudentInforManagement = () => {
     setCurrentPage(1);
   }, [filteredStudentInfors]);
 
-  const totalPages = Math.max(1, Math.ceil((filteredStudentInfors?.length || 0) / limit));
+  const totalPages = Math.max(
+    1,
+    Math.ceil((filteredStudentInfors?.length || 0) / limit)
+  );
   // clamp currentPage if totalPages decreased
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -381,14 +384,19 @@ const StudentInforManagement = () => {
 
   const handleBulkDelete = async (ids) => {
     if (!ids || ids.length === 0) return;
-    if (!window.confirm(`Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`)) return;
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`
+      )
+    )
+      return;
     const errors = [];
     for (const id of ids) {
       try {
         await deleteStudentInfor(id);
         setStudentInfors((s) => s.filter((r) => r.id !== id));
       } catch (e) {
-        console.error('Bulk delete error', e, id);
+        console.error("Bulk delete error", e, id);
         errors.push({ id, error: e?.message || String(e) });
       }
     }
@@ -449,9 +457,12 @@ const StudentInforManagement = () => {
     setExportLoading(true);
     try {
       const XLSX = await ensureXLSX();
-      const rows = (filteredStudentInfors && filteredStudentInfors.length > 0) ? filteredStudentInfors : studentInfors;
+      const rows =
+        filteredStudentInfors && filteredStudentInfors.length > 0
+          ? filteredStudentInfors
+          : studentInfors;
       if (!rows || rows.length === 0) {
-        alert('Không có dữ liệu để xuất');
+        alert("Không có dữ liệu để xuất");
         return;
       }
 
@@ -460,24 +471,27 @@ const StudentInforManagement = () => {
       const data = rows.map((r) =>
         columns.map((c) => {
           const v = r[c.key];
-          if (c.key === 'dob') {
+          if (c.key === "dob") {
             // prefer YYYY-MM-DD for dob export
-            return parseDateToYMD(v) || '';
+            return parseDateToYMD(v) || "";
           }
-          return v ?? '';
+          return v ?? "";
         })
       );
 
       const aoa = [header, ...data];
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
       const now = new Date();
-      const fn = `student_infor_export_${now.toISOString().slice(0,19).replace(/[:T]/g,'_')}.xlsx`;
+      const fn = `student_infor_export_${now
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:T]/g, "_")}.xlsx`;
       XLSX.writeFile(wb, fn);
     } catch (err) {
-      console.error('Export error', err);
-      setError('Xuất Excel thất bại: ' + (err?.message || String(err)));
+      console.error("Export error", err);
+      setError("Xuất Excel thất bại: " + (err?.message || String(err)));
     } finally {
       setExportLoading(false);
     }
@@ -499,7 +513,10 @@ const StudentInforManagement = () => {
     try {
       const XLSX = await ensureXLSX();
       const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+      const workbook = XLSX.read(arrayBuffer, {
+        type: "array",
+        cellDates: true,
+      });
       // Always read sheet số 1 (first sheet). sheetIndex is 0-based.
       const sheetIndex = 0;
       if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -568,7 +585,9 @@ const StudentInforManagement = () => {
           fullName: fullName || "",
           dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
           // examDate may be present in some excel files (Ngày thi)
-          examDate: headerMap.examDate ? parseExcelDateToYMD(vals[headerMap.examDate]) : "",
+          examDate: headerMap.examDate
+            ? parseExcelDateToYMD(vals[headerMap.examDate])
+            : "",
           subject: headerMap.subject
             ? String(vals[headerMap.subject]).trim()
             : "",
@@ -602,13 +621,17 @@ const StudentInforManagement = () => {
 
       // Split rows into import candidates (have student identity) and
       // link candidates (have examLink + at least one exam-metadata field).
-      let toImport = allRows.filter((it) => (it.studentId || it.fullName));
+      let toImport = allRows.filter((it) => it.studentId || it.fullName);
       const linkCandidates = allRows.filter((it) => {
         const hasLink = it.examLink && it.examLink.trim();
-        const hasExamMeta = (it.examDate && it.examDate.trim()) || (it.subject && it.subject.trim()) || (it.examSession && it.examSession.trim()) || (it.examTime && it.examTime.trim()) || (it.examRoom && it.examRoom.trim());
+        const hasExamMeta =
+          (it.examDate && it.examDate.trim()) ||
+          (it.subject && it.subject.trim()) ||
+          (it.examSession && it.examSession.trim()) ||
+          (it.examTime && it.examTime.trim()) ||
+          (it.examRoom && it.examRoom.trim());
         return hasLink && hasExamMeta;
       });
-
 
       // If the Excel contains an exam link and rows that match existing records by
       // exam fields (examDate, subject, examSession, examTime, examRoom), then
@@ -617,11 +640,13 @@ const StudentInforManagement = () => {
       // link nhóm (group link) be applied to matching exam records in the DB.
       try {
         const linkUpdates = [];
-        const normalize = (v) => (v == null ? "" : String(v).trim().toLowerCase());
+        const normalize = (v) =>
+          v == null ? "" : String(v).trim().toLowerCase();
         for (const item of linkCandidates) {
           if (!item.examLink) continue;
           // build match predicate values
-          const ed = (item.examDate && item.examDate !== "") ? item.examDate : null;
+          const ed =
+            item.examDate && item.examDate !== "" ? item.examDate : null;
           const subj = normalize(item.subject);
           const sess = normalize(item.examSession);
           const etime = normalize(item.examTime);
@@ -651,21 +676,27 @@ const StudentInforManagement = () => {
         }
 
         if (linkUpdates.length > 0) {
-          console.info(`Applying ${linkUpdates.length} link updates from Excel`);
+          console.info(
+            `Applying ${linkUpdates.length} link updates from Excel`
+          );
           for (const u of linkUpdates) {
             try {
               await updateStudentInfor(u.id, { examLink: u.link });
               // update local state
-              setStudentInfors((prev) => prev.map((p) => (p.id === u.id ? { ...p, examLink: u.link } : p)));
+              setStudentInfors((prev) =>
+                prev.map((p) =>
+                  p.id === u.id ? { ...p, examLink: u.link } : p
+                )
+              );
             } catch (e) {
-              console.error('Failed to update examLink for', u.id, e);
+              console.error("Failed to update examLink for", u.id, e);
             }
           }
         }
 
         // If we applied link updates and there are no identity rows to import,
         // surface a success message and stop the import flow gracefully.
-        if ((linkUpdates.length > 0) && (!toImport || toImport.length === 0)) {
+        if (linkUpdates.length > 0 && (!toImport || toImport.length === 0)) {
           const msg = `Áp dụng ${linkUpdates.length} cập nhật link phòng từ file Excel thành công.`;
           console.info(msg);
           setError(null);
@@ -673,7 +704,7 @@ const StudentInforManagement = () => {
           return;
         }
       } catch (e) {
-        console.error('Error while applying link updates from Excel', e);
+        console.error("Error while applying link updates from Excel", e);
       }
       // Deduplicate against existing DB records: skip imports that already exist in `studentInfors`.
       // New rule: treat a row as duplicate only if there exists an existing record with the same
@@ -697,8 +728,12 @@ const StudentInforManagement = () => {
       const existingById = new Map();
       const existingByNameDob = new Map();
       (studentInfors || []).forEach((s) => {
-        const idKey = String(s.studentId || "").trim().toLowerCase();
-        const name = String(s.fullName || "").trim().toLowerCase();
+        const idKey = String(s.studentId || "")
+          .trim()
+          .toLowerCase();
+        const name = String(s.fullName || "")
+          .trim()
+          .toLowerCase();
         const dob = parseDateToYMD(s.dob || "");
         const nameDobKey = name && dob ? `${name}||${dob}` : null;
         const comp = makeComposite(s);
@@ -718,8 +753,12 @@ const StudentInforManagement = () => {
       const filtered = [];
       let skippedExisting = 0;
       for (const item of toImport) {
-        const idKey = String(item.studentId || "").trim().toLowerCase();
-        const name = String(item.fullName || "").trim().toLowerCase();
+        const idKey = String(item.studentId || "")
+          .trim()
+          .toLowerCase();
+        const name = String(item.fullName || "")
+          .trim()
+          .toLowerCase();
         const dob = parseDateToYMD(item.dob || "");
         const nameDobKey = name && dob ? `${name}||${dob}` : null;
         const comp = makeComposite(item);
@@ -912,10 +951,14 @@ const StudentInforManagement = () => {
                   <button
                     onClick={handleExportExcel}
                     disabled={exportLoading}
-                    className={`ml-2 ${exportLoading ? 'bg-gray-400' : 'bg-yellow-600 hover:bg-yellow-700'} text-white px-4 py-2 rounded-md`}
+                    className={`ml-2 ${
+                      exportLoading
+                        ? "bg-gray-400"
+                        : "bg-yellow-600 hover:bg-yellow-700"
+                    } text-white px-4 py-2 rounded-md`}
                     title="Xuất Excel các bản ghi đang hiển thị"
                   >
-                    {exportLoading ? `Đang xuất...` : 'Export Excel'}
+                    {exportLoading ? `Đang xuất...` : "Export Excel"}
                   </button>
                   <input
                     id="student-import-input"
@@ -960,7 +1003,11 @@ const StudentInforManagement = () => {
                 <div className="flex items-center justify-center py-20">
                   <div className="text-center">
                     <LoadingSpinner />
-                    <div className={`mt-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <div
+                      className={`mt-3 text-sm ${
+                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
                       Đang tải dữ liệu...
                     </div>
                   </div>
@@ -980,11 +1027,15 @@ const StudentInforManagement = () => {
                   {/* Pagination controls */}
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-sm text-gray-600 dark:text-gray-300">
-                      Hiển thị <strong>{showingFrom}</strong> - <strong>{showingTo}</strong> của <strong>{filteredStudentInfors.length}</strong> bản ghi
+                      Hiển thị <strong>{showingFrom}</strong> -{" "}
+                      <strong>{showingTo}</strong> của{" "}
+                      <strong>{filteredStudentInfors.length}</strong> bản ghi
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <label className="text-sm text-gray-600 dark:text-gray-300">Hiển thị</label>
+                      <label className="text-sm text-gray-600 dark:text-gray-300">
+                        Hiển thị
+                      </label>
                       <select
                         value={limit}
                         onChange={(e) => {
@@ -1002,9 +1053,15 @@ const StudentInforManagement = () => {
 
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          onClick={() =>
+                            setCurrentPage((p) => Math.max(1, p - 1))
+                          }
                           disabled={currentPage <= 1}
-                          className={`px-3 py-1 rounded-md ${currentPage <= 1 ? 'bg-gray-200 text-gray-400' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                          className={`px-3 py-1 rounded-md ${
+                            currentPage <= 1
+                              ? "bg-gray-200 text-gray-400"
+                              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                          }`}
                         >
                           &laquo; Prev
                         </button>
@@ -1014,9 +1071,15 @@ const StudentInforManagement = () => {
                         </div>
 
                         <button
-                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          onClick={() =>
+                            setCurrentPage((p) => Math.min(totalPages, p + 1))
+                          }
                           disabled={currentPage >= totalPages}
-                          className={`px-3 py-1 rounded-md ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                          className={`px-3 py-1 rounded-md ${
+                            currentPage >= totalPages
+                              ? "bg-gray-200 text-gray-400"
+                              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                          }`}
                         >
                           Next &raquo;
                         </button>
@@ -1050,13 +1113,16 @@ const StudentInforManagement = () => {
         {pendingImportInfo ? (
           <div className="space-y-4">
             <p>
-              Tìm thấy <strong>{pendingImportInfo.originalCount}</strong> bản ghi trong file.
+              Tìm thấy <strong>{pendingImportInfo.originalCount}</strong> bản
+              ghi trong file.
             </p>
             <p>
-              Bỏ qua <strong>{pendingImportInfo.skippedExisting}</strong> bản ghi trùng đã có trên hệ thống.
+              Bỏ qua <strong>{pendingImportInfo.skippedExisting}</strong> bản
+              ghi trùng đã có trên hệ thống.
             </p>
             <p>
-              Bắt đầu import <strong>{pendingImportInfo.toImport.length}</strong> bản ghi?
+              Bắt đầu import{" "}
+              <strong>{pendingImportInfo.toImport.length}</strong> bản ghi?
             </p>
 
             <div className="flex justify-end gap-2">
@@ -1076,8 +1142,10 @@ const StudentInforManagement = () => {
                   try {
                     await executeImport(pendingImportInfo.toImport);
                   } catch (err) {
-                    console.error('Execute import error', err);
-                    setError('Import thất bại: ' + (err?.message || String(err)));
+                    console.error("Execute import error", err);
+                    setError(
+                      "Import thất bại: " + (err?.message || String(err))
+                    );
                   }
                 }}
                 className="px-3 py-1.5 rounded-md bg-green-600 text-white"
@@ -1097,14 +1165,19 @@ const StudentInforManagement = () => {
         onClose={() => {
           /* prevent closing while importing */
         }}
-        title={importProgress.total ? `Import dữ liệu (${importPercent}%)` : "Import dữ liệu"}
+        title={
+          importProgress.total
+            ? `Import dữ liệu (${importPercent}%)`
+            : "Import dữ liệu"
+        }
         className="max-w-md"
       >
         <div className="space-y-3">
           <div className="text-sm text-gray-700 dark:text-gray-200">
             {importProgress.total > 0 ? (
               <>
-                Đã xử lý <strong>{importProgress.done}</strong> / <strong>{importProgress.total}</strong> bản ghi.
+                Đã xử lý <strong>{importProgress.done}</strong> /{" "}
+                <strong>{importProgress.total}</strong> bản ghi.
               </>
             ) : (
               <>Đang chuẩn bị dữ liệu...</>
@@ -1124,7 +1197,8 @@ const StudentInforManagement = () => {
 
           {importErrors && importErrors.length > 0 && (
             <div className="text-sm text-red-600 dark:text-red-400">
-              Có {importErrors.length} lỗi xảy ra (xem console để biết chi tiết).
+              Có {importErrors.length} lỗi xảy ra (xem console để biết chi
+              tiết).
             </div>
           )}
         </div>
