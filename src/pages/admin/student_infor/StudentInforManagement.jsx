@@ -323,6 +323,29 @@ const StudentInforManagement = () => {
     });
   }, [studentInfors, searchQuery]);
 
+  // Pagination state (show limited records like other management pages)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(10); // rows per page
+
+  // reset to first page when filter result changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredStudentInfors]);
+
+  const totalPages = Math.max(1, Math.ceil((filteredStudentInfors?.length || 0) / limit));
+  // clamp currentPage if totalPages decreased
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages]);
+
+  const startIndex = (currentPage - 1) * limit;
+  const pagedStudentInfors = (filteredStudentInfors || []).slice(
+    startIndex,
+    startIndex + limit
+  );
+  const showingFrom = filteredStudentInfors.length === 0 ? 0 : startIndex + 1;
+  const showingTo = Math.min(filteredStudentInfors.length, startIndex + limit);
+
   const openAddModal = () => {
     setEditingItem(null);
     setForm(emptyForm);
@@ -862,15 +885,64 @@ const StudentInforManagement = () => {
                   </div>
                 </div>
               ) : (
-                <StudentTable
-                  columns={columns}
-                  rows={filteredStudentInfors}
-                  loading={loading}
-                  isDarkMode={isDarkMode}
-                  openEditModal={openEditModal}
-                  handleDelete={handleDelete}
-                  onBulkDelete={handleBulkDelete}
-                />
+                <>
+                  <StudentTable
+                    columns={columns}
+                    rows={pagedStudentInfors}
+                    loading={loading}
+                    isDarkMode={isDarkMode}
+                    openEditModal={openEditModal}
+                    handleDelete={handleDelete}
+                    onBulkDelete={handleBulkDelete}
+                  />
+
+                  {/* Pagination controls */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                      Hiển thị <strong>{showingFrom}</strong> - <strong>{showingTo}</strong> của <strong>{filteredStudentInfors.length}</strong> bản ghi
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm text-gray-600 dark:text-gray-300">Hiển thị</label>
+                      <select
+                        value={limit}
+                        onChange={(e) => {
+                          const v = Number(e.target.value) || 10;
+                          setLimit(v);
+                          setCurrentPage(1);
+                        }}
+                        className="px-2 py-1 border rounded-md text-sm"
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage <= 1}
+                          className={`px-3 py-1 rounded-md ${currentPage <= 1 ? 'bg-gray-200 text-gray-400' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                        >
+                          &laquo; Prev
+                        </button>
+
+                        <div className="text-sm text-gray-700 dark:text-gray-200 px-2">
+                          {currentPage} / {totalPages}
+                        </div>
+
+                        <button
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={currentPage >= totalPages}
+                          className={`px-3 py-1 rounded-md ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border'}`}
+                        >
+                          Next &raquo;
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </main>

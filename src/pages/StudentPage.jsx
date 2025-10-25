@@ -106,6 +106,25 @@ const StudentPage = () => {
     });
   }, [rows, search]);
 
+  // Pagination (client-side) similar to admin management pages
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    // reset to first page whenever the filtered list changes
+    setCurrentPage(1);
+  }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil((filtered?.length || 0) / limit));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages]);
+
+  const startIndex = (currentPage - 1) * limit;
+  const paged = (filtered || []).slice(startIndex, startIndex + limit);
+  const showingFrom = filtered.length === 0 ? 0 : startIndex + 1;
+  const showingTo = Math.min(filtered.length, startIndex + limit);
+
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -167,7 +186,9 @@ const StudentPage = () => {
 
           <div className="flex-1 p-6 min-w-0">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-semibold text-white">Danh sách thí sinh</h1>
+              <h1 className="text-2xl font-semibold text-white">
+                Danh sách thí sinh
+              </h1>
 
               <div className="flex items-center gap-3">
                 <div className="w-64">
@@ -187,37 +208,49 @@ const StudentPage = () => {
                   <button
                     onClick={async () => {
                       try {
-                        const XLSX = await import('xlsx');
+                        const XLSX = await import("xlsx");
                         const data = filtered.map((r) => ({
-                          'Mã sv': r.studentId || '',
-                          'Họ và tên': r.fullName || '',
-                          'Ngày sinh': formatDate(r.dob) || '',
-                          'Tên môn học': r.subject || '',
-                          'Ca thi': r.examSession || '',
-                          'Thời gian': r.examTime || '',
-                          'Phòng thi': r.examRoom || '',
-                          'Khóa': r.course || '',
-                          'Mã ngành': r.majorCode || '',
-                          'Hình thức thi': r.examType || '',
-                          'Link phòng': r.examLink || ''
+                          "Mã sv": r.studentId || "",
+                          "Họ và tên": r.fullName || "",
+                          "Ngày sinh": formatDate(r.dob) || "",
+                          "Tên môn học": r.subject || "",
+                          "Ca thi": r.examSession || "",
+                          "Thời gian": r.examTime || "",
+                          "Phòng thi": r.examRoom || "",
+                          Khóa: r.course || "",
+                          "Mã ngành": r.majorCode || "",
+                          "Hình thức thi": r.examType || "",
+                          "Link phòng": r.examLink || "",
                         }));
 
                         const wb = XLSX.utils.book_new();
                         const ws = XLSX.utils.json_to_sheet(data);
-                        XLSX.utils.book_append_sheet(wb, ws, 'Danh sách thí sinh');
-                        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+                        XLSX.utils.book_append_sheet(
+                          wb,
+                          ws,
+                          "Danh sách thí sinh"
+                        );
+                        const wbout = XLSX.write(wb, {
+                          bookType: "xlsx",
+                          type: "array",
+                        });
+                        const blob = new Blob([wbout], {
+                          type: "application/octet-stream",
+                        });
                         const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
+                        const a = document.createElement("a");
                         a.href = url;
-                        a.download = `students_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.xlsx`;
+                        a.download = `students_${new Date()
+                          .toISOString()
+                          .slice(0, 19)
+                          .replace(/[:T]/g, "-")}.xlsx`;
                         document.body.appendChild(a);
                         a.click();
                         a.remove();
                         URL.revokeObjectURL(url);
                       } catch (e) {
-                        console.error('Export XLSX failed', e);
-                        alert('Lỗi export XLSX: ' + (e?.message || e));
+                        console.error("Export XLSX failed", e);
+                        alert("Lỗi export XLSX: " + (e?.message || e));
                       }
                     }}
                     className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
@@ -236,10 +269,15 @@ const StudentPage = () => {
               {/* Mobile optimized view: stacked cards for small screens */}
               {windowWidth < 770 ? (
                 <div className="p-3 space-y-3">
+                  <div className="mb-2 text-sm text-gray-700 dark:text-gray-300">
+                    Hiển thị <strong>{showingFrom}</strong> -{" "}
+                    <strong>{showingTo}</strong> của{" "}
+                    <strong>{filtered.length}</strong> bản ghi
+                  </div>
                   {filtered.length === 0 ? (
                     <div className="p-4 text-center">Không có bản ghi nào</div>
                   ) : (
-                    filtered.map((r) => (
+                    paged.map((r) => (
                       <div
                         key={r.id}
                         className={`p-3 bg-transparent border rounded-lg  bg-white dark:bg-gray-800 rounded shadow shadow-sm ${
@@ -337,7 +375,7 @@ const StudentPage = () => {
                         </tr>
                       )}
 
-                      {filtered.map((r) => (
+                      {paged.map((r) => (
                         <tr
                           key={r.id}
                           className="hover:bg-gray-50 dark:hover:bg-gray-900"
@@ -392,6 +430,61 @@ const StudentPage = () => {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* Pagination controls */}
+            <div className="mt-4 flex items-center justify-center md:justify-between w-full md:w-[90%] mx-auto">
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-600 dark:text-gray-300">
+                  Hiển thị
+                </label>
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) || 10;
+                    setLimit(v);
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 border rounded-md text-sm"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage <= 1
+                        ? "bg-gray-200 text-gray-400"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                    }`}
+                  >
+                    &laquo; Prev
+                  </button>
+
+                  <div className="text-sm text-gray-700 dark:text-gray-200 px-2">
+                    {currentPage} / {totalPages}
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage >= totalPages}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage >= totalPages
+                        ? "bg-gray-200 text-gray-400"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                    }`}
+                  >
+                    Next &raquo;
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
