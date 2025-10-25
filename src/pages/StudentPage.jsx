@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { subscribeStudentInfor } from "../firebase/studentInforService";
@@ -47,6 +48,7 @@ const StudentPage = () => {
   );
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [user] = useAuthState(auth);
+  const location = useLocation();
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -70,6 +72,22 @@ const StudentPage = () => {
 
     return () => unsub && typeof unsub === "function" && unsub();
   }, []);
+
+  // If navigated here with ?query=..., prefill the search input.
+  // This uses URL params only to set the local search state — we do NOT run
+  // any additional Firestore query here; filtering is client-side on `rows`.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || "");
+      const q = params.get("query") || "";
+      if (q && q !== search) {
+        setSearch(q);
+      }
+    } catch (e) {
+      // ignore malformed URL
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   // Load sidebar categories + documents so sidebar shows the usual category list
   useEffect(() => {
