@@ -66,7 +66,10 @@ const RoomInforManagement = () => {
   const [filterSession, setFilterSession] = useState("");
 
   // in-app confirmation popup state (replaces window.confirm)
-  const [confirmState, setConfirmState] = useState({ open: false, message: "" });
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    message: "",
+  });
   const confirmResolverRef = useRef(null);
 
   const showConfirm = (message) =>
@@ -365,19 +368,19 @@ const RoomInforManagement = () => {
         if (mapped) headerMap[h] = mapped;
       });
       // Debug: log header map so admins can verify Excel headers map to expected fields
-      console.info('handleExcelImport: headerMap', headerMap);
+      console.info("handleExcelImport: headerMap", headerMap);
 
       // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
-  let updatedCount = 0;
-  let studentUpdatedCount = 0;
-  let rowCount = 0;
-  // additional counters for debugging/reporting
-  let rowsSkippedNoKey = 0; // rows with no matching key fields
-  let rowsWithNoMatches = 0; // rows that had key but no matching room docs
-  let rowsWithMatches = 0; // rows that had at least one matching room doc
-  // collect rows for display in the result modal so admin can inspect failures
-  const skippedRowsList = [];
-  const noMatchRowsList = [];
+      let updatedCount = 0;
+      let studentUpdatedCount = 0;
+      let rowCount = 0;
+      // additional counters for debugging/reporting
+      let rowsSkippedNoKey = 0; // rows with no matching key fields
+      let rowsWithNoMatches = 0; // rows that had key but no matching room docs
+      let rowsWithMatches = 0; // rows that had at least one matching room doc
+      // collect rows for display in the result modal so admin can inspect failures
+      const skippedRowsList = [];
+      const noMatchRowsList = [];
 
       // open import progress modal
       setImportModal((m) => ({
@@ -416,11 +419,14 @@ const RoomInforManagement = () => {
         ) {
           rowsSkippedNoKey++;
           // Log the skipped row for debugging: show mapped keys so we can see which headers were missing
-          console.warn(`handleExcelImport: skipped row ${rowCount} (missing key fields)`, {
-            mapped,
-            keyObj,
-            raw: row,
-          });
+          console.warn(
+            `handleExcelImport: skipped row ${rowCount} (missing key fields)`,
+            {
+              mapped,
+              keyObj,
+              raw: row,
+            }
+          );
           // store a lightweight representation for the modal
           skippedRowsList.push({
             rowIndex: rowCount,
@@ -451,17 +457,23 @@ const RoomInforManagement = () => {
         if (!matches || matches.length === 0) {
           rowsWithNoMatches++;
           // Log the no-match case with the key used so we can diagnose why rooms weren't found
-          console.warn(`handleExcelImport: no matching rooms for row ${rowCount}`, {
-            keyObj,
-            mapped,
-            raw: row,
-          });
+          console.warn(
+            `handleExcelImport: no matching rooms for row ${rowCount}`,
+            {
+              keyObj,
+              mapped,
+              raw: row,
+            }
+          );
           // Also log a sample of existing room normalized keys to help debugging
           try {
             const allRooms = await getAllRoomInfor();
             const norm = (v) => normalizeForSearch(String(v || "")).trim();
             console.warn(
-              `handleExcelImport: available rooms (sample ${Math.min(50, allRooms.length)}):`,
+              `handleExcelImport: available rooms (sample ${Math.min(
+                50,
+                allRooms.length
+              )}):`,
               allRooms.slice(0, 50).map((r) => ({
                 id: r.id,
                 subject: norm(r.subject),
@@ -471,7 +483,10 @@ const RoomInforManagement = () => {
               }))
             );
           } catch (e) {
-            console.warn('handleExcelImport: failed to fetch all rooms for debug', e);
+            console.warn(
+              "handleExcelImport: failed to fetch all rooms for debug",
+              e
+            );
           }
           // If there are no room_infor docs, but excel provides date/link, update student_infor directly
           const updatesFallback = {};
@@ -487,33 +502,49 @@ const RoomInforManagement = () => {
                 examRoom: keyObj.examRoom,
               };
               // attempt to update students directly
-              const res = await updateStudentsByMatch(criteria, updatesFallback);
-              if (res && typeof res.updated === 'number' && res.updated > 0) {
+              const res = await updateStudentsByMatch(
+                criteria,
+                updatesFallback
+              );
+              if (res && typeof res.updated === "number" && res.updated > 0) {
                 studentUpdatedCount += res.updated;
                 setImportModal((m) => ({
                   ...m,
                   processed: (m.processed || 0) + 1,
-                  studentUpdatedCount: (m.studentUpdatedCount || 0) + (res.updated || 0),
+                  studentUpdatedCount:
+                    (m.studentUpdatedCount || 0) + (res.updated || 0),
                 }));
               } else {
                 // nothing updated
-                setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+                setImportModal((m) => ({
+                  ...m,
+                  processed: (m.processed || 0) + 1,
+                }));
               }
             } catch (e) {
-              console.error('handleExcelImport: fallback updateStudentsByMatch failed', e);
-              setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+              console.error(
+                "handleExcelImport: fallback updateStudentsByMatch failed",
+                e
+              );
+              setImportModal((m) => ({
+                ...m,
+                processed: (m.processed || 0) + 1,
+              }));
             }
           } else {
             // store for modal review
             noMatchRowsList.push({ rowIndex: rowCount, keyObj, mapped });
             // advance processed for this row
-            setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
+            setImportModal((m) => ({
+              ...m,
+              processed: (m.processed || 0) + 1,
+            }));
           }
           continue;
         }
         rowsWithMatches++;
 
-  for (const doc of matches) {
+        for (const doc of matches) {
           const updates = {};
           // update date if present in excel and missing in db
           const docDate = parseDateToYMD(doc.examDate || "");
@@ -546,20 +577,27 @@ const RoomInforManagement = () => {
                   ...m,
                   processed: (m.processed || 0) + 1,
                   updatedCount: (m.updatedCount || 0) + 1,
-                  studentUpdatedCount: (m.studentUpdatedCount || 0) + (res.updated || 0),
+                  studentUpdatedCount:
+                    (m.studentUpdatedCount || 0) + (res.updated || 0),
                 }));
-            } else {
-              // still increment processed for a room updated even if no students changed
+              } else {
+                // still increment processed for a room updated even if no students changed
+                setImportModal((m) => ({
+                  ...m,
+                  processed: (m.processed || 0) + 1,
+                  updatedCount: (m.updatedCount || 0) + 1,
+                }));
+              }
+            } catch (e) {
+              console.error(
+                "handleExcelImport: failed to update student records",
+                e
+              );
+              // ensure processed count advances so progress continues
               setImportModal((m) => ({
                 ...m,
                 processed: (m.processed || 0) + 1,
-                updatedCount: (m.updatedCount || 0) + 1,
               }));
-            }
-            } catch (e) {
-              console.error("handleExcelImport: failed to update student records", e);
-              // ensure processed count advances so progress continues
-              setImportModal((m) => ({ ...m, processed: (m.processed || 0) + 1 }));
             }
           }
         }
@@ -643,19 +681,24 @@ const RoomInforManagement = () => {
 
           const updates = {};
           // only update fields that actually changed (avoid overwriting unintended values)
-          if ((form.subject || "") !== (editing.subject || "")) updates.subject = form.subject || "";
-          if ((form.examDate || "") !== (editing.examDate || "")) updates.examDate = form.examDate || "";
-          if ((form.examLink || "") !== (editing.examLink || "")) updates.examLink = form.examLink || "";
+          if ((form.subject || "") !== (editing.subject || ""))
+            updates.subject = form.subject || "";
+          if ((form.examDate || "") !== (editing.examDate || ""))
+            updates.examDate = form.examDate || "";
+          if ((form.examLink || "") !== (editing.examLink || ""))
+            updates.examLink = form.examLink || "";
 
           if (Object.keys(updates).length > 0) {
             const res = await updateStudentsByMatch(criteria, updates);
-            if (res && typeof res.updated === 'number' && res.updated > 0) {
+            if (res && typeof res.updated === "number" && res.updated > 0) {
               // Let the live subscription reflect changes; optionally notify admin
-              console.info(`Updated ${res.updated} student_infor records to reflect changes.`);
+              console.info(
+                `Updated ${res.updated} student_infor records to reflect changes.`
+              );
             }
           }
         } catch (e) {
-          console.error('Failed to update student records for room edit', e);
+          console.error("Failed to update student records for room edit", e);
         }
       } else {
         await addRoomInfor(form);
@@ -734,92 +777,129 @@ const RoomInforManagement = () => {
           )}
 
           <div className="flex-1 p-6 min-w-0">
-              <div className="mb-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Quản lý thông tin phòng thi</h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Lấy dữ liệu trực tiếp từ bảng thí sinh — chỉ hiển thị các trường cần thiết và loại bỏ trùng.</p>
+            <div className="mb-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+                    Quản lý thông tin phòng thi
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                    Lấy dữ liệu trực tiếp từ bảng thí sinh — chỉ hiển thị các
+                    trường cần thiết và loại bỏ trùng.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    id="room-excel-file"
+                    type="file"
+                    accept=".xls,.xlsx"
+                    onChange={(e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (f) handleExcelImport(f);
+                      e.target.value = null;
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() =>
+                      document.getElementById("room-excel-file")?.click()
+                    }
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm text-sm"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 5v14m7-7H5"
+                      />
+                    </svg>
+                    Import Excel
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="relative">
+                    <input
+                      placeholder="Tìm theo tên môn"
+                      value={filterSubject}
+                      onChange={(e) => setFilterSubject(e.target.value)}
+                      className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      Môn
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="relative">
                     <input
-                      id="room-excel-file"
-                      type="file"
-                      accept=".xls,.xlsx"
-                      onChange={(e) => {
-                        const f = e.target.files && e.target.files[0];
-                        if (f) handleExcelImport(f);
-                        e.target.value = null;
-                      }}
-                      className="hidden"
+                      placeholder="Tìm theo phòng"
+                      value={filterRoom}
+                      onChange={(e) => setFilterRoom(e.target.value)}
+                      className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
                     />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      Phòng
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="date"
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
+                      className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      placeholder="Tìm theo ca thi"
+                      value={filterSession}
+                      onChange={(e) => setFilterSession(e.target.value)}
+                      className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      Ca
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
+                    Tổng: <strong>{rooms.length}</strong> — Hiển thị:{" "}
+                    <strong>{filteredRooms.length}</strong>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => document.getElementById("room-excel-file")?.click()}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm text-sm"
+                      onClick={() => {
+                        setFilterSubject("");
+                        setFilterRoom("");
+                        setFilterDate("");
+                        setFilterSession("");
+                      }}
+                      className="px-3 py-1 rounded border text-sm"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14m7-7H5"/></svg>
-                      Import Excel
+                      Xóa bộ lọc
+                    </button>
+                    <button
+                      onClick={importFromStudents}
+                      className="px-3 py-1 rounded border text-sm"
+                    >
+                      Nhập từ thí sinh
                     </button>
                   </div>
                 </div>
-
-                <div className="mt-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-4 shadow-sm">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="relative">
-                      <input
-                        placeholder="Tìm theo tên môn"
-                        value={filterSubject}
-                        onChange={(e) => setFilterSubject(e.target.value)}
-                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Môn</div>
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        placeholder="Tìm theo phòng"
-                        value={filterRoom}
-                        onChange={(e) => setFilterRoom(e.target.value)}
-                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Phòng</div>
-                    </div>
-
-                    <div>
-                      <input
-                        type="date"
-                        value={filterDate}
-                        onChange={(e) => setFilterDate(e.target.value)}
-                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
-                      />
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        placeholder="Tìm theo ca thi"
-                        value={filterSession}
-                        onChange={(e) => setFilterSession(e.target.value)}
-                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Ca</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="text-sm text-gray-700 dark:text-gray-300">Tổng: <strong>{rooms.length}</strong> — Hiển thị: <strong>{filteredRooms.length}</strong></div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => { setFilterSubject(""); setFilterRoom(""); setFilterDate(""); setFilterSession(""); }}
-                        className="px-3 py-1 rounded border text-sm"
-                      >Xóa bộ lọc</button>
-                      <button
-                        onClick={importFromStudents}
-                        className="px-3 py-1 rounded border text-sm"
-                      >Nhập từ thí sinh</button>
-                    </div>
-                  </div>
-                </div>
               </div>
+            </div>
             {error && (
               <div className="mb-4 text-sm text-red-700">{String(error)}</div>
             )}
@@ -973,7 +1053,8 @@ const RoomInforManagement = () => {
             isOpen={importModal.open}
             onClose={() => {
               // only allow closing when done
-              if (importModal.done) setImportModal((m) => ({ ...m, open: false }));
+              if (importModal.done)
+                setImportModal((m) => ({ ...m, open: false }));
             }}
             title={importModal.title || "Nhập Excel"}
           >
@@ -989,15 +1070,22 @@ const RoomInforManagement = () => {
                       style={{
                         width:
                           importModal.total > 0
-                            ? `${Math.round((importModal.processed / importModal.total) * 100)}%`
+                            ? `${Math.round(
+                                (importModal.processed / importModal.total) *
+                                  100
+                              )}%`
                             : "0%",
                       }}
                     />
                   </div>
                   <div className="text-xs text-gray-500 mt-2">
                     Đã xử lý: {importModal.processed}/{importModal.total}
-                    {importModal.updatedCount ? ` — phòng cập nhật: ${importModal.updatedCount}` : ""}
-                    {importModal.studentUpdatedCount ? ` — thí sinh cập nhật: ${importModal.studentUpdatedCount}` : ""}
+                    {importModal.updatedCount
+                      ? ` — phòng cập nhật: ${importModal.updatedCount}`
+                      : ""}
+                    {importModal.studentUpdatedCount
+                      ? ` — thí sinh cập nhật: ${importModal.studentUpdatedCount}`
+                      : ""}
                   </div>
                 </div>
               )}
@@ -1005,38 +1093,82 @@ const RoomInforManagement = () => {
               {importModal.done && (
                 <div className="space-y-4">
                   {/* Show lists of problematic rows for admin inspection */}
-                  {importModal.noMatchRows && importModal.noMatchRows.length > 0 && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Dòng không tìm thấy phòng khớp ({importModal.noMatchRows.length})</div>
-                      <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
-                        {importModal.noMatchRows.map((r, i) => (
-                          <div key={`nomatch-${i}`} className="mb-2 text-xs text-gray-800 dark:text-gray-200">
-                            <div className="font-semibold">Dòng {r.rowIndex}</div>
-                            <div>subject: {r.mapped?.subject || r.keyObj?.subject || "(trống)"} — ca: {r.mapped?.examSession || r.keyObj?.examSession || "(trống)"} — thời gian: {r.mapped?.examTime || r.keyObj?.examTime || "(trống)"} — phòng: {r.mapped?.examRoom || r.keyObj?.examRoom || "(trống)"}</div>
-                          </div>
-                        ))}
+                  {importModal.noMatchRows &&
+                    importModal.noMatchRows.length > 0 && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Dòng không tìm thấy phòng khớp (
+                          {importModal.noMatchRows.length})
+                        </div>
+                        <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
+                          {importModal.noMatchRows.map((r, i) => (
+                            <div
+                              key={`nomatch-${i}`}
+                              className="mb-2 text-xs text-gray-800 dark:text-gray-200"
+                            >
+                              <div className="font-semibold">
+                                Dòng {r.rowIndex}
+                              </div>
+                              <div>
+                                subject:{" "}
+                                {r.mapped?.subject ||
+                                  r.keyObj?.subject ||
+                                  "(trống)"}{" "}
+                                — ca:{" "}
+                                {r.mapped?.examSession ||
+                                  r.keyObj?.examSession ||
+                                  "(trống)"}{" "}
+                                — thời gian:{" "}
+                                {r.mapped?.examTime ||
+                                  r.keyObj?.examTime ||
+                                  "(trống)"}{" "}
+                                — phòng:{" "}
+                                {r.mapped?.examRoom ||
+                                  r.keyObj?.examRoom ||
+                                  "(trống)"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {importModal.skippedRows && importModal.skippedRows.length > 0 && (
-                    <div>
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Dòng bị bỏ qua do thiếu trường để đối chiếu ({importModal.skippedRows.length})</div>
-                      <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
-                        {importModal.skippedRows.map((r, i) => (
-                          <div key={`skipped-${i}`} className="mb-2 text-xs text-gray-800 dark:text-gray-200">
-                            <div className="font-semibold">Dòng {r.rowIndex}</div>
-                            <div>Mapped keys: {Object.keys(r.mapped || {}).length > 0 ? Object.entries(r.mapped).map(([k,v]) => `${k}:${String(v)}`).join(' | ') : '(không có trường)'} </div>
-                          </div>
-                        ))}
+                  {importModal.skippedRows &&
+                    importModal.skippedRows.length > 0 && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                          Dòng bị bỏ qua do thiếu trường để đối chiếu (
+                          {importModal.skippedRows.length})
+                        </div>
+                        <div className="mt-2 max-h-48 overflow-auto border rounded p-2 bg-gray-50 dark:bg-gray-900">
+                          {importModal.skippedRows.map((r, i) => (
+                            <div
+                              key={`skipped-${i}`}
+                              className="mb-2 text-xs text-gray-800 dark:text-gray-200"
+                            >
+                              <div className="font-semibold">
+                                Dòng {r.rowIndex}
+                              </div>
+                              <div>
+                                Mapped keys:{" "}
+                                {Object.keys(r.mapped || {}).length > 0
+                                  ? Object.entries(r.mapped)
+                                      .map(([k, v]) => `${k}:${String(v)}`)
+                                      .join(" | ")
+                                  : "(không có trường)"}{" "}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   <div className="flex items-center justify-end">
                     <button
                       type="button"
-                      onClick={() => setImportModal((m) => ({ ...m, open: false }))}
+                      onClick={() =>
+                        setImportModal((m) => ({ ...m, open: false }))
+                      }
                       className="px-4 py-2 rounded bg-blue-600 text-white text-sm"
                     >
                       Đóng

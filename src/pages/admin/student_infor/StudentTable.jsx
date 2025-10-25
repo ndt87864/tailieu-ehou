@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Modal from "../../../components/Modal";
 import { formatDate } from "./studentInforHelpers";
 
 const StudentTable = ({
@@ -9,28 +10,53 @@ const StudentTable = ({
   openEditModal,
   handleDelete,
   onBulkDelete,
+  // array of all ids across DB or across the current filter (optional)
+  allRowIds,
 }) => {
   const [selectedIds, setSelectedIds] = useState(new Set());
 
-  // keep selection in sync when rows change (remove ids that are no longer visible)
+  // keep selection in sync when rows/allRowIds change.
+  // If allRowIds is provided we keep selection across pages (but drop ids that no longer exist in allRowIds).
+  // Otherwise we restrict selection to visible rows only.
   useEffect(() => {
     setSelectedIds((prev) => {
-      if (!rows || rows.length === 0) return new Set();
-      const visibleIds = new Set((rows || []).map((r) => r.id));
+      if (!prev || prev.size === 0) return new Set();
+      const allowed = new Set(
+        (allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id))
+      );
       const next = new Set();
-      for (const id of prev) if (visibleIds.has(id)) next.add(id);
+      for (const id of prev) if (allowed.has(id)) next.add(id);
       return next;
     });
-  }, [rows]);
+    // only respond to rows or allRowIds
+  }, [rows, allRowIds]);
 
-  const toggleSelectAll = () => {
-    if (!rows || rows.length === 0) return;
-    const allSelected = rows.every((r) => selectedIds.has(r.id));
+  const [showSelectAllConfirm, setShowSelectAllConfirm] = useState(false);
+
+  // When master checkbox is clicked, if there are more records in allRowIds
+  // than visible rows, prompt the user to choose scope (visible vs all).
+  const handleMasterCheckbox = () => {
+    const visibleIds = (rows || []).map((r) => r.id);
+    const targetIds = allRowIds && allRowIds.length ? allRowIds : visibleIds;
+    if (!targetIds || targetIds.length === 0) return;
+
+    const allSelected = targetIds.every((id) => selectedIds.has(id));
+
+    // if unselecting, just clear selection without prompt
     if (allSelected) {
       setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(rows.map((r) => r.id)));
+      return;
     }
+
+    // if targetIds comes from allRowIds AND there are more records than visible,
+    // ask user whether they want to select only visible or all
+    if (allRowIds && allRowIds.length > visibleIds.length) {
+      setShowSelectAllConfirm(true);
+      return;
+    }
+
+    // default behavior: select targetIds (visible)
+    setSelectedIds(new Set(targetIds));
   };
 
   const toggleSelectOne = (id) => {
@@ -98,12 +124,12 @@ const StudentTable = ({
                   <input
                     type="checkbox"
                     aria-label="select all"
-                    onChange={toggleSelectAll}
-                    checked={
-                      rows &&
-                      rows.length > 0 &&
-                      rows.every((r) => selectedIds.has(r.id))
-                    }
+                    onChange={handleMasterCheckbox}
+                    checked={(() => {
+                      const targetIds = allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id);
+                      if (!targetIds || targetIds.length === 0) return false;
+                      return targetIds.every((id) => selectedIds.has(id));
+                    })()}
                   />
                   {/* Bulk delete icon button moved next to master checkbox */}
                   <button
@@ -285,6 +311,41 @@ const StudentTable = ({
         </div>
         <div />
       </div>
+      {/* Select-all confirmation modal */}
+      <Modal
+        isOpen={showSelectAllConfirm}
+        onClose={() => setShowSelectAllConfirm(false)}
+        title="Chọn phạm vi"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p>Bạn muốn chọn chỉ những bản ghi đang hiển thị trên trang này, hay chọn tất cả bản ghi trong bộ lọc hiện tại?</p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                // choose visible only
+                const visibleIds = (rows || []).map((r) => r.id);
+                setSelectedIds(new Set(visibleIds));
+                setShowSelectAllConfirm(false);
+              }}
+              className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-800"
+            >
+              Chỉ chọn những dữ liệu đang hiển thị
+            </button>
+            <button
+              onClick={() => {
+                // choose all (from allRowIds)
+                const allIds = allRowIds && allRowIds.length ? allRowIds : (rows || []).map((r) => r.id);
+                setSelectedIds(new Set(allIds));
+                setShowSelectAllConfirm(false);
+              }}
+              className="px-3 py-1.5 rounded-md bg-blue-600 text-white"
+            >
+              Chọn tất cả dữ liệu
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

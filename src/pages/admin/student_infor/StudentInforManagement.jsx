@@ -1024,6 +1024,9 @@ const StudentInforManagement = () => {
                     openEditModal={openEditModal}
                     handleDelete={handleDelete}
                     onBulkDelete={handleBulkDelete}
+                    // pass allRowIds so the table can support "select all" across the full
+                    // filtered result (or the whole DB if filteredStudentInfors === studentInfors)
+                    allRowIds={(filteredStudentInfors || []).map((r) => r.id)}
                   />
 
                   {/* Pagination controls */}
