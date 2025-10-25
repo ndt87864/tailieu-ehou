@@ -1,11 +1,19 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   getAllStudentInfor,
   subscribeStudentInfor,
 } from "../../../firebase/studentInforService";
-import { formatDate, normalizeForSearch, parseDateToYMD } from "../student_infor/studentInforHelpers";
+import {
+  formatDate,
+  normalizeForSearch,
+  parseDateToYMD,
+  ensureXLSX,
+  mapHeaderToKey,
+  parseExcelDateToYMD,
+} from "../student_infor/studentInforHelpers";
 import { useTheme } from "../../../context/ThemeContext";
+import { useUserRole } from "../../../context/UserRoleContext";
 import Sidebar from "../../../components/Sidebar";
 import UserHeader from "../../../components/UserHeader";
 import { HomeMobileHeader } from "../../../components/MobileHeader";
@@ -13,7 +21,11 @@ import Footer from "../../../components/Footer";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import { getAllCategoriesWithDocuments } from "../../../firebase/firestoreService";
 import Modal from "../../../components/Modal";
-import { getAllRoomInfor, addRoomInfor, updateRoomInfor } from "../../../firebase/roomInforService";
+import {
+  getAllRoomInfor,
+  addRoomInfor,
+  updateRoomInfor,
+} from "../../../firebase/roomInforService";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../firebase/firebase";
 
@@ -40,6 +52,24 @@ const RoomInforManagement = () => {
   const [filterRoom, setFilterRoom] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterSession, setFilterSession] = useState("");
+
+  // in-app confirmation popup state (replaces window.confirm)
+  const [confirmState, setConfirmState] = useState({ open: false, message: "" });
+  const confirmResolverRef = useRef(null);
+
+  const showConfirm = (message) =>
+    new Promise((resolve) => {
+      confirmResolverRef.current = resolve;
+      setConfirmState({ open: true, message });
+    });
+
+  const handleConfirmResult = (val) => {
+    setConfirmState({ open: false, message: "" });
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(val);
+      confirmResolverRef.current = null;
+    }
+  };
 
   const computeRoomsFromStudents = (students = []) => {
     const map = new Map();
@@ -81,6 +111,7 @@ const RoomInforManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [user] = useAuthState(auth);
+  const { isAdmin } = useUserRole();
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -150,17 +181,38 @@ const RoomInforManagement = () => {
   };
 
   const makeKey = (r) =>
-    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${r.examTime || ""}||${r.examRoom || ""}`;
+    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
+      r.examTime || ""
+    }||${r.examRoom || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
       const all = await getAllRoomInfor();
-      const key = makeKey(roomObj);
-      return all.filter(
-        (d) =>
-          `${d.examDate || ""}||${d.subject || ""}||${d.examSession || ""}||${d.examTime || ""}||${d.examRoom || ""}` ===
-          key
-      );
+
+      // Match by subject, examSession, examTime, examRoom (normalized). Only require examDate when it's provided in roomObj.
+      return all.filter((d) => {
+        try {
+          const norm = (v) => normalizeForSearch(String(v || "")).trim();
+
+          // if caller provided examDate (non-empty), require date equality (normalized YMD)
+          if (roomObj.examDate) {
+            const a = parseDateToYMD(roomObj.examDate || "");
+            const b = parseDateToYMD(d.examDate || "");
+            if (a !== b) return false;
+          }
+
+          // subject/session/time/room comparisons
+          const fieldsMatch =
+            norm(d.subject) === norm(roomObj.subject) &&
+            norm(d.examSession) === norm(roomObj.examSession) &&
+            norm(d.examTime) === norm(roomObj.examTime) &&
+            norm(d.examRoom) === norm(roomObj.examRoom);
+
+          return fieldsMatch;
+        } catch (e) {
+          return false;
+        }
+      });
     } catch (err) {
       console.error("getMatchingRoomDocs error", err);
       return [];
@@ -200,12 +252,10 @@ const RoomInforManagement = () => {
 
   // Import unique room metadata from existing student_infor records
   const importFromStudents = async () => {
-    if (
-      !window.confirm(
-        "Nhập danh sách phòng từ dữ liệu thí sinh hiện có? Các phòng trùng sẽ được bỏ qua."
-      )
-    )
-      return;
+    const proceed = await showConfirm(
+      "Nhập danh sách phòng từ dữ liệu thí sinh hiện có? Các phòng trùng sẽ được bỏ qua."
+    );
+    if (!proceed) return;
     setIsSaving(true);
     try {
       const students = await getAllStudentInfor();
@@ -261,6 +311,99 @@ const RoomInforManagement = () => {
     } catch (err) {
       console.error("importFromStudents error", err);
       alert("Lỗi khi nhập dữ liệu từ thí sinh. Xem console để biết chi tiết.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Import examDate and examLink from Excel when matching subject/session/time/room
+  const handleExcelImport = async (file) => {
+    if (!file) return;
+    const proceed = await showConfirm(
+      "Nhập từ file Excel: sẽ cập nhật ngày thi và link phòng cho các phòng khớp (không tạo mới). Tiếp tục?"
+    );
+    if (!proceed) return;
+    setIsSaving(true);
+    try {
+      const XLSX = await ensureXLSX();
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: "array" });
+      const firstSheet = wb.SheetNames[0];
+      const sheet = wb.Sheets[firstSheet];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if (!Array.isArray(json) || json.length === 0) {
+        alert("File Excel không có dữ liệu.");
+        return;
+      }
+
+      // Map headers: take the first row keys
+      const headerMap = {};
+      const firstRow = json[0];
+      Object.keys(firstRow).forEach((h) => {
+        const mapped = mapHeaderToKey(h);
+        if (mapped) headerMap[h] = mapped;
+      });
+
+      // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
+      let updatedCount = 0;
+      let rowCount = 0;
+
+      for (const row of json) {
+        rowCount++;
+        const mapped = {};
+        Object.entries(row).forEach(([k, v]) => {
+          const key = headerMap[k];
+          if (key) mapped[key] = v;
+        });
+
+        // build match key from subject/session/time/room
+        const keyObj = {
+          subject: (mapped.subject || "").toString().trim(),
+          examSession: (mapped.examSession || "").toString().trim(),
+          examTime: (mapped.examTime || "").toString().trim(),
+          examRoom: (mapped.examRoom || "").toString().trim(),
+        };
+
+        if (
+          !keyObj.subject &&
+          !keyObj.examSession &&
+          !keyObj.examTime &&
+          !keyObj.examRoom
+        )
+          continue;
+
+        const matches = await getMatchingRoomDocs(keyObj);
+        if (!matches || matches.length === 0) continue;
+
+        // normalize date value if present
+        let rowDate = "";
+        if (mapped.examDate) {
+          rowDate = parseExcelDateToYMD(mapped.examDate);
+        }
+        const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
+
+        for (const doc of matches) {
+          const updates = {};
+          // update date if present in excel and missing in db
+          const docDate = parseDateToYMD(doc.examDate || "");
+          if (rowDate && !docDate) updates.examDate = rowDate;
+          // update link if present in excel and missing in db
+          if (rowLink && (!doc.examLink || String(doc.examLink).trim() === ""))
+            updates.examLink = rowLink;
+
+          if (Object.keys(updates).length > 0) {
+            await updateRoomInfor(doc.id, { ...doc, ...updates });
+            updatedCount++;
+          }
+        }
+      }
+
+      alert(
+        `Đã xử lý ${rowCount} dòng. Cập nhật ${updatedCount} bản ghi phòng.`
+      );
+    } catch (err) {
+      console.error("handleExcelImport error", err);
+      alert("Lỗi khi đọc file Excel. Xem console để biết chi tiết.");
     } finally {
       setIsSaving(false);
     }
@@ -328,29 +471,32 @@ const RoomInforManagement = () => {
       )}
 
       <div className="flex min-h-screen w-full">
-        <div
-          className={`theme-sidebar ${
-            windowWidth < 770
-              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${
-                  isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                }`
-              : "sticky top-0 h-screen z-10"
-          }`}
-        >
-          <Sidebar
-            sidebarData={sidebarData}
-            documents={documents}
-            openMain={openMain}
-            setOpenMain={setOpenMain}
-            selectedCategory={selectedCategory}
-            selectedDocument={selectedDocument}
-            setSelectedDocument={setSelectedDocument}
-            setSearch={() => {}}
-            setDocuments={setDocuments}
-            isOpen={isSidebarOpen}
-            setIsOpen={setIsSidebarOpen}
-          />
-        </div>
+        {isAdmin && (
+          <div
+            className={`theme-sidebar ${
+              windowWidth < 770
+                ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${
+                    isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                  }`
+                : "sticky top-0 h-screen z-10"
+            }`}
+          >
+            <Sidebar
+              sidebarData={sidebarData}
+              documents={documents}
+              openMain={openMain}
+              setOpenMain={setOpenMain}
+              selectedCategory={selectedCategory}
+              selectedDocument={selectedDocument}
+              setSelectedDocument={setSelectedDocument}
+              setSearch={() => {}}
+              setDocuments={setDocuments}
+              isOpen={isSidebarOpen}
+              setIsOpen={setIsSidebarOpen}
+              hideDocumentTree={true}
+            />
+          </div>
+        )}
 
         {isSidebarOpen && windowWidth < 770 && (
           <div
@@ -371,65 +517,92 @@ const RoomInforManagement = () => {
           )}
 
           <div className="flex-1 p-6 min-w-0">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                Quản lý thông tin phòng thi
-              </h2>
-              <div>
-                <span className="text-sm text-gray-600 mr-3">
-                  Dữ liệu lấy trực tiếp từ bảng thí sinh — chỉ hiển thị các
-                  trường cần thiết và loại bỏ trùng.
-                </span>
-              </div>
-            </div>
+              <div className="mb-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Quản lý thông tin phòng thi</h2>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Lấy dữ liệu trực tiếp từ bảng thí sinh — chỉ hiển thị các trường cần thiết và loại bỏ trùng.</p>
+                  </div>
 
-            {/* Search / filter controls */}
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <input
-                placeholder="Tìm theo tên môn"
-                value={filterSubject}
-                onChange={(e) => setFilterSubject(e.target.value)}
-                className="px-3 py-2 rounded border w-full"
-              />
-              <input
-                placeholder="Tìm theo phòng"
-                value={filterRoom}
-                onChange={(e) => setFilterRoom(e.target.value)}
-                className="px-3 py-2 rounded border w-full"
-              />
-              <input
-                type="date"
-                placeholder="Ngày thi"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="px-3 py-2 rounded border w-full"
-              />
-              <input
-                placeholder="Tìm theo ca thi"
-                value={filterSession}
-                onChange={(e) => setFilterSession(e.target.value)}
-                className="px-3 py-2 rounded border w-full"
-              />
-            </div>
-            <div className="mb-4 flex items-center justify-between">
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Tổng: <strong>{rooms.length}</strong> — Hiển thị: <strong>{filteredRooms.length}</strong>
-              </div>
-              <div>
-                <button
-                  onClick={() => {
-                    setFilterSubject("");
-                    setFilterRoom("");
-                    setFilterDate("");
-                    setFilterSession("");
-                  }}
-                  className="px-3 py-1 text-sm rounded border"
-                >
-                  Xóa bộ lọc
-                </button>
-              </div>
-            </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="room-excel-file"
+                      type="file"
+                      accept=".xls,.xlsx"
+                      onChange={(e) => {
+                        const f = e.target.files && e.target.files[0];
+                        if (f) handleExcelImport(f);
+                        e.target.value = null;
+                      }}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => document.getElementById("room-excel-file")?.click()}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm text-sm"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v14m7-7H5"/></svg>
+                      Import Excel
+                    </button>
+                  </div>
+                </div>
 
+                <div className="mt-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="relative">
+                      <input
+                        placeholder="Tìm theo tên môn"
+                        value={filterSubject}
+                        onChange={(e) => setFilterSubject(e.target.value)}
+                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Môn</div>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        placeholder="Tìm theo phòng"
+                        value={filterRoom}
+                        onChange={(e) => setFilterRoom(e.target.value)}
+                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Phòng</div>
+                    </div>
+
+                    <div>
+                      <input
+                        type="date"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
+                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                      />
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        placeholder="Tìm theo ca thi"
+                        value={filterSession}
+                        onChange={(e) => setFilterSession(e.target.value)}
+                        className="px-3 py-2 rounded-lg border w-full bg-gray-50 dark:bg-gray-900 text-sm"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">Ca</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">Tổng: <strong>{rooms.length}</strong> — Hiển thị: <strong>{filteredRooms.length}</strong></div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setFilterSubject(""); setFilterRoom(""); setFilterDate(""); setFilterSession(""); }}
+                        className="px-3 py-1 rounded border text-sm"
+                      >Xóa bộ lọc</button>
+                      <button
+                        onClick={importFromStudents}
+                        className="px-3 py-1 rounded border text-sm"
+                      >Nhập từ thí sinh</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             {error && (
               <div className="mb-4 text-sm text-red-700">{String(error)}</div>
             )}
@@ -549,6 +722,35 @@ const RoomInforManagement = () => {
             )}
           </div>
 
+          {/* Confirmation modal (replaces native window.confirm) */}
+          <Modal
+            isOpen={confirmState.open}
+            onClose={() => handleConfirmResult(false)}
+            title="Xác nhận"
+          >
+            <div className="space-y-4">
+              <div className="text-sm text-gray-700 dark:text-gray-200">
+                {confirmState.message}
+              </div>
+              <div className="flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmResult(false)}
+                  className="px-4 py-2 rounded border text-sm"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmResult(true)}
+                  className="px-4 py-2 rounded bg-blue-600 text-white text-sm"
+                >
+                  Tiếp tục
+                </button>
+              </div>
+            </div>
+          </Modal>
+
           {/* Edit/Add modal for room_infor (updates all matching DB records when saving) */}
           <Modal
             isOpen={isModalOpen}
@@ -587,7 +789,9 @@ const RoomInforManagement = () => {
                   <div className="text-sm text-gray-600">Ca thi</div>
                   <input
                     value={form.examSession || ""}
-                    onChange={(e) => handleChange("examSession", e.target.value)}
+                    onChange={(e) =>
+                      handleChange("examSession", e.target.value)
+                    }
                     className="mt-1 block w-full rounded border px-3 py-2"
                   />
                 </label>
