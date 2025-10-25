@@ -25,7 +25,7 @@ import QuestionManagement from "./pages/admin/question/QuestionManagement";
 import HomePage from "./pages/HomePage";
 import Pricing from "./pages/Pricing";
 import EditorPage from "./pages/EditorPage";
-import StudentInforManagement from "./pages/admin/StudentInforManagement";
+import StudentInforManagement from "./pages/admin/student_infor/StudentInforManagement";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase/firebase";
 import { useUserRole } from "./context/UserRoleContext";

@@ -1,20 +1,30 @@
 import React, { useEffect, useState } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { useTheme } from "../../context/ThemeContext";
-import { useUserRole } from "../../context/UserRoleContext";
-import { auth } from "../../firebase/firebase";
+import { useTheme } from "../../../context/ThemeContext";
+import { useUserRole } from "../../../context/UserRoleContext";
+import { auth } from "../../../firebase/firebase";
 import {
   getAllStudentInfor,
   subscribeStudentInfor,
   addStudentInfor,
   updateStudentInfor,
   deleteStudentInfor,
-} from "../../firebase/studentInforService";
-import Sidebar from "../../components/Sidebar";
-import UserHeader from "../../components/UserHeader";
-import { DocumentMobileHeader } from "../../components/MobileHeader";
-import ThemeColorPicker from "../../components/ThemeColorPicker";
-import Modal from "../../components/Modal";
+} from "../../../firebase/studentInforService";
+import Sidebar from "../../../components/Sidebar";
+import UserHeader from "../../../components/UserHeader";
+import { DocumentMobileHeader } from "../../../components/MobileHeader";
+import ThemeColorPicker from "../../../components/ThemeColorPicker";
+import StudentFormModal from "./StudentFormModal";
+import StudentTable from "./StudentTable";
+import {
+  ensureXLSX,
+  mapHeaderToKey,
+  normalizeForSearch,
+  formatDate,
+  isValidUrl,
+  parseDateToYMD,
+  computePendingLinkUpdates,
+} from "./studentInforHelpers";
 
 const columns = [
   { key: "studentId", label: "Mã sv" },
@@ -62,6 +72,9 @@ const StudentInforManagement = () => {
   const [lastRawHeaders, setLastRawHeaders] = useState(null);
   const [lastHeaderMap, setLastHeaderMap] = useState(null);
   const [lastIgnoredHeaders, setLastIgnoredHeaders] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const [syncErrors, setSyncErrors] = useState([]);
   const ALLOWED_IMPORT_KEYS = [
     "studentId",
     "fullName",
@@ -101,6 +114,57 @@ const StudentInforManagement = () => {
     }
   };
 
+  // computePendingLinkUpdates is provided by studentInforHelpers
+  const syncExamLinks = async () => {
+    if (
+      !window.confirm(
+        "Bạn có chắc muốn đồng bộ link phòng cho các bản ghi thiếu?"
+      )
+    )
+      return;
+    setIsSyncing(true);
+    setSyncErrors([]);
+    try {
+      const updates = computePendingLinkUpdates(studentInfors);
+
+      if (updates.length === 0) {
+        alert("Không có bản ghi nào cần đồng bộ.");
+        return;
+      }
+
+      setSyncProgress({ done: 0, total: updates.length });
+      const errors = [];
+      let done = 0;
+      for (const u of updates) {
+        try {
+          await updateStudentInfor(u.id, { examLink: u.link });
+          // update local state
+          setStudentInfors((prev) =>
+            prev.map((p) => (p.id === u.id ? { ...p, examLink: u.link } : p))
+          );
+        } catch (err) {
+          console.error("Sync update error", err, u);
+          errors.push({ id: u.id, error: err?.message || String(err) });
+        } finally {
+          done += 1;
+          setSyncProgress({ done, total: updates.length });
+        }
+      }
+
+      setSyncErrors(errors);
+      if (errors.length > 0) {
+        setError(
+          `Đồng bộ hoàn tất nhưng có ${errors.length} lỗi. Kiểm tra console để biết chi tiết.`
+        );
+      } else {
+        setError(null);
+        alert(`Đồng bộ thành công ${updates.length} bản ghi.`);
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   useEffect(() => {
     // Subscribe to realtime updates
     setLoading(true);
@@ -121,23 +185,61 @@ const StudentInforManagement = () => {
     };
   }, []);
 
+  // Auto-sync: whenever studentInfors change, check for pending link updates and apply them automatically.
+  useEffect(() => {
+    if (!studentInfors || studentInfors.length === 0) return;
+    if (isSyncing) return; // avoid re-entrancy
+
+    const pending = computePendingLinkUpdates(studentInfors);
+    if (!pending || pending.length === 0) return;
+
+    // Run async without blocking render
+    (async () => {
+      try {
+        console.info(
+          "Auto-sync: found",
+          pending.length,
+          "updates, applying..."
+        );
+        setIsSyncing(true);
+        setSyncProgress({ done: 0, total: pending.length });
+        let done = 0;
+        const errors = [];
+        for (const u of pending) {
+          try {
+            await updateStudentInfor(u.id, { examLink: u.link });
+            setStudentInfors((prev) =>
+              prev.map((p) => (p.id === u.id ? { ...p, examLink: u.link } : p))
+            );
+          } catch (err) {
+            console.error("Auto-sync update error", err, u);
+            errors.push({ id: u.id, error: err?.message || String(err) });
+          } finally {
+            done += 1;
+            setSyncProgress({ done, total: pending.length });
+          }
+        }
+        if (errors.length > 0) {
+          setSyncErrors(errors);
+          setError(`Đồng bộ tự động hoàn tất nhưng có ${errors.length} lỗi.`);
+        } else {
+          setSyncErrors([]);
+          setError(null);
+          console.info("Auto-sync complete");
+        }
+      } finally {
+        setIsSyncing(false);
+      }
+    })();
+  }, [studentInfors]);
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Normalize text for search (remove diacritics and lowercase)
-  const normalizeForSearch = (s = "") => {
-    try {
-      return String(s)
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .toLowerCase();
-    } catch (e) {
-      return String(s).toLowerCase();
-    }
-  };
+  // normalizeForSearch is imported from studentInforHelpers
 
   const filteredStudentInfors = React.useMemo(() => {
     const q = normalizeForSearch(searchQuery.trim());
@@ -229,119 +331,9 @@ const StudentInforManagement = () => {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  // Utility to format dob (supports Firestore Timestamp or ISO/date string)
-  const formatDate = (value) => {
-    if (!value) return "";
-    try {
-      // Firestore Timestamp
-      if (value.toDate && typeof value.toDate === "function") {
-        const d = value.toDate();
-        return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1
-        ).padStart(2, "0")}/${d.getFullYear()}`;
-      }
+  // formatDate, isValidUrl and parseDateToYMD are imported from studentInforHelpers
 
-      // ISO string or YYYY-MM-DD
-      const d = new Date(value);
-      if (!isNaN(d.getTime())) {
-        return `${String(d.getDate()).padStart(2, "0")}/${String(
-          d.getMonth() + 1
-        ).padStart(2, "0")}/${d.getFullYear()}`;
-      }
-    } catch (e) {
-      // ignore and fallback to raw
-    }
-    return value;
-  };
-
-  // Basic URL validation
-  const isValidUrl = (value) => {
-    if (!value) return false;
-    try {
-      const u = new URL(value);
-      return u.protocol === "http:" || u.protocol === "https:";
-    } catch (e) {
-      return false;
-    }
-  };
-
-  // Helper: ensure SheetJS (XLSX) is loaded (loads from CDN if needed)
-  const ensureXLSX = () => {
-    return new Promise((resolve, reject) => {
-      if (typeof window === "undefined")
-        return reject(new Error("Browser environment required"));
-      if (window.XLSX) return resolve(window.XLSX);
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js";
-      script.async = true;
-      script.onload = () => {
-        if (window.XLSX) resolve(window.XLSX);
-        else reject(new Error("XLSX failed to load"));
-      };
-      script.onerror = (e) => reject(new Error("Failed to load XLSX library"));
-      document.head.appendChild(script);
-    });
-  };
-
-  // Normalize header string: remove diacritics, spaces and lowercase
-  const normalizeHeader = (s = "") => {
-    try {
-      return String(s)
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .replace(/[^\w]/g, "")
-        .toLowerCase();
-    } catch (e) {
-      // fallback
-      return String(s)
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "");
-    }
-  };
-
-  // Map a raw header to our DB key
-  const mapHeaderToKey = (h) => {
-    const n = normalizeHeader(h);
-    if (!n) return null;
-    if (n === "stt") return null;
-    // Student identifier: prefer common patterns (Mã SV, MSSV, SBD, Số báo danh)
-    if (
-      /(masv|mssv|msv|sbd|sobadanh|sobd|sobaodanh|sinhvien|mssinhvien)/.test(n)
-    )
-      return "studentId";
-    // Full name combined
-    if (n === "hoten" || n === "hovaten" || n === "hotenvaten")
-      return "fullName";
-    // Separate surname/given name
-    if (n === "ho") return "lastName";
-    if (n === "ten") return "firstName";
-    if (n.includes("tenmon") || n.includes("mon") || n.includes("monhoc"))
-      return "subject";
-    if (n.includes("cathi") || (n.includes("ca") && n.includes("thi")))
-      return "examSession";
-    if (
-      n.includes("thoigian") ||
-      n.includes("thoigian") ||
-      n.includes("thoi") ||
-      n.includes("gian")
-    )
-      return "examTime";
-    if (n.includes("phong")) return "examRoom";
-    if (n.includes("khoa")) return "course";
-    if (n.includes("manganh") || (n.includes("ma") && n.includes("nganh")))
-      return "majorCode";
-    if (n.includes("hinhthuc") || n.includes("hinh")) return "examType";
-    if (n.includes("link")) return "examLink";
-    if (
-      n.includes("ngaysinh") ||
-      n.includes("ngaysinh") ||
-      n.includes("dob") ||
-      n.includes("date")
-    )
-      return "dob";
-    // No broad fallback on 'ma' to avoid mapping generic "Mã ..." (e.g., 'Mã đề') to studentId.
-    return null;
-  };
+  // XLSX and header mapping helpers are provided by studentInforHelpers
 
   // Handle file import: parse workbook, map rows, prompt, and import sequentially
   const handleFileImport = async (file) => {
@@ -397,7 +389,7 @@ const StudentInforManagement = () => {
         console.info("Import - ignored headers (will not be used):", ignored);
 
       // Prepare objects
-      const toImport = [];
+      let toImport = [];
       for (const r of rows) {
         // Skip empty rows: require at least studentId or fullName
         const vals = r;
@@ -448,8 +440,65 @@ const StudentInforManagement = () => {
         toImport.push(item);
       }
 
+      // Deduplicate against existing DB records: skip imports that already exist in `studentInfors`.
+      const existingIds = new Set(
+        (studentInfors || [])
+          .map((s) =>
+            String(s.studentId || "")
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean)
+      );
+      const existingNameDob = new Set(
+        (studentInfors || [])
+          .map((s) => {
+            const name = String(s.fullName || "")
+              .trim()
+              .toLowerCase();
+            const dob = parseDateToYMD(s.dob || "");
+            return name && dob ? `${name}||${dob}` : null;
+          })
+          .filter(Boolean)
+      );
+
+      const originalCount = toImport.length;
+      const filtered = [];
+      let skippedExisting = 0;
+      for (const item of toImport) {
+        const idKey = String(item.studentId || "")
+          .trim()
+          .toLowerCase();
+        const nameDobKey = `${String(item.fullName || "")
+          .trim()
+          .toLowerCase()}||${parseDateToYMD(item.dob || "")}`;
+        if (idKey) {
+          if (existingIds.has(idKey)) {
+            skippedExisting += 1;
+            continue;
+          }
+        } else if (nameDobKey && existingNameDob.has(nameDobKey)) {
+          skippedExisting += 1;
+          continue;
+        }
+        filtered.push(item);
+      }
+      toImport = filtered;
+
       if (toImport.length === 0) {
-        // Provide diagnostic info in error message and console
+        // If all rows from the file were skipped because they already exist in DB,
+        // show a clearer message to the admin instead of the generic diagnostic.
+        if (originalCount > 0 && skippedExisting === originalCount) {
+          const dupMsg = `Dữ liệu import đã tồn tại trong hệ thống. Không có bản ghi mới để import (${skippedExisting}/${originalCount} bản ghi trùng).`;
+          console.info("Import aborted - all rows already exist in DB", {
+            originalCount,
+            skippedExisting,
+          });
+          setError(dupMsg);
+          return;
+        }
+
+        // Provide diagnostic info in error message and console for other cases
         const hr =
           rawHeaders && rawHeaders.length
             ? rawHeaders.join(", ")
@@ -476,10 +525,10 @@ const StudentInforManagement = () => {
         return;
       }
 
-      // Confirm with user
+      // Confirm with user, showing how many will be imported and how many were skipped
       if (
         !window.confirm(
-          `Tìm thấy ${toImport.length} bản ghi. Bắt đầu import vào cơ sở dữ liệu?`
+          `Tìm thấy ${originalCount} bản ghi trong file. Bỏ qua ${skippedExisting} bản ghi trùng đã có trên hệ thống. Bắt đầu import ${toImport.length} bản ghi?`
         )
       )
         return;
@@ -686,161 +735,14 @@ const StudentInforManagement = () => {
                 </div>
               )}
 
-              {/* Table area - styled like other admin pages */}
-              <div
-                className={`rounded-lg shadow-md overflow-hidden ${
-                  isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
-                }`}
-              >
-                <div
-                  className={`px-6 py-4 ${
-                    isDarkMode
-                      ? "bg-gray-700/50 border-b border-gray-700"
-                      : "bg-gray-50 border-b border-gray-200"
-                  }`}
-                >
-                  <h3
-                    className={`text-lg font-medium ${
-                      isDarkMode ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    Danh sách sinh viên
-                  </h3>
-                  <p
-                    className={`mt-1 text-sm ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
-                    }`}
-                  >
-                    Hiển thị {filteredStudentInfors.length} /{" "}
-                    {studentInfors.length} bản ghi
-                  </p>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table
-                    className={`min-w-full divide-y ${
-                      isDarkMode ? "divide-gray-700" : "divide-gray-200"
-                    }`}
-                  >
-                    <thead>
-                      <tr
-                        className={isDarkMode ? "bg-gray-700/30" : "bg-gray-50"}
-                      >
-                        {columns.map((col) => (
-                          <th
-                            key={col.key}
-                            scope="col"
-                            className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                              isDarkMode ? "text-gray-300" : "text-gray-500"
-                            }`}
-                          >
-                            {col.label}
-                          </th>
-                        ))}
-                        <th
-                          scope="col"
-                          className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                            isDarkMode ? "text-gray-300" : "text-gray-500"
-                          }`}
-                        >
-                          Hành động
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody
-                      className={`divide-y ${
-                        isDarkMode ? "divide-gray-700" : "divide-gray-200"
-                      }`}
-                    >
-                      {loading ? (
-                        <tr>
-                          <td
-                            colSpan={columns.length + 1}
-                            className={`px-6 py-6 text-center ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          >
-                            Đang tải...
-                          </td>
-                        </tr>
-                      ) : filteredStudentInfors.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={columns.length + 1}
-                            className={`px-6 py-10 text-center ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                          >
-                            <div className="mx-auto">Không có dữ liệu</div>
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredStudentInfors.map((row) => (
-                          <tr
-                            key={row.id}
-                            className={
-                              isDarkMode
-                                ? "hover:bg-gray-700/30"
-                                : "hover:bg-gray-50"
-                            }
-                          >
-                            {columns.map((col) => (
-                              <td
-                                key={col.key}
-                                className="px-6 py-4 whitespace-nowrap text-sm"
-                              >
-                                {col.key === "dob" ? (
-                                  formatDate(row[col.key])
-                                ) : col.key === "examLink" ? (
-                                  row[col.key] ? (
-                                    <a
-                                      href={row[col.key]}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-400 hover:underline"
-                                      title={row[col.key]}
-                                    >
-                                      {row[col.key].length > 60
-                                        ? row[col.key].slice(0, 60) + "..."
-                                        : row[col.key]}
-                                    </a>
-                                  ) : (
-                                    ""
-                                  )
-                                ) : (
-                                  row[col.key] ?? ""
-                                )}
-                              </td>
-                            ))}
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <button
-                                onClick={() => openEditModal(row)}
-                                className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium ${
-                                  isDarkMode
-                                    ? "bg-blue-600 hover:bg-blue-500 text-white"
-                                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                                }`}
-                              >
-                                Sửa
-                              </button>
-                              <button
-                                onClick={() => handleDelete(row.id)}
-                                className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium ml-2 ${
-                                  isDarkMode
-                                    ? "bg-red-700 hover:bg-red-600 text-white"
-                                    : "bg-red-600 hover:bg-red-700 text-white"
-                                }`}
-                              >
-                                Xóa
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <StudentTable
+                columns={columns}
+                rows={filteredStudentInfors}
+                loading={loading}
+                isDarkMode={isDarkMode}
+                openEditModal={openEditModal}
+                handleDelete={handleDelete}
+              />
             </div>
           </main>
         </div>
@@ -852,126 +754,16 @@ const StudentInforManagement = () => {
         isDarkMode={isDarkMode}
       />
 
-      {/* Modal (popup) */}
-      <React.Suspense fallback={null}>
-        {isModalOpen && (
-          // Lazy-render modal children only when open
-          <Modal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            title={editingItem ? "Sửa thông tin" : "Thêm sinh viên"}
-          >
-            {error && <div className="alert-error">{error}</div>}
-            <form onSubmit={handleSave}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="form-row">
-                  <label>Mã sv</label>
-                  <input
-                    value={form.studentId}
-                    onChange={(e) => handleChange("studentId", e.target.value)}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Họ và tên</label>
-                  <input
-                    value={form.fullName}
-                    onChange={(e) => handleChange("fullName", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label>Ngày sinh</label>
-                  <input
-                    type="date"
-                    value={form.dob}
-                    onChange={(e) => handleChange("dob", e.target.value)}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Tên môn học</label>
-                  <input
-                    value={form.subject}
-                    onChange={(e) => handleChange("subject", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label>Ca thi</label>
-                  <input
-                    value={form.examSession}
-                    onChange={(e) =>
-                      handleChange("examSession", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Thời gian</label>
-                  <input
-                    value={form.examTime}
-                    onChange={(e) => handleChange("examTime", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label>Phòng thi</label>
-                  <input
-                    value={form.examRoom}
-                    onChange={(e) => handleChange("examRoom", e.target.value)}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Khóa</label>
-                  <input
-                    value={form.course}
-                    onChange={(e) => handleChange("course", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row">
-                  <label>Mã ngành</label>
-                  <input
-                    value={form.majorCode}
-                    onChange={(e) => handleChange("majorCode", e.target.value)}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Hình thức thi</label>
-                  <input
-                    value={form.examType}
-                    onChange={(e) => handleChange("examType", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-row md:col-span-2">
-                  <label>Link phòng</label>
-                  <input
-                    value={form.examLink}
-                    onChange={(e) => handleChange("examLink", e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 text-right">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary ml-2"
-                  disabled={isSaving}
-                >
-                  {isSaving ? "Đang lưu..." : "Lưu"}
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
-      </React.Suspense>
+      <StudentFormModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        editingItem={editingItem}
+        form={form}
+        handleChange={handleChange}
+        handleSave={handleSave}
+        isSaving={isSaving}
+        error={error}
+      />
     </div>
   );
 };
