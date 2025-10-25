@@ -16,6 +16,7 @@ import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import StudentFormModal from "./StudentFormModal";
 import Modal from "../../../components/Modal";
+import LoadingSpinner from "../../../components/LoadingSpinner";
 import StudentTable from "./StudentTable";
 import {
   ensureXLSX,
@@ -851,15 +852,26 @@ const StudentInforManagement = () => {
                 </div>
               )}
 
-              <StudentTable
-                columns={columns}
-                rows={filteredStudentInfors}
-                loading={loading}
-                isDarkMode={isDarkMode}
-                openEditModal={openEditModal}
-                handleDelete={handleDelete}
-                onBulkDelete={handleBulkDelete}
-              />
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="text-center">
+                    <LoadingSpinner />
+                    <div className={`mt-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      Đang tải dữ liệu...
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <StudentTable
+                  columns={columns}
+                  rows={filteredStudentInfors}
+                  loading={loading}
+                  isDarkMode={isDarkMode}
+                  openEditModal={openEditModal}
+                  handleDelete={handleDelete}
+                  onBulkDelete={handleBulkDelete}
+                />
+              )}
             </div>
           </main>
         </div>
