@@ -167,20 +167,64 @@ const StudentPage = () => {
 
           <div className="flex-1 p-6 min-w-0">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-semibold text-white">
-                Danh sách thí sinh
-              </h1>
-              <div className="w-80">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm theo mã sv hoặc họ và tên"
-                  className={`w-full px-3 py-2 rounded border focus:outline-none sm:text-sm ${
-                    isDarkMode
-                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-300"
-                      : "bg-white border-gray-300 placeholder-gray-500"
-                  }`}
-                />
+              <h1 className="text-2xl font-semibold text-white">Danh sách thí sinh</h1>
+
+              <div className="flex items-center gap-3">
+                <div className="w-64">
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Tìm theo mã sv hoặc họ và tên"
+                    className={`w-full px-3 py-2 rounded border focus:outline-none sm:text-sm ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-300"
+                        : "bg-white border-gray-300 placeholder-gray-500"
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const XLSX = await import('xlsx');
+                        const data = filtered.map((r) => ({
+                          'Mã sv': r.studentId || '',
+                          'Họ và tên': r.fullName || '',
+                          'Ngày sinh': formatDate(r.dob) || '',
+                          'Tên môn học': r.subject || '',
+                          'Ca thi': r.examSession || '',
+                          'Thời gian': r.examTime || '',
+                          'Phòng thi': r.examRoom || '',
+                          'Khóa': r.course || '',
+                          'Mã ngành': r.majorCode || '',
+                          'Hình thức thi': r.examType || '',
+                          'Link phòng': r.examLink || ''
+                        }));
+
+                        const wb = XLSX.utils.book_new();
+                        const ws = XLSX.utils.json_to_sheet(data);
+                        XLSX.utils.book_append_sheet(wb, ws, 'Danh sách thí sinh');
+                        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `students_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        console.error('Export XLSX failed', e);
+                        alert('Lỗi export XLSX: ' + (e?.message || e));
+                      }
+                    }}
+                    className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    Export XLSX
+                  </button>
+                </div>
               </div>
             </div>
 
