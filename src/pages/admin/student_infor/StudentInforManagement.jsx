@@ -326,8 +326,14 @@ const StudentInforManagement = () => {
       const id = normalizeForSearch(r.studentId || "");
       const name = normalizeForSearch(r.fullName || "");
       const subject = normalizeForSearch(r.subject || "");
-      // allow searching by studentId, fullName or subject name
-      return id.includes(q) || name.includes(q) || subject.includes(q);
+      const usernameNorm = normalizeForSearch(r.username || "");
+      // allow searching by studentId, fullName, subject name or username (tài khoản)
+      return (
+        id.includes(q) ||
+        name.includes(q) ||
+        subject.includes(q) ||
+        usernameNorm.includes(q)
+      );
     });
   }, [studentInfors, searchQuery]);
 
@@ -1124,7 +1130,7 @@ const StudentInforManagement = () => {
                   <div className="ml-2 flex items-center">
                     <input
                       type="search"
-                      placeholder="Tìm theo Mã SV, Họ và tên hoặc Tên môn học..."
+                      placeholder="Tìm theo Mã SV, Họ và tên, Tài khoản hoặc Tên môn học..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="px-3 py-2 border rounded-md w-64 text-sm"
