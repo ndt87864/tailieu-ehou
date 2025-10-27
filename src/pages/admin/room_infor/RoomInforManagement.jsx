@@ -92,7 +92,7 @@ const RoomInforManagement = () => {
       // build a composite key from the fields we care about
       const key = `${s.examDate || ""}||${s.subject || ""}||${
         s.examSession || ""
-      }||${s.examTime || ""}||${s.examRoom || ""}`;
+      }||${s.examTime || ""}||${s.examRoom || ""}||${s.examType || ""}`;
       if (!map.has(key)) {
         map.set(key, {
           id: key, // deterministic id for display only
@@ -101,6 +101,7 @@ const RoomInforManagement = () => {
           examSession: s.examSession || "",
           examTime: s.examTime || "",
           examRoom: s.examRoom || "",
+          examType: s.examType || "",
           examLink: s.examLink || "",
         });
       } else {
@@ -198,7 +199,7 @@ const RoomInforManagement = () => {
   const makeKey = (r) =>
     `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
       r.examTime || ""
-    }||${r.examRoom || ""}`;
+    }||${r.examRoom || ""}||${r.examType || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
@@ -283,7 +284,7 @@ const RoomInforManagement = () => {
       const existingKeys = new Set(
         (rooms || []).map(
           (r) =>
-            `${r.examDate}||${r.subject}||${r.examSession}||${r.examTime}||${r.examRoom}`
+            `${r.examDate}||${r.subject}||${r.examSession}||${r.examTime}||${r.examRoom}||${r.examType}`
         )
       );
 
@@ -292,7 +293,7 @@ const RoomInforManagement = () => {
       for (const s of students) {
         const key = `${s.examDate || ""}||${s.subject || ""}||${
           s.examSession || ""
-        }||${s.examTime || ""}||${s.examRoom || ""}`;
+        }||${s.examTime || ""}||${s.examRoom || ""}||${s.examType || ""}`;
         if (!key) continue;
         // skip empty key
         if (!candidatesMap.has(key)) {
@@ -302,6 +303,7 @@ const RoomInforManagement = () => {
             examSession: s.examSession || "",
             examTime: s.examTime || "",
             examRoom: s.examRoom || "",
+            examType: s.examType || "",
             examLink: s.examLink || "",
           });
         }
@@ -910,13 +912,13 @@ const RoomInforManagement = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 md:overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <div className="text-sm text-gray-700 dark:text-gray-300">
                       Tổng: <strong>{rooms.length}</strong>
                     </div>
                   </div>
-                  <table className="min-w-full table-auto">
+                  <table className="min-w-max table-auto">
                     <thead className="bg-gray-50 dark:bg-gray-900">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -935,6 +937,9 @@ const RoomInforManagement = () => {
                           Phòng
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                          Hình thức thi
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                           Link phòng
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -943,10 +948,10 @@ const RoomInforManagement = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredRooms.length === 0 ? (
+                        {filteredRooms.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="p-6 text-center text-sm text-gray-500"
                           >
                             Không có dữ liệu
@@ -982,6 +987,9 @@ const RoomInforManagement = () => {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examRoom || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                              {r.examType || "-"}
                             </td>
                             <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400 break-all">
                               {r.examLink ? (
