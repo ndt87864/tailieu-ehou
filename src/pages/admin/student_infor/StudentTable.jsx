@@ -34,8 +34,6 @@ const StudentTable = ({
   }, [rows, allRowIds]);
 
   const [showSelectAllConfirm, setShowSelectAllConfirm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteResult, setDeleteResult] = useState(null); // {success: true/false, message: string}
 
   // When master checkbox is clicked, if there are more records in allRowIds
   // than visible rows, prompt the user to choose scope (visible vs all).
@@ -76,40 +74,11 @@ const StudentTable = ({
     if (!onBulkDelete) return;
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    setShowDeleteConfirm(true);
+    // Delegate confirmation and deletion to parent to avoid duplicate modals
+    onBulkDelete(ids);
   };
 
-  const confirmBulkDelete = async () => {
-    if (!onBulkDelete) return;
-    const ids = Array.from(selectedIds);
-    setShowDeleteConfirm(false);
-    try {
-      // Call parent handler. If it returns a Promise we await the real deletion result.
-      const res = onBulkDelete(ids);
-      if (res && typeof res.then === "function") {
-        await res;
-        setDeleteResult({
-          success: true,
-          message: `Đã xóa thành công ${ids.length} bản ghi.`,
-        });
-        setSelectedIds(new Set());
-      } else {
-        // Parent opened its own confirmation modal and will perform deletion later.
-        // Do not claim success immediately; inform the user a request was sent.
-        setDeleteResult({
-          success: true,
-          message:
-            "Yêu cầu xóa đã được gửi. Vui lòng xác nhận trong cửa sổ quản lý để hoàn tất.",
-        });
-        // keep selection so user can still see/confirm in parent modal
-      }
-    } catch (err) {
-      setDeleteResult({
-        success: false,
-        message: `Xóa thất bại: ${err?.message || "Lỗi không xác định"}`,
-      });
-    }
-  };
+  // Parent handles confirmation and result; no local confirm handler here
   return (
     <div
       className={`rounded-lg shadow-md overflow-hidden ${
@@ -384,51 +353,7 @@ const StudentTable = ({
         </div>
       </Modal>
 
-      {/* Bulk delete confirmation modal */}
-      <Modal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        title="Xác nhận xóa"
-        className="max-w-md"
-      >
-        <div className="space-y-4">
-          <p>Bạn có chắc muốn xóa {selectedIds.size} bản ghi đã chọn không?</p>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-800"
-            >
-              Hủy
-            </button>
-            <button
-              onClick={confirmBulkDelete}
-              className="px-3 py-1.5 rounded-md bg-red-600 text-white"
-            >
-              Xác nhận xóa
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Bulk delete result modal */}
-      <Modal
-        isOpen={!!deleteResult}
-        onClose={() => setDeleteResult(null)}
-        title={deleteResult?.success ? "Thành công" : "Lỗi"}
-        className="max-w-md"
-      >
-        <div className="space-y-4">
-          <p>{deleteResult?.message}</p>
-          <div className="flex justify-end">
-            <button
-              onClick={() => setDeleteResult(null)}
-              className="px-3 py-1.5 rounded-md bg-blue-600 text-white"
-            >
-              Đóng
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {/* Bulk delete confirmation/result handled by parent to avoid duplicates */}
     </div>
   );
 };

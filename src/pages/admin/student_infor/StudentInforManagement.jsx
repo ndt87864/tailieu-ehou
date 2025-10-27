@@ -590,8 +590,10 @@ const StudentInforManagement = () => {
     setImportProgress({ done: 0, total: 0 });
     setImportErrors([]);
     try {
-      // Support CSV files directly (avoid loading XLSX for CSV)
-      let rows = null;
+  // Support CSV files directly (avoid loading XLSX for CSV)
+  let rows = null;
+  // default date1904 flag (CSV won't set this)
+  let date1904 = false;
       const name = (file.name || "").toLowerCase();
       const isCSV = name.endsWith(".csv") || file.type === "text/csv";
 
@@ -609,6 +611,13 @@ const StudentInforManagement = () => {
           type: "array",
           cellDates: true,
         });
+        // detect if workbook uses Excel 1904 date system
+        const date1904 = Boolean(
+          workbook &&
+            workbook.Workbook &&
+            workbook.Workbook.WBProps &&
+            workbook.Workbook.WBProps.date1904
+        );
         // Only process the first sheet of the workbook (SheetNames[0]).
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
           setError("File không chứa sheet nào");
@@ -644,7 +653,8 @@ const StudentInforManagement = () => {
           worksheet = workbook.Sheets[chosen];
         }
         // Convert to JSON using headers from sheet
-        rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+  // include cellDates handling above; we'll pass date1904 flag when parsing
+  rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (!rows || rows.length === 0) {
           setError("Không tìm thấy dữ liệu trong file");
@@ -696,10 +706,12 @@ const StudentInforManagement = () => {
           username: headerMap.username
             ? String(vals[headerMap.username]).trim()
             : "",
-          dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
+          dob: headerMap.dob
+            ? parseExcelDateToYMD(vals[headerMap.dob], { date1904 })
+            : "",
           // examDate may be present in some excel files (Ngày thi)
           examDate: headerMap.examDate
-            ? parseExcelDateToYMD(vals[headerMap.examDate])
+            ? parseExcelDateToYMD(vals[headerMap.examDate], { date1904 })
             : "",
           subject: headerMap.subject
             ? String(vals[headerMap.subject]).trim()

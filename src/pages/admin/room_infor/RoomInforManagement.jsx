@@ -344,7 +344,11 @@ const RoomInforManagement = () => {
     try {
       const XLSX = await ensureXLSX();
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: "array" });
+      // request cellDates so date cells become JS Date where possible
+      const wb = XLSX.read(data, { type: "array", cellDates: true });
+      const date1904 = Boolean(
+        wb && wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904
+      );
       const firstSheet = wb.SheetNames[0];
       const sheet = wb.Sheets[firstSheet];
       const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
@@ -451,7 +455,7 @@ const RoomInforManagement = () => {
         // normalize date value if present (we'll need this whether room docs exist or not)
         let rowDate = "";
         if (mapped.examDate) {
-          rowDate = parseExcelDateToYMD(mapped.examDate);
+          rowDate = parseExcelDateToYMD(mapped.examDate, { date1904 });
         }
         const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
 

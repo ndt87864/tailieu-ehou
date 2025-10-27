@@ -103,21 +103,25 @@ export const parseDateToYMD = (v) => {
   }
 };
 // Convert Excel serial (number) to JS Date
-export const excelSerialToDate = (serial) => {
+export const excelSerialToDate = (serial, options = {}) => {
   if (serial === null || serial === undefined) return null;
   const s = Number(serial);
   if (isNaN(s)) return null;
-  // Excel stores days since 1899-12-31; convert to JS timestamp (ms)
-  // Note: using 25569 as offset (days between 1899-12-31 and 1970-01-01)
+  // Excel stores days since 1899-12-31 (or 1904-01-01 for 1904 system);
+  // convert to JS timestamp (ms)
+  // Default offset uses 25569 (days between 1899-12-31 and 1970-01-01)
+  // If workbook uses the 1904 date system, use offset 24107 instead.
+  const use1904 = Boolean(options && options.date1904);
+  const offset = use1904 ? 24107 : 25569;
   // Calculate UTC milliseconds for the Excel serial so we don't get
   // local-timezone shifts when formatting the date later.
-  const ms = Math.round((s - 25569) * 86400 * 1000);
+  const ms = Math.round((s - offset) * 86400 * 1000);
   return new Date(ms);
 };
 
 // Parse an Excel cell value (which may be number serial, Date, Firestore Timestamp, or string)
 // and return YYYY-MM-DD or empty string when not parseable
-export const parseExcelDateToYMD = (v) => {
+export const parseExcelDateToYMD = (v, options = {}) => {
   if (v === null || v === undefined || v === "") return "";
   try {
     if (v && typeof v.toDate === "function") return parseDateToYMD(v);
@@ -133,7 +137,7 @@ export const parseExcelDateToYMD = (v) => {
 
     // Numeric Excel serial values -> convert to Date and use UTC fields.
     if (typeof v === "number") {
-      const d = excelSerialToDate(v);
+      const d = excelSerialToDate(v, options);
       if (!d) return "";
       return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
         d.getUTCDate()
