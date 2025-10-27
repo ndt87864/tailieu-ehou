@@ -84,9 +84,22 @@ const StudentTable = ({
     const ids = Array.from(selectedIds);
     setShowDeleteConfirm(false);
     try {
-      await onBulkDelete(ids);
-      setDeleteResult({ success: true, message: `Đã xóa thành công ${ids.length} bản ghi.` });
-      setSelectedIds(new Set());
+      // Call parent handler. If it returns a Promise we await the real deletion result.
+      const res = onBulkDelete(ids);
+      if (res && typeof res.then === "function") {
+        await res;
+        setDeleteResult({ success: true, message: `Đã xóa thành công ${ids.length} bản ghi.` });
+        setSelectedIds(new Set());
+      } else {
+        // Parent opened its own confirmation modal and will perform deletion later.
+        // Do not claim success immediately; inform the user a request was sent.
+        setDeleteResult({
+          success: true,
+          message:
+            "Yêu cầu xóa đã được gửi. Vui lòng xác nhận trong cửa sổ quản lý để hoàn tất.",
+        });
+        // keep selection so user can still see/confirm in parent modal
+      }
     } catch (err) {
       setDeleteResult({ success: false, message: `Xóa thất bại: ${err?.message || 'Lỗi không xác định'}` });
     }

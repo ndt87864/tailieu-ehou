@@ -24,3 +24,16 @@ export const updateUserPaidCategories = async (userId, paidCategoriesData) => {
     throw error;
   }
 };
+
+/**
+ * Deletes student information in bulk
+ * @param {Array<string>} ids - The array of student information document IDs to delete
+ * @returns {Promise<number>} - A promise that resolves with the number of deleted records
+ */
+export const bulkDeleteStudentInfor = async (ids = []) => {
+  if (!Array.isArray(ids)) return 0;
+  const toDelete = ids.slice(0, 10); // Only delete up to 10 records
+  const promises = toDelete.map(id => deleteDoc(doc(db, STUDENT_INFOR_COLLECTION, id)));
+  await Promise.all(promises);
+  return toDelete.length;
+};

@@ -9,6 +9,7 @@ import {
   addStudentInfor,
   updateStudentInfor,
   deleteStudentInfor,
+  bulkDeleteStudentInfor,
 } from "../../../firebase/studentInforService";
 import Sidebar from "../../../components/Sidebar";
 import UserHeader from "../../../components/UserHeader";
@@ -419,6 +420,8 @@ const StudentInforManagement = () => {
   const [bulkDeleteIds, setBulkDeleteIds] = useState([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [bulkDeleteResult, setBulkDeleteResult] = useState(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({ done: 0, total: 0 });
 
   const handleBulkDelete = (ids) => {
     if (!ids || ids.length === 0) return;
@@ -429,28 +432,39 @@ const StudentInforManagement = () => {
   const confirmBulkDelete = async () => {
     setShowBulkDeleteModal(false);
     if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+
+    // Delete in chunks of 10 until all ids processed
+    setBulkDeleting(true);
+    setBulkDeleteProgress({ done: 0, total: bulkDeleteIds.length });
+    const idsToProcess = Array.from(bulkDeleteIds);
     const errors = [];
-    for (const id of bulkDeleteIds) {
-      try {
-        await deleteStudentInfor(id);
-        setStudentInfors((s) => s.filter((r) => r.id !== id));
-      } catch (e) {
-        console.error("Bulk delete error", e, id);
-        errors.push({ id, error: e?.message || String(e) });
+
+    try {
+      while (idsToProcess.length > 0) {
+        const chunk = idsToProcess.splice(0, 10);
+        try {
+          // bulkDeleteStudentInfor deletes up to 10 ids and returns number deleted
+          const deleted = await bulkDeleteStudentInfor(chunk);
+          // remove deleted ids from local state
+          setStudentInfors((prev) => prev.filter((r) => !chunk.includes(r.id)));
+          setBulkDeleteProgress((p) => ({ done: p.done + deleted, total: p.total }));
+        } catch (e) {
+          console.error("Bulk delete chunk error", e, chunk);
+          // record per-id errors
+          for (const id of chunk) errors.push({ id, error: e?.message || String(e) });
+        }
       }
+
+      if (errors.length > 0) {
+        setBulkDeleteResult({ success: false, message: `Xóa hoàn tất nhưng có ${errors.length} lỗi.` });
+      } else {
+        setBulkDeleteResult({ success: true, message: `Xóa thành công ${bulkDeleteProgress.total || bulkDeleteIds.length} bản ghi.` });
+      }
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteIds([]);
+      setBulkDeleteProgress((p) => ({ ...p, done: p.total }));
     }
-    if (errors.length > 0) {
-      setBulkDeleteResult({
-        success: false,
-        message: `Xóa hoàn tất nhưng có ${errors.length} lỗi.`,
-      });
-    } else {
-      setBulkDeleteResult({
-        success: true,
-        message: `Xóa thành công ${bulkDeleteIds.length} bản ghi.`,
-      });
-    }
-    setBulkDeleteIds([]);
   };
 
   const handleSave = async (e) => {
@@ -1528,6 +1542,31 @@ const StudentInforManagement = () => {
           </div>
         </div>
       </Modal>
+      {/* Bulk delete confirmation modal (parent-level) */}
+      <Modal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        title="Xác nhận xóa nhiều"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p>Bạn có chắc muốn xóa <strong>{bulkDeleteIds.length}</strong> bản ghi đã chọn không?</p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowBulkDeleteModal(false)}
+              className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-800"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={confirmBulkDelete}
+              className="px-3 py-1.5 rounded-md bg-red-600 text-white"
+            >
+              Xác nhận xóa
+            </button>
+          </div>
+        </div>
+      </Modal>
       {/* Single delete result modal */}
       <Modal
         isOpen={!!deleteResult}
@@ -1563,6 +1602,28 @@ const StudentInforManagement = () => {
             >
               Đóng
             </button>
+          </div>
+        </div>
+      </Modal>
+      {/* Bulk deleting progress modal */}
+      <Modal
+        isOpen={bulkDeleting}
+        onClose={() => {
+          /* prevent closing while deleting */
+        }}
+        title={`Xóa dữ liệu (${Math.round(((bulkDeleteProgress.done || 0) / (bulkDeleteProgress.total || 1)) * 100)}%)`}
+        className="max-w-md"
+      >
+        <div className="space-y-3">
+          <div className="text-sm text-gray-700 dark:text-gray-200">
+            Đang xóa <strong>{bulkDeleteProgress.done}</strong> / <strong>{bulkDeleteProgress.total}</strong> bản ghi...
+          </div>
+
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
+            <div
+              className="h-4 bg-red-500 dark:bg-red-400 transition-all"
+              style={{ width: `${bulkDeleteProgress.total ? Math.min(100, Math.round((bulkDeleteProgress.done / bulkDeleteProgress.total) * 100)) : 0}%` }}
+            />
           </div>
         </div>
       </Modal>
