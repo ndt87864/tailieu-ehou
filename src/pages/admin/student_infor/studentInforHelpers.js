@@ -109,6 +109,8 @@ export const excelSerialToDate = (serial) => {
   if (isNaN(s)) return null;
   // Excel stores days since 1899-12-31; convert to JS timestamp (ms)
   // Note: using 25569 as offset (days between 1899-12-31 and 1970-01-01)
+  // Calculate UTC milliseconds for the Excel serial so we don't get
+  // local-timezone shifts when formatting the date later.
   const ms = Math.round((s - 25569) * 86400 * 1000);
   return new Date(ms);
 };
@@ -119,10 +121,23 @@ export const parseExcelDateToYMD = (v) => {
   if (v === null || v === undefined || v === "") return "";
   try {
     if (v && typeof v.toDate === "function") return parseDateToYMD(v);
-    if (v instanceof Date) return parseDateToYMD(v);
+    // If XLSX (or workbook) already gave us a JS Date instance we should
+    // treat it as an Excel cell date (timezone-less) and use UTC getters
+    // to extract the calendar date so local TZ offsets don't change the day.
+    const pad = (n) => String(n).padStart(2, "0");
+    if (v instanceof Date) {
+      return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(
+        v.getUTCDate()
+      )}`;
+    }
+
+    // Numeric Excel serial values -> convert to Date and use UTC fields.
     if (typeof v === "number") {
       const d = excelSerialToDate(v);
-      return d ? parseDateToYMD(d) : "";
+      if (!d) return "";
+      return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(
+        d.getUTCDate()
+      )}`;
     }
     // If it's a string, try to robustly parse common formats like
     // dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd, etc., because `new Date(str)`
@@ -151,6 +166,75 @@ export const parseExcelDateToYMD = (v) => {
   } catch (e) {
     return "";
   }
+};
+
+// Simple, robust CSV parser (handles quoted fields and CR/LF).
+// Returns an array of objects where keys come from the header row.
+export const parseCSV = (text) => {
+  if (!text && text !== "") return [];
+  // Remove BOM if present
+  const s = String(text).replace(/^\uFEFF/, "");
+  const rows = [];
+
+  let cur = "";
+  let row = [];
+  let i = 0;
+  let inQuotes = false;
+  while (i < s.length) {
+    const ch = s[i];
+    const next = s[i + 1];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (next === '"') {
+          cur += '"';
+          i += 1; // skip escaped quote
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(cur);
+        cur = "";
+      } else if (ch === '\r') {
+        // ignore, handle on \n
+      } else if (ch === '\n') {
+        row.push(cur);
+        rows.push(row);
+        row = [];
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    i += 1;
+  }
+  // push last
+  if (cur !== "" || inQuotes || row.length > 0) {
+    row.push(cur);
+    rows.push(row);
+  }
+
+  if (rows.length === 0) return [];
+
+  const headers = rows[0].map((h) => (h == null ? "" : String(h).trim()));
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const arr = rows[r];
+    // skip empty trailing rows
+    if (arr.length === 1 && arr[0] === "") continue;
+    const obj = {};
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c] || `col${c}`;
+      obj[key] = c < arr.length && arr[c] != null ? String(arr[c]) : "";
+    }
+    out.push(obj);
+  }
+  return out;
 };
 
 export const computePendingLinkUpdates = (records) => {

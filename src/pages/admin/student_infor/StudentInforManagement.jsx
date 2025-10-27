@@ -27,6 +27,7 @@ import {
   isValidUrl,
   parseDateToYMD,
   parseExcelDateToYMD,
+  parseCSV,
   computePendingLinkUpdates,
 } from "./studentInforHelpers";
 
@@ -421,7 +422,10 @@ const StudentInforManagement = () => {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [bulkDeleteResult, setBulkDeleteResult] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({ done: 0, total: 0 });
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState({
+    done: 0,
+    total: 0,
+  });
 
   const handleBulkDelete = (ids) => {
     if (!ids || ids.length === 0) return;
@@ -447,18 +451,30 @@ const StudentInforManagement = () => {
           const deleted = await bulkDeleteStudentInfor(chunk);
           // remove deleted ids from local state
           setStudentInfors((prev) => prev.filter((r) => !chunk.includes(r.id)));
-          setBulkDeleteProgress((p) => ({ done: p.done + deleted, total: p.total }));
+          setBulkDeleteProgress((p) => ({
+            done: p.done + deleted,
+            total: p.total,
+          }));
         } catch (e) {
           console.error("Bulk delete chunk error", e, chunk);
           // record per-id errors
-          for (const id of chunk) errors.push({ id, error: e?.message || String(e) });
+          for (const id of chunk)
+            errors.push({ id, error: e?.message || String(e) });
         }
       }
 
       if (errors.length > 0) {
-        setBulkDeleteResult({ success: false, message: `Xóa hoàn tất nhưng có ${errors.length} lỗi.` });
+        setBulkDeleteResult({
+          success: false,
+          message: `Xóa hoàn tất nhưng có ${errors.length} lỗi.`,
+        });
       } else {
-        setBulkDeleteResult({ success: true, message: `Xóa thành công ${bulkDeleteProgress.total || bulkDeleteIds.length} bản ghi.` });
+        setBulkDeleteResult({
+          success: true,
+          message: `Xóa thành công ${
+            bulkDeleteProgress.total || bulkDeleteIds.length
+          } bản ghi.`,
+        });
       }
     } finally {
       setBulkDeleting(false);
@@ -574,52 +590,66 @@ const StudentInforManagement = () => {
     setImportProgress({ done: 0, total: 0 });
     setImportErrors([]);
     try {
-      const XLSX = await ensureXLSX();
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, {
-        type: "array",
-        cellDates: true,
-      });
-      // Only process the first sheet of the workbook (SheetNames[0]).
-      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        setError("File không chứa sheet nào");
-        setImportLoading(false);
-        return;
-      }
-      // If workbook has a single sheet, just use it.
-      let worksheet;
-      if (workbook.SheetNames.length === 1) {
-        const only = workbook.SheetNames[0];
-        worksheet = workbook.Sheets[only];
-      } else {
-        // Multiple sheets: prefer exact " DATA"; otherwise accept trimmed/case-insensitive 'data' (e.g. 'Data', 'DATA').
-        const prefer = " DATA";
-        let chosen = workbook.SheetNames.find((s) => s === prefer);
-        if (!chosen) {
-          chosen = workbook.SheetNames.find(
-            (s) => typeof s === "string" && s.trim().toLowerCase() === "data"
-          );
-        }
+      // Support CSV files directly (avoid loading XLSX for CSV)
+      let rows = null;
+      const name = (file.name || "").toLowerCase();
+      const isCSV = name.endsWith(".csv") || file.type === "text/csv";
 
-        if (!chosen) {
-          const available = workbook.SheetNames.join(", ");
-          const msg = `File phải chứa sheet có tên "${prefer}" (hoặc 'Data'). Sheet hiện có: ${available}`;
-          console.warn("Import aborted - required sheet missing", {
-            availableSheets: workbook.SheetNames,
-          });
-          setError(msg);
+      if (isCSV) {
+        const text = await file.text();
+        rows = parseCSV(text);
+        if (!rows || rows.length === 0) {
+          setError("Không tìm thấy dữ liệu trong file");
+          return;
+        }
+      } else {
+        const XLSX = await ensureXLSX();
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: "array",
+          cellDates: true,
+        });
+        // Only process the first sheet of the workbook (SheetNames[0]).
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          setError("File không chứa sheet nào");
           setImportLoading(false);
           return;
         }
+        // If workbook has a single sheet, just use it.
+        let worksheet;
+        if (workbook.SheetNames.length === 1) {
+          const only = workbook.SheetNames[0];
+          worksheet = workbook.Sheets[only];
+        } else {
+          // Multiple sheets: prefer exact " DATA"; otherwise accept trimmed/case-insensitive 'data' (e.g. 'Data', 'DATA').
+          const prefer = " DATA";
+          let chosen = workbook.SheetNames.find((s) => s === prefer);
+          if (!chosen) {
+            chosen = workbook.SheetNames.find(
+              (s) => typeof s === "string" && s.trim().toLowerCase() === "data"
+            );
+          }
 
-        worksheet = workbook.Sheets[chosen];
-      }
-      // Convert to JSON using headers from sheet
-      const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+          if (!chosen) {
+            const available = workbook.SheetNames.join(", ");
+            const msg = `File phải chứa sheet có tên "${prefer}" (hoặc 'Data'). Sheet hiện có: ${available}`;
+            console.warn("Import aborted - required sheet missing", {
+              availableSheets: workbook.SheetNames,
+            });
+            setError(msg);
+            setImportLoading(false);
+            return;
+          }
 
-      if (!rows || rows.length === 0) {
-        setError("Không tìm thấy dữ liệu trong file");
-        return;
+          worksheet = workbook.Sheets[chosen];
+        }
+        // Convert to JSON using headers from sheet
+        rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+        if (!rows || rows.length === 0) {
+          setError("Không tìm thấy dữ liệu trong file");
+          return;
+        }
       }
 
       // Build header map from first row keys
@@ -1550,7 +1580,10 @@ const StudentInforManagement = () => {
         className="max-w-md"
       >
         <div className="space-y-4">
-          <p>Bạn có chắc muốn xóa <strong>{bulkDeleteIds.length}</strong> bản ghi đã chọn không?</p>
+          <p>
+            Bạn có chắc muốn xóa <strong>{bulkDeleteIds.length}</strong> bản ghi
+            đã chọn không?
+          </p>
           <div className="flex justify-end gap-2">
             <button
               onClick={() => setShowBulkDeleteModal(false)}
@@ -1611,18 +1644,34 @@ const StudentInforManagement = () => {
         onClose={() => {
           /* prevent closing while deleting */
         }}
-        title={`Xóa dữ liệu (${Math.round(((bulkDeleteProgress.done || 0) / (bulkDeleteProgress.total || 1)) * 100)}%)`}
+        title={`Xóa dữ liệu (${Math.round(
+          ((bulkDeleteProgress.done || 0) / (bulkDeleteProgress.total || 1)) *
+            100
+        )}%)`}
         className="max-w-md"
       >
         <div className="space-y-3">
           <div className="text-sm text-gray-700 dark:text-gray-200">
-            Đang xóa <strong>{bulkDeleteProgress.done}</strong> / <strong>{bulkDeleteProgress.total}</strong> bản ghi...
+            Đang xóa <strong>{bulkDeleteProgress.done}</strong> /{" "}
+            <strong>{bulkDeleteProgress.total}</strong> bản ghi...
           </div>
 
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
             <div
               className="h-4 bg-red-500 dark:bg-red-400 transition-all"
-              style={{ width: `${bulkDeleteProgress.total ? Math.min(100, Math.round((bulkDeleteProgress.done / bulkDeleteProgress.total) * 100)) : 0}%` }}
+              style={{
+                width: `${
+                  bulkDeleteProgress.total
+                    ? Math.min(
+                        100,
+                        Math.round(
+                          (bulkDeleteProgress.done / bulkDeleteProgress.total) *
+                            100
+                        )
+                      )
+                    : 0
+                }%`,
+              }}
             />
           </div>
         </div>

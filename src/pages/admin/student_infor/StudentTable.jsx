@@ -88,7 +88,10 @@ const StudentTable = ({
       const res = onBulkDelete(ids);
       if (res && typeof res.then === "function") {
         await res;
-        setDeleteResult({ success: true, message: `Đã xóa thành công ${ids.length} bản ghi.` });
+        setDeleteResult({
+          success: true,
+          message: `Đã xóa thành công ${ids.length} bản ghi.`,
+        });
         setSelectedIds(new Set());
       } else {
         // Parent opened its own confirmation modal and will perform deletion later.
@@ -101,7 +104,10 @@ const StudentTable = ({
         // keep selection so user can still see/confirm in parent modal
       }
     } catch (err) {
-      setDeleteResult({ success: false, message: `Xóa thất bại: ${err?.message || 'Lỗi không xác định'}` });
+      setDeleteResult({
+        success: false,
+        message: `Xóa thất bại: ${err?.message || "Lỗi không xác định"}`,
+      });
     }
   };
   return (
