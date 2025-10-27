@@ -390,27 +390,47 @@ const StudentInforManagement = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa bản ghi này?")) return;
+  // Modal state for single delete
+  const [deleteId, setDeleteId] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteResult, setDeleteResult] = useState(null);
+
+  const handleDelete = (id) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+    if (!deleteId) return;
     try {
-      await deleteStudentInfor(id);
-      setStudentInfors((s) => s.filter((r) => r.id !== id));
+      await deleteStudentInfor(deleteId);
+      setStudentInfors((s) => s.filter((r) => r.id !== deleteId));
+      setDeleteResult({ success: true, message: "Xóa thành công." });
     } catch (e) {
       console.error(e);
-      setError("Xóa thất bại");
+      setDeleteResult({ success: false, message: "Xóa thất bại." });
+    } finally {
+      setDeleteId(null);
     }
   };
 
-  const handleBulkDelete = async (ids) => {
+  // Modal state for bulk delete
+  const [bulkDeleteIds, setBulkDeleteIds] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [bulkDeleteResult, setBulkDeleteResult] = useState(null);
+
+  const handleBulkDelete = (ids) => {
     if (!ids || ids.length === 0) return;
-    if (
-      !window.confirm(
-        `Bạn có chắc muốn xóa ${ids.length} bản ghi đã chọn không?`
-      )
-    )
-      return;
+    setBulkDeleteIds(ids);
+    setShowBulkDeleteModal(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setShowBulkDeleteModal(false);
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
     const errors = [];
-    for (const id of ids) {
+    for (const id of bulkDeleteIds) {
       try {
         await deleteStudentInfor(id);
         setStudentInfors((s) => s.filter((r) => r.id !== id));
@@ -420,11 +440,17 @@ const StudentInforManagement = () => {
       }
     }
     if (errors.length > 0) {
-      setError(`Xóa hoàn tất nhưng có ${errors.length} lỗi.`);
+      setBulkDeleteResult({
+        success: false,
+        message: `Xóa hoàn tất nhưng có ${errors.length} lỗi.`,
+      });
     } else {
-      setError(null);
-      alert(`Xóa thành công ${ids.length - errors.length} bản ghi`);
+      setBulkDeleteResult({
+        success: true,
+        message: `Xóa thành công ${bulkDeleteIds.length} bản ghi.`,
+      });
     }
+    setBulkDeleteIds([]);
   };
 
   const handleSave = async (e) => {
@@ -557,14 +583,16 @@ const StudentInforManagement = () => {
         let chosen = workbook.SheetNames.find((s) => s === prefer);
         if (!chosen) {
           chosen = workbook.SheetNames.find(
-            (s) => typeof s === 'string' && s.trim().toLowerCase() === 'data'
+            (s) => typeof s === "string" && s.trim().toLowerCase() === "data"
           );
         }
 
         if (!chosen) {
-          const available = workbook.SheetNames.join(', ');
+          const available = workbook.SheetNames.join(", ");
           const msg = `File phải chứa sheet có tên "${prefer}" (hoặc 'Data'). Sheet hiện có: ${available}`;
-          console.warn('Import aborted - required sheet missing', { availableSheets: workbook.SheetNames });
+          console.warn("Import aborted - required sheet missing", {
+            availableSheets: workbook.SheetNames,
+          });
           setError(msg);
           setImportLoading(false);
           return;
@@ -621,7 +649,9 @@ const StudentInforManagement = () => {
         const item = {
           studentId: studentId || "",
           fullName: fullName || "",
-          username: headerMap.username ? String(vals[headerMap.username]).trim() : "",
+          username: headerMap.username
+            ? String(vals[headerMap.username]).trim()
+            : "",
           dob: headerMap.dob ? parseExcelDateToYMD(vals[headerMap.dob]) : "",
           // examDate may be present in some excel files (Ngày thi)
           examDate: headerMap.examDate
@@ -799,7 +829,13 @@ const StudentInforManagement = () => {
       // them immediately. Use more robust normalization to avoid misses.
       const dateUpdates = [];
       const handledImportIndexes = new Set();
-      const normalizeId = (s) => (s == null ? "" : String(s).replace(/[^a-z0-9]/gi, "").trim().toLowerCase());
+      const normalizeId = (s) =>
+        s == null
+          ? ""
+          : String(s)
+              .replace(/[^a-z0-9]/gi, "")
+              .trim()
+              .toLowerCase();
       const normalizeName = (s) => normalizeForSearch(String(s || "").trim());
 
       for (let i = 0; i < toImport.length; i++) {
@@ -825,10 +861,16 @@ const StudentInforManagement = () => {
         }
 
         // try username match if provided
-        const importedUsername = String(item.username || "").trim().toLowerCase();
+        const importedUsername = String(item.username || "")
+          .trim()
+          .toLowerCase();
         if (importedUsername) {
           const matches = (studentInfors || []).filter((s) => {
-            return String(s.username || "").trim().toLowerCase() === importedUsername;
+            return (
+              String(s.username || "")
+                .trim()
+                .toLowerCase() === importedUsername
+            );
           });
           for (const m of matches) {
             const mExam = parseDateToYMD(m.examDate || "");
@@ -847,7 +889,9 @@ const StudentInforManagement = () => {
           const matches = (studentInfors || []).filter((s) => {
             const sNameNorm = normalizeName(s.fullName || "");
             const sDob = parseDateToYMD(s.dob || "");
-            return sNameNorm === importedNameNorm && sDob && sDob === importedDob;
+            return (
+              sNameNorm === importedNameNorm && sDob && sDob === importedDob
+            );
           });
           for (const m of matches) {
             const mExam = parseDateToYMD(m.examDate || "");
@@ -860,7 +904,10 @@ const StudentInforManagement = () => {
       }
 
       if (dateUpdates.length > 0) {
-        console.info(`Applying ${dateUpdates.length} examDate updates from Excel to existing records`, { dateUpdates });
+        console.info(
+          `Applying ${dateUpdates.length} examDate updates from Excel to existing records`,
+          { dateUpdates }
+        );
 
         // Show progress in the import modal while applying date updates
         setImportProgress({ done: 0, total: dateUpdates.length });
@@ -881,7 +928,9 @@ const StudentInforManagement = () => {
               try {
                 await updateStudentInfor(u.id, { examDate: u.examDate });
                 setStudentInfors((prev) =>
-                  prev.map((p) => (p.id === u.id ? { ...p, examDate: u.examDate } : p))
+                  prev.map((p) =>
+                    p.id === u.id ? { ...p, examDate: u.examDate } : p
+                  )
                 );
               } catch (e) {
                 console.error("Failed to apply examDate update", u, e);
@@ -898,10 +947,14 @@ const StudentInforManagement = () => {
         await Promise.all(workers);
 
         if (errors.length > 0) {
-          console.warn(`Completed examDate updates with ${errors.length} errors`);
+          console.warn(
+            `Completed examDate updates with ${errors.length} errors`
+          );
           // attach to importErrors for admin to inspect
           setImportErrors((prev) => [...(prev || []), ...errors]);
-          setError(`Áp dụng ngày thi hoàn tất nhưng có ${errors.length} lỗi (xem console).`);
+          setError(
+            `Áp dụng ngày thi hoàn tất nhưng có ${errors.length} lỗi (xem console).`
+          );
         } else {
           setError(null);
         }
@@ -925,53 +978,68 @@ const StudentInforManagement = () => {
         const nameDobKey = name && dob ? `${name}||${dob}` : null;
         const comp = makeComposite({ ...item, examDate: itemExamDate });
 
-          let isDuplicate = false;
-          const normalize = (v) => (v == null ? "" : String(v).trim().toLowerCase());
+        let isDuplicate = false;
+        const normalize = (v) =>
+          v == null ? "" : String(v).trim().toLowerCase();
 
-          // Helper to compare exam-related fields between an existing record and the imported item
-          const fieldsEqual = (existing, imported) => {
-            const eExamDate = parseDateToYMD(existing.examDate || "") || "";
-            const iExamDate = parseDateToYMD(imported.examDate || "") || "";
-            if (eExamDate !== iExamDate) return false;
-            if (normalize(existing.subject) !== normalize(imported.subject)) return false;
-            if (normalize(existing.examSession) !== normalize(imported.examSession)) return false;
-            if (normalize(existing.examTime) !== normalize(imported.examTime)) return false;
-            if (normalize(existing.examRoom) !== normalize(imported.examRoom)) return false;
-            if (normalize(existing.course) !== normalize(imported.course)) return false;
-            if (normalize(existing.majorCode) !== normalize(imported.majorCode)) return false;
-            if (normalize(existing.examType) !== normalize(imported.examType)) return false;
-            return true;
-          };
+        // Helper to compare exam-related fields between an existing record and the imported item
+        const fieldsEqual = (existing, imported) => {
+          const eExamDate = parseDateToYMD(existing.examDate || "") || "";
+          const iExamDate = parseDateToYMD(imported.examDate || "") || "";
+          if (eExamDate !== iExamDate) return false;
+          if (normalize(existing.subject) !== normalize(imported.subject))
+            return false;
+          if (
+            normalize(existing.examSession) !== normalize(imported.examSession)
+          )
+            return false;
+          if (normalize(existing.examTime) !== normalize(imported.examTime))
+            return false;
+          if (normalize(existing.examRoom) !== normalize(imported.examRoom))
+            return false;
+          if (normalize(existing.course) !== normalize(imported.course))
+            return false;
+          if (normalize(existing.majorCode) !== normalize(imported.majorCode))
+            return false;
+          if (normalize(existing.examType) !== normalize(imported.examType))
+            return false;
+          return true;
+        };
 
-          // Check duplicates by studentId: only if there's an existing record with same id
-          // and all exam-related fields match exactly (including examDate). If DB examDate
-          // is empty but imported has a value, fieldsEqual will return false so it's NOT a duplicate.
-          if (idKey) {
-            const matches = (studentInfors || []).filter(
-              (s) => String(s.studentId || "").trim().toLowerCase() === idKey
-            );
-            for (const m of matches) {
-              if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
-                isDuplicate = true;
-                break;
-              }
+        // Check duplicates by studentId: only if there's an existing record with same id
+        // and all exam-related fields match exactly (including examDate). If DB examDate
+        // is empty but imported has a value, fieldsEqual will return false so it's NOT a duplicate.
+        if (idKey) {
+          const matches = (studentInfors || []).filter(
+            (s) =>
+              String(s.studentId || "")
+                .trim()
+                .toLowerCase() === idKey
+          );
+          for (const m of matches) {
+            if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
+              isDuplicate = true;
+              break;
             }
           }
+        }
 
-          // If not duplicate by id, check by fullName+dob
-          if (!isDuplicate && nameDobKey) {
-            const matches = (studentInfors || []).filter((s) => {
-              const sName = String(s.fullName || "").trim().toLowerCase();
-              const sDob = parseDateToYMD(s.dob || "");
-              return sName === name && sDob === dob;
-            });
-            for (const m of matches) {
-              if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
-                isDuplicate = true;
-                break;
-              }
+        // If not duplicate by id, check by fullName+dob
+        if (!isDuplicate && nameDobKey) {
+          const matches = (studentInfors || []).filter((s) => {
+            const sName = String(s.fullName || "")
+              .trim()
+              .toLowerCase();
+            const sDob = parseDateToYMD(s.dob || "");
+            return sName === name && sDob === dob;
+          });
+          for (const m of matches) {
+            if (fieldsEqual(m, { ...item, examDate: itemExamDate })) {
+              isDuplicate = true;
+              break;
             }
           }
+        }
 
         if (isDuplicate) {
           skippedExisting += 1;
@@ -1006,17 +1074,27 @@ const StudentInforManagement = () => {
         if (!requiredPresent) {
           // Tell admin which required headers are missing (concise)
           const needed = [
-            { key: 'studentId', label: 'Mã sinh viên' },
-            { key: 'fullName', label: 'Họ và tên (hoặc Họ + Tên)' },
-            { key: 'dob', label: 'Ngày sinh (nếu dùng Họ+Ngày sinh để khớp)' },
+            { key: "studentId", label: "Mã sinh viên" },
+            { key: "fullName", label: "Họ và tên (hoặc Họ + Tên)" },
+            { key: "dob", label: "Ngày sinh (nếu dùng Họ+Ngày sinh để khớp)" },
           ];
-          const found = needed.filter((n) => headerMap[n.key]).map((n) => n.label);
+          const found = needed
+            .filter((n) => headerMap[n.key])
+            .map((n) => n.label);
           const missing = needed
             .filter((n) => !headerMap[n.key])
             .map((n) => n.label);
 
-          const shortMsg = `Không tìm thấy trường cần thiết để import bản ghi. Tìm thấy: ${found.length ? found.join(', ') : '(không có)'}; Thiếu: ${missing.join(', ')}. Vui lòng kiểm tra header dòng 1 (ví dụ: Mã sinh viên, Họ, Tên, Ngày sinh).`;
-          console.warn('Import aborted - missing required headers', { rawHeaders, headerMap, ignored });
+          const shortMsg = `Không tìm thấy trường cần thiết để import bản ghi. Tìm thấy: ${
+            found.length ? found.join(", ") : "(không có)"
+          }; Thiếu: ${missing.join(
+            ", "
+          )}. Vui lòng kiểm tra header dòng 1 (ví dụ: Mã sinh viên, Họ, Tên, Ngày sinh).`;
+          console.warn("Import aborted - missing required headers", {
+            rawHeaders,
+            headerMap,
+            ignored,
+          });
           setError(shortMsg);
           return;
         }
@@ -1030,7 +1108,12 @@ const StudentInforManagement = () => {
           : "(no mapped headers)";
 
         const msg = `Không tìm thấy bản ghi hợp lệ để import. Các trường được mapping: ${mappedKeys}. Có thể do tất cả bản ghi trong file đã tồn tại hoặc thiếu thông tin nhận dạng. Kiểm tra header dòng 1 (ví dụ: Mã sinh viên, Họ, Tên, ...).`;
-        console.warn("Import aborted - no valid rows to import", { originalCount, skippedExisting, headerMap, rawHeaders });
+        console.warn("Import aborted - no valid rows to import", {
+          originalCount,
+          skippedExisting,
+          headerMap,
+          rawHeaders,
+        });
         setError(msg);
         return;
       }
@@ -1420,6 +1503,69 @@ const StudentInforManagement = () => {
         </div>
       </Modal>
 
+      {/* Single delete confirmation modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Xác nhận xóa"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p>Bạn có chắc muốn xóa bản ghi này không?</p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="px-3 py-1.5 rounded-md bg-gray-200 text-gray-800"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-3 py-1.5 rounded-md bg-red-600 text-white"
+            >
+              Xác nhận xóa
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {/* Single delete result modal */}
+      <Modal
+        isOpen={!!deleteResult}
+        onClose={() => setDeleteResult(null)}
+        title={deleteResult?.success ? "Thành công" : "Lỗi"}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p>{deleteResult?.message}</p>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setDeleteResult(null)}
+              className="px-3 py-1.5 rounded-md bg-blue-600 text-white"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {/* Bulk delete result modal */}
+      <Modal
+        isOpen={!!bulkDeleteResult}
+        onClose={() => setBulkDeleteResult(null)}
+        title={bulkDeleteResult?.success ? "Thành công" : "Lỗi"}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p>{bulkDeleteResult?.message}</p>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setBulkDeleteResult(null)}
+              className="px-3 py-1.5 rounded-md bg-blue-600 text-white"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      </Modal>
       <StudentFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
