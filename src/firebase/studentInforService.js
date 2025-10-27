@@ -75,6 +75,15 @@ export const updateStudentInfor = async (id, data) => {
 export const deleteStudentInfor = async (id) => {
   await deleteDoc(doc(db, STUDENT_INFOR_COLLECTION, id));
 };
+ 
+// Bulk delete: delete up to 10 student records at once
+export const bulkDeleteStudentInfor = async (ids = []) => {
+  if (!Array.isArray(ids)) throw new Error("Input must be an array of IDs");
+  const toDelete = ids.slice(0, 10); // Only delete up to 10 records
+  const promises = toDelete.map(id => deleteDoc(doc(db, STUDENT_INFOR_COLLECTION, id)));
+  await Promise.all(promises);
+  return toDelete.length;
+};
 
 // Get student documents that match provided criteria.
 // criteria: { subject, examSession, examTime, examRoom, examDate? }
