@@ -1,3 +1,4 @@
+import ExamSessionManagement from "./pages/admin/exam-session/ExamSessionManagement";
 import React, { useEffect, useState, Suspense, lazy } from "react";
 import {
   Routes,
@@ -127,86 +128,7 @@ const ConditionalHomeRoute = () => {
   return <HomePage />;
 };
 
-// Các component được bảo vệ riêng lẻ
-const AdminUserManagementPage = () => (
-  <ProtectedAdminRoute>
-    <AdminUserManagement />
-  </ProtectedAdminRoute>
-);
 
-const AdminCategoryManagementPage = () => (
-  <ProtectedAdminRoute>
-    <CategoryManagement />
-  </ProtectedAdminRoute>
-);
-
-const AdminDocumentManagementPage = () => (
-  <ProtectedAdminRoute>
-    <DocumentManagement />
-  </ProtectedAdminRoute>
-);
-
-const AdminQuestionManagementPage = () => (
-  <ProtectedAdminRoute>
-    <QuestionManagement />
-  </ProtectedAdminRoute>
-);
-
-const AdminDashboardPage = () => (
-  <ProtectedAdminRoute>
-    <AdminDashboard />
-  </ProtectedAdminRoute>
-);
-
-const AdminStudentInforManagementPage = () => (
-  <ProtectedAdminRoute>
-    <StudentInforManagement />
-  </ProtectedAdminRoute>
-);
-
-const AdminRoomInforManagementPage = () => (
-  <ProtectedAdminRoute>
-    <RoomInforManagement />
-  </ProtectedAdminRoute>
-);
-
-const AdminCalendarNoteManagementPage = () => (
-  <ProtectedAdminRoute>
-    <CalendarNoteManagement />
-  </ProtectedAdminRoute>
-);
-
-const PremiumUserManagementPage = () => (
-  <ProtectedAdminRoute>
-    <PremiumUserManagement />
-  </ProtectedAdminRoute>
-);
-
-const FooterManagementPage = () => (
-  <ProtectedAdminRoute>
-    <FooterManagement />
-  </ProtectedAdminRoute>
-);
-
-// Trang upload ảnh admin
-//import AdminImageUploader from "./pages/admin/AdminImageUploader";
-// const AdminImageUploaderPage = () => (
-//   <ProtectedAdminRoute>
-//     <AdminImageUploader />
-//   </ProtectedAdminRoute>
-// );
-
-const PricingContentManagementPage = () => (
-  <ProtectedAdminRoute>
-    <PricingContentManagement />
-  </ProtectedAdminRoute>
-);
-
-const ExamQuestionManagementPage = () => (
-  <ProtectedAdminRoute>
-    <ExamQuestionManagement />
-  </ProtectedAdminRoute>
-);
 
 // Add domain redirect helper
 const redirectIfNeeded = () => {
@@ -520,57 +442,120 @@ function App() {
 
                 {/* Sử dụng các component bảo vệ riêng lẻ */}
                 <Route
+                  path="/admin/exam-sessions"
+                  element={
+                    <ProtectedAdminRoute>
+                      <ExamSessionManagement />
+                    </ProtectedAdminRoute>
+                  }
+                />
+                <Route
                   path="/admin/users"
-                  element={<AdminUserManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminUserManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/categories"
-                  element={<AdminCategoryManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <CategoryManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/student-infor"
-                  element={<AdminStudentInforManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <StudentInforManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/documents"
-                  element={<AdminDocumentManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <DocumentManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/questions"
-                  element={<AdminQuestionManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <QuestionManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/calendar-notes"
-                  element={<AdminCalendarNoteManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <CalendarNoteManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/room-infor"
-                  element={<AdminRoomInforManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <RoomInforManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/premium-users"
-                  element={<PremiumUserManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <PremiumUserManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/footer"
-                  element={<FooterManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <FooterManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/admin/dashboard"
-                  element={<AdminDashboardPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminDashboard />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 {/* Trang upload ảnh admin
                 <Route
                   path="/admin/image-uploader"
-                  element={<AdminImageUploaderPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminImageUploader />
+                    </ProtectedAdminRoute>
+                  }
                 /> */}
-                <Route path="/admin" element={<AdminDashboardPage />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedAdminRoute>
+                      <AdminDashboard />
+                    </ProtectedAdminRoute>
+                  }
+                />
 
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/editor" element={<EditorPage />} />
                 <Route
                   path="/admin/pricing-content-management"
-                  element={<PricingContentManagementPage />}
+                  element={
+                    <ProtectedAdminRoute>
+                      <PricingContentManagement />
+                    </ProtectedAdminRoute>
+                  }
                 />
                 <Route
                   path="/:categorySlug/:documentSlug"

@@ -8,3 +8,4 @@ export * from './firebase.js';
 export * from './authService.js';
 export * from './firestoreService.js';
 export * from './optimizedFirestoreService.js';
+export * from './examSessionService.js';

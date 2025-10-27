@@ -590,10 +590,10 @@ const StudentInforManagement = () => {
     setImportProgress({ done: 0, total: 0 });
     setImportErrors([]);
     try {
-  // Support CSV files directly (avoid loading XLSX for CSV)
-  let rows = null;
-  // default date1904 flag (CSV won't set this)
-  let date1904 = false;
+      // Support CSV files directly (avoid loading XLSX for CSV)
+      let rows = null;
+      // default date1904 flag (CSV won't set this)
+      let date1904 = false;
       const name = (file.name || "").toLowerCase();
       const isCSV = name.endsWith(".csv") || file.type === "text/csv";
 
@@ -653,8 +653,8 @@ const StudentInforManagement = () => {
           worksheet = workbook.Sheets[chosen];
         }
         // Convert to JSON using headers from sheet
-  // include cellDates handling above; we'll pass date1904 flag when parsing
-  rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+        // include cellDates handling above; we'll pass date1904 flag when parsing
+        rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
         if (!rows || rows.length === 0) {
           setError("Không tìm thấy dữ liệu trong file");
