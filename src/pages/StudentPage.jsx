@@ -19,6 +19,7 @@ import { auth } from "../firebase/firebase";
 const columns = [
   { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
+  { key: "username", label: "Tài khoản" },
   { key: "dob", label: "Ngày sinh" },
   { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
@@ -120,7 +121,8 @@ const StudentPage = () => {
     return rows.filter((r) => {
       return (
         (r.studentId && normalizeForSearch(r.studentId).includes(q)) ||
-        (r.fullName && normalizeForSearch(r.fullName).includes(q))
+        (r.fullName && normalizeForSearch(r.fullName).includes(q)) ||
+        (r.username && normalizeForSearch(r.username).includes(q))
       );
     });
   }, [rows, search]);
@@ -214,7 +216,7 @@ const StudentPage = () => {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tìm theo mã sv hoặc họ và tên"
+                    placeholder="Tìm theo mã sv, họ và tên , Tài khoản..."
                     className={`w-full px-3 py-2 rounded border focus:outline-none sm:text-sm ${
                       isDarkMode
                         ? "bg-gray-700 border-gray-600 text-white placeholder-gray-300"
@@ -231,6 +233,7 @@ const StudentPage = () => {
                         const data = filtered.map((r) => ({
                           "Mã sv": r.studentId || "",
                           "Họ và tên": r.fullName || "",
+                          "Tài khoản": r.username || "",
                           "Ngày sinh": formatDate(r.dob) || "",
                           "Tên môn học": r.subject || "",
                           "Ca thi": r.examSession || "",
@@ -310,6 +313,9 @@ const StudentPage = () => {
                             </div>
                             <div className="text-xs text-gray-500 truncate">
                               Mã sv: {r.studentId || "-"}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              Tài khoản: {r.username || "-"}
                             </div>
                             <div className="text-xs text-gray-500 truncate">
                               Ngày thi:{" "}
@@ -412,6 +418,9 @@ const StudentPage = () => {
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.fullName || ""}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
+                            {r.username || ""}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {formatDate(r.dob) || (

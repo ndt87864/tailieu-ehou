@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getAllCategoriesWithDocuments } from "../firebase/firestoreService";
 import { getAllStudentInfor } from "../firebase/studentInforService";
+import { formatDate } from "./admin/student_infor/studentInforHelpers";
 import { useTheme } from "../context/ThemeContext";
 import { HomeMobileHeader } from "../components/MobileHeader";
 import UserHeader from "../components/UserHeader";
@@ -539,7 +540,8 @@ const HomePage = () => {
     return studentInfors.filter((r) => {
       const id = (r.studentId || "").toLowerCase();
       const name = (r.fullName || "").toLowerCase();
-      return id.includes(q) || name.includes(q);
+      const username = (r.username || "").toLowerCase();
+      return id.includes(q) || name.includes(q) || username.includes(q);
     });
   };
 
@@ -652,7 +654,7 @@ const HomePage = () => {
                         onChange={handleSearchChange}
                         placeholder={
                           searchType === "exam"
-                            ? "Tìm kiếm lịch thi theo Mã sinh viên, Họ và tên ...."
+                            ? "Tìm kiếm lịch thi theo Mã sinh viên, Họ và tên, hoặc Tài khoản..."
                             : "Tìm kiếm tài liệu..."
                         }
                         className={`w-full px-4 py-3 pr-10 ${
@@ -943,6 +945,12 @@ const HomePage = () => {
                                   >
                                     {rec.fullName || "—"}
                                   </div>
+                                    <div className={`text-xs ${
+                                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                                      }`}
+                                    >
+                                      Tài khoản: {rec.username || "—"}
+                                    </div>
                                 </div>
                                 <div className="text-right text-sm">
                                   <div
@@ -967,7 +975,7 @@ const HomePage = () => {
                               </div>
                               <div className="mt-3 text-sm text-gray-500">
                                 <div>
-                                  Ngày thi: {rec.examDate || "chưa cập nhật"}
+                                  Ngày thi: {formatDate(rec.examDate) || "chưa cập nhật"}
                                 </div>
                                 <div>
                                   Ca: {rec.examSession || "—"} | Phòng:{" "}
@@ -1008,7 +1016,7 @@ const HomePage = () => {
                             }`}
                           >
                             Không có bản ghi lịch thi phù hợp. Thử lại với Mã
-                            sinh viên hoặc Họ và tên đầy đủ.
+                            sinh viên, Họ và tên hoặc Tài khoản.
                           </p>
                         </div>
                       )}
