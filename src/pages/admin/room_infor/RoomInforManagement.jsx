@@ -203,7 +203,9 @@ const RoomInforManagement = () => {
 
   // BỎ examTime khỏi key
   const makeKey = (r) =>
-    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${r.examRoom || ""}||${r.examType || ""}`;
+    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
+      r.examRoom || ""
+    }||${r.examType || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
@@ -224,28 +226,44 @@ const RoomInforManagement = () => {
             }
           }
           if (norm(d.subject) !== norm(roomObj.subject)) {
-            logReason.push(`subject not match: excel=${norm(roomObj.subject)}, db=${norm(d.subject)}`);
+            logReason.push(
+              `subject not match: excel=${norm(roomObj.subject)}, db=${norm(
+                d.subject
+              )}`
+            );
           }
           if (norm(d.examSession) !== norm(roomObj.examSession)) {
-            logReason.push(`examSession not match: excel=${norm(roomObj.examSession)}, db=${norm(d.examSession)}`);
+            logReason.push(
+              `examSession not match: excel=${norm(
+                roomObj.examSession
+              )}, db=${norm(d.examSession)}`
+            );
           }
           if (norm(d.examRoom) !== norm(roomObj.examRoom)) {
-            logReason.push(`examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(d.examRoom)}`);
+            logReason.push(
+              `examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(
+                d.examRoom
+              )}`
+            );
           }
           if (roomObj.examType && norm(d.examType) !== norm(roomObj.examType)) {
-            logReason.push(`examType not match: excel=${norm(roomObj.examType)}, db=${norm(d.examType)}`);
+            logReason.push(
+              `examType not match: excel=${norm(roomObj.examType)}, db=${norm(
+                d.examType
+              )}`
+            );
           }
           if (logReason.length > 0) {
-            console.warn('[RoomImport][NoMatch]', {
+            console.warn("[RoomImport][NoMatch]", {
               excel: roomObj,
               db: d,
-              reasons: logReason
+              reasons: logReason,
             });
             return false;
           }
           return true;
         } catch (e) {
-          console.error('[RoomImport][ErrorMatching]', e);
+          console.error("[RoomImport][ErrorMatching]", e);
           return false;
         }
       });
@@ -531,7 +549,10 @@ const RoomInforManagement = () => {
           examDate: rowDate,
         });
         // If no matches found, try a relaxed second-pass: match by room number OR by examLink directly
-        if ((!matches || matches.length === 0) && (normKeyObj.examRoom || rowLink)) {
+        if (
+          (!matches || matches.length === 0) &&
+          (normKeyObj.examRoom || rowLink)
+        ) {
           try {
             const allRooms = await getAllRoomInfor();
             const norm = (v) => normalizeForSearch(String(v || "")).trim();
@@ -539,13 +560,22 @@ const RoomInforManagement = () => {
               try {
                 const dbRoomNorm = norm(d.examRoom);
                 const dbLinkNorm = normalizeForSearch(d.examLink || "").trim();
-                const roomMatch = normKeyObj.examRoom ? dbRoomNorm === normKeyObj.examRoom : false;
-                const linkMatch = rowLink ? dbLinkNorm === normalizeForSearch(rowLink) : false;
+                const roomMatch = normKeyObj.examRoom
+                  ? dbRoomNorm === normKeyObj.examRoom
+                  : false;
+                const linkMatch = rowLink
+                  ? dbLinkNorm === normalizeForSearch(rowLink)
+                  : false;
                 // also allow matching numeric room when input contains number but DB room has extra text
                 if (!roomMatch && normKeyObj.examRoom) {
-                  const digitsInDb = (dbRoomNorm || '').match(/\d+/g) || [];
-                  const digitsInInput = (normKeyObj.examRoom || '').match(/\d+/g) || [];
-                  if (digitsInDb.length && digitsInInput.length && digitsInDb.join('') === digitsInInput.join('')) {
+                  const digitsInDb = (dbRoomNorm || "").match(/\d+/g) || [];
+                  const digitsInInput =
+                    (normKeyObj.examRoom || "").match(/\d+/g) || [];
+                  if (
+                    digitsInDb.length &&
+                    digitsInInput.length &&
+                    digitsInDb.join("") === digitsInInput.join("")
+                  ) {
                     return true;
                   }
                 }
@@ -555,11 +585,16 @@ const RoomInforManagement = () => {
               }
             });
             if (roomCandidates && roomCandidates.length > 0) {
-              console.info('[RoomImport][RelaxedMatch] found', roomCandidates.length, 'candidates for row', rowCount);
+              console.info(
+                "[RoomImport][RelaxedMatch] found",
+                roomCandidates.length,
+                "candidates for row",
+                rowCount
+              );
               matches = roomCandidates;
             }
           } catch (e) {
-            console.warn('handleExcelImport: relaxed matching failed', e);
+            console.warn("handleExcelImport: relaxed matching failed", e);
           }
         }
         if (!matches || matches.length === 0) {
@@ -786,7 +821,7 @@ const RoomInforManagement = () => {
             const created = await addRoomInfor(form);
             if (created) affectedDocs.push(created);
           } catch (e) {
-            console.error('Failed to create room_infor document', e);
+            console.error("Failed to create room_infor document", e);
           }
         } else {
           for (const doc of matches) {
@@ -795,7 +830,7 @@ const RoomInforManagement = () => {
               // push a representation of the updated doc (use form values for current state)
               affectedDocs.push({ id: doc.id, ...form });
             } catch (e) {
-              console.error('Failed to update room_infor document', doc.id, e);
+              console.error("Failed to update room_infor document", doc.id, e);
             }
           }
         }
@@ -827,10 +862,14 @@ const RoomInforManagement = () => {
             updatesFromForm.examType = form.examType || "";
 
           if (Object.keys(updatesFromForm).length > 0) {
-            const res = await updateStudentsByMatch(origCriteria, updatesFromForm, {
-              allowBulk: true,
-              force: true,
-            });
+            const res = await updateStudentsByMatch(
+              origCriteria,
+              updatesFromForm,
+              {
+                allowBulk: true,
+                force: true,
+              }
+            );
             if (res && typeof res.updated === "number" && res.updated > 0) {
               console.info(
                 `Updated ${res.updated} student_infor records to reflect room edits (original key).`
@@ -859,7 +898,11 @@ const RoomInforManagement = () => {
                 allowBulk: true,
                 force: true,
               });
-              if (res2 && typeof res2.updated === "number" && res2.updated > 0) {
+              if (
+                res2 &&
+                typeof res2.updated === "number" &&
+                res2.updated > 0
+              ) {
                 console.info(
                   `Updated ${res2.updated} student_infor records to reflect room edits (saved doc ${savedDoc.id}).`
                 );

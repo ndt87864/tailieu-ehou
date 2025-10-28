@@ -16,11 +16,10 @@ import ThemeColorPicker from "../components/ThemeColorPicker";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebase/firebase";
 
+// Hide studentId, dob, examType columns from user-facing table
 const columns = [
-  { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
   { key: "username", label: "Tài khoản" },
-  { key: "dob", label: "Ngày sinh" },
   { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },
@@ -28,7 +27,6 @@ const columns = [
   { key: "examRoom", label: "Phòng thi" },
   { key: "course", label: "Khóa" },
   { key: "majorCode", label: "Mã ngành" },
-  { key: "examType", label: "Hình thức thi" },
   { key: "examLink", label: "Link phòng" },
 ];
 
@@ -216,7 +214,7 @@ const StudentPage = () => {
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Tìm theo mã sv, họ và tên , Tài khoản..."
+                    placeholder="Tìm theo họ và tên , Tài khoản..."
                     className={`w-full px-3 py-2 rounded border focus:outline-none sm:text-sm ${
                       isDarkMode
                         ? "bg-gray-700 border-gray-600 text-white placeholder-gray-300"
@@ -230,18 +228,16 @@ const StudentPage = () => {
                     onClick={async () => {
                       try {
                         const XLSX = await import("xlsx");
+                        // Export only visible fields (hide studentId, dob, examType)
                         const data = filtered.map((r) => ({
-                          "Mã sv": r.studentId || "",
                           "Họ và tên": r.fullName || "",
                           "Tài khoản": r.username || "",
-                          "Ngày sinh": formatDate(r.dob) || "",
                           "Tên môn học": r.subject || "",
                           "Ca thi": r.examSession || "",
                           "Thời gian": r.examTime || "",
                           "Phòng thi": r.examRoom || "",
                           Khóa: r.course || "",
                           "Mã ngành": r.majorCode || "",
-                          "Hình thức thi": r.examType || "",
                           "Link phòng": r.examLink || "",
                         }));
 
@@ -312,9 +308,6 @@ const StudentPage = () => {
                               {r.fullName || "-"}
                             </div>
                             <div className="text-xs text-gray-500 truncate">
-                              Mã sv: {r.studentId || "-"}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate">
                               Tài khoản: {r.username || "-"}
                             </div>
                             <div className="text-xs text-gray-500 truncate">
@@ -326,9 +319,7 @@ const StudentPage = () => {
                               )}
                             </div>
                           </div>
-                          <div className="text-xs text-gray-400 ml-3">
-                            {formatDate(r.dob) || ""}
-                          </div>
+                          {/* DOB hidden on user-facing page */}
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -356,10 +347,7 @@ const StudentPage = () => {
                             <span className="font-medium">Mã ngành:</span>{" "}
                             {r.majorCode || "-"}
                           </div>
-                          <div className="col-span-2">
-                            <span className="font-medium">Hình thức:</span>{" "}
-                            {r.examType || "-"}
-                          </div>
+                          {/* examType hidden on user-facing page */}
 
                           <div className="col-span-2">
                             <span className="font-medium">Link phòng:</span>{" "}
@@ -414,20 +402,10 @@ const StudentPage = () => {
                           className="hover:bg-gray-50 dark:hover:bg-gray-900"
                         >
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                            {r.studentId || ""}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.fullName || ""}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.username || ""}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                            {formatDate(r.dob) || (
-                              <span className="text-sm text-gray-500">
-                                chưa cập nhật
-                              </span>
-                            )}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {formatDate(r.examDate) || (
@@ -453,9 +431,6 @@ const StudentPage = () => {
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.majorCode || ""}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                            {r.examType || ""}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.examLink ? (

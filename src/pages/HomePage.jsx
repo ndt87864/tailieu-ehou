@@ -654,7 +654,7 @@ const HomePage = () => {
                         onChange={handleSearchChange}
                         placeholder={
                           searchType === "exam"
-                            ? "Tìm kiếm lịch thi theo Mã sinh viên, Họ và tên, hoặc Tài khoản..."
+                            ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
                             : "Tìm kiếm tài liệu..."
                         }
                         className={`w-full px-4 py-3 pr-10 ${
@@ -925,7 +925,7 @@ const HomePage = () => {
                                         : "text-gray-500"
                                     }`}
                                   >
-                                    Mã SV
+                                    Họ và tên
                                   </div>
                                   <div
                                     className={`font-medium ${
@@ -934,23 +934,17 @@ const HomePage = () => {
                                         : "text-gray-900"
                                     }`}
                                   >
-                                    {rec.studentId || "—"}
-                                  </div>
-                                  <div
-                                    className={`text-sm mt-1 ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-700"
-                                    }`}
-                                  >
                                     {rec.fullName || "—"}
                                   </div>
-                                    <div className={`text-xs ${
-                                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                                      }`}
-                                    >
-                                      Tài khoản: {rec.username || "—"}
-                                    </div>
+                                  <div
+                                    className={`text-xs mt-1 ${
+                                      isDarkMode
+                                        ? "text-gray-400"
+                                        : "text-gray-500"
+                                    }`}
+                                  >
+                                    Tài khoản: {rec.username || "—"}
+                                  </div>
                                 </div>
                                 <div className="text-right text-sm">
                                   <div
@@ -975,7 +969,8 @@ const HomePage = () => {
                               </div>
                               <div className="mt-3 text-sm text-gray-500">
                                 <div>
-                                  Ngày thi: {formatDate(rec.examDate) || "chưa cập nhật"}
+                                  Ngày thi:{" "}
+                                  {formatDate(rec.examDate) || "chưa cập nhật"}
                                 </div>
                                 <div>
                                   Ca: {rec.examSession || "—"} | Phòng:{" "}
