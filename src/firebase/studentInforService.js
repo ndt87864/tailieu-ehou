@@ -1,5 +1,5 @@
 // studentInforService.js - CRUD cho collection student_infor
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp, query } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp, query, writeBatch } from 'firebase/firestore';
 import { db as dbPJ } from './firebase_pj';
 
 const db = dbPJ;
@@ -293,5 +293,35 @@ export const updateStudentsByMatch = async (criteria = {}, updates = {}, options
   } catch (err) {
     console.error('updateStudentsByMatch error', err);
     return { updated: 0 };
+  }
+};
+
+// Delete all student documents that match the criteria.
+// This operation batches deletes (safe for large sets) and returns { deleted } count.
+export const deleteStudentsByMatch = async (criteria = {}) => {
+  try {
+    if (!criteria || Object.keys(criteria).length === 0) return { deleted: 0 };
+
+    const matches = await getStudentsByMatch(criteria);
+    if (!matches || matches.length === 0) return { deleted: 0 };
+
+    const ids = matches.map((m) => m.id).filter(Boolean);
+    if (ids.length === 0) return { deleted: 0 };
+
+    // Firestore batches support up to 500 ops. We'll chunk to 400 to be safe.
+    const CHUNK_SIZE = 400;
+    let deleted = 0;
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((id) => batch.delete(doc(db, STUDENT_INFOR_COLLECTION, id)));
+      await batch.commit();
+      deleted += chunk.length;
+    }
+
+    return { deleted };
+  } catch (err) {
+    console.error('deleteStudentsByMatch error', err);
+    return { deleted: 0 };
   }
 };

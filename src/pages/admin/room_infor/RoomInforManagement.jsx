@@ -3,8 +3,9 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
   getAllStudentInfor,
   subscribeStudentInfor,
+  updateStudentsByMatch,
+  deleteStudentsByMatch,
 } from "../../../firebase/studentInforService";
-import { updateStudentsByMatch } from "../../../firebase/studentInforService";
 import {
   formatDate,
   normalizeForSearch,
@@ -29,6 +30,7 @@ import {
   addRoomInfor,
   updateRoomInfor,
 } from "../../../firebase/roomInforService";
+import { deleteRoomInfor } from "../../../firebase/roomInforService";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../firebase/firebase";
 
@@ -929,6 +931,57 @@ const RoomInforManagement = () => {
     }
   };
 
+  // Delete a displayed room (derived) and all matching student_infor records.
+  const handleDeleteRoom = async (r) => {
+    const proceed = await showConfirm(
+      "Xóa phòng này và tất cả bản ghi thí sinh trùng (Ngày thi, Tên môn, Ca, Thời gian, Phòng, Link). Hành động không thể hoàn tác. Tiếp tục?"
+    );
+    if (!proceed) return;
+    setIsSaving(true);
+    try {
+      // Delete any room_infor documents that match this room (if present)
+      const matches = await getMatchingRoomDocs({
+        examDate: r.examDate,
+        subject: r.subject,
+        examSession: r.examSession,
+        examTime: r.examTime,
+        examRoom: r.examRoom,
+        examType: r.examType,
+      });
+
+      let deletedRooms = 0;
+      for (const doc of matches) {
+        try {
+          await deleteRoomInfor(doc.id);
+          deletedRooms++;
+        } catch (e) {
+          console.warn('Failed to delete room_infor', doc.id, e);
+        }
+      }
+
+      // Delete matching student records
+      const criteria = {
+        subject: r.subject,
+        examSession: r.examSession,
+        examTime: r.examTime,
+        examRoom: r.examRoom,
+      };
+      if (r.examDate) criteria.examDate = r.examDate;
+      if (r.examType) criteria.examType = r.examType;
+
+      const res = await deleteStudentsByMatch(criteria);
+
+      alert(
+        `Hoàn thành. Đã xóa ${deletedRooms} phòng (nếu có) và ${res.deleted || 0} bản ghi thí sinh.`
+      );
+    } catch (err) {
+      console.error('handleDeleteRoom error', err);
+      alert('Lỗi khi xóa phòng hoặc bản ghi thí sinh. Xem console để biết chi tiết.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div
       className={`flex flex-col min-h-screen ${
@@ -1219,6 +1272,13 @@ const RoomInforManagement = () => {
                                   className="px-2 py-1 rounded bg-yellow-400 text-xs text-white hover:opacity-90"
                                 >
                                   Sửa
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRoom(r)}
+                                  disabled={isSaving}
+                                  className="px-2 py-1 rounded bg-red-600 text-xs text-white hover:opacity-90"
+                                >
+                                  Xóa
                                 </button>
                               </div>
                             </td>
