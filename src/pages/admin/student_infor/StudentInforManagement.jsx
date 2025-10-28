@@ -32,10 +32,8 @@ import {
 } from "./studentInforHelpers";
 
 const columns = [
-  { key: "studentId", label: "Mã sv" },
   { key: "fullName", label: "Họ và tên" },
   { key: "username", label: "Tài khoản" },
-  { key: "dob", label: "Ngày sinh" },
   { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },

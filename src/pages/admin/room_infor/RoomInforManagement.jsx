@@ -223,7 +223,11 @@ const RoomInforManagement = () => {
             norm(d.subject) === norm(roomObj.subject) &&
             norm(d.examSession) === norm(roomObj.examSession) &&
             norm(d.examTime) === norm(roomObj.examTime) &&
-            norm(d.examRoom) === norm(roomObj.examRoom);
+            norm(d.examRoom) === norm(roomObj.examRoom) &&
+            // if caller provided examType, require it to match as well; otherwise ignore
+            (roomObj.examType
+              ? norm(d.examType) === norm(roomObj.examType)
+              : true);
 
           return fieldsMatch;
         } catch (e) {
@@ -344,7 +348,10 @@ const RoomInforManagement = () => {
     setIsSaving(true);
     try {
       // Support CSV as well as Excel. Use file extension/type to choose parser.
-      const isCsv = String(file.name || "").toLowerCase().endsWith(".csv") || file.type === "text/csv";
+      const isCsv =
+        String(file.name || "")
+          .toLowerCase()
+          .endsWith(".csv") || file.type === "text/csv";
       let json = [];
       let date1904 = false;
 
@@ -359,7 +366,10 @@ const RoomInforManagement = () => {
         // request cellDates so date cells become JS Date where possible
         const wb = XLSX.read(data, { type: "array", cellDates: true });
         date1904 = Boolean(
-          wb && wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904
+          wb &&
+            wb.Workbook &&
+            wb.Workbook.WBProps &&
+            wb.Workbook.WBProps.date1904
         );
         const firstSheet = wb.SheetNames[0];
         const sheet = wb.Sheets[firstSheet];
@@ -428,6 +438,7 @@ const RoomInforManagement = () => {
           examSession: (mapped.examSession || "").toString().trim(),
           examTime: (mapped.examTime || "").toString().trim(),
           examRoom: (mapped.examRoom || "").toString().trim(),
+          examType: (mapped.examType || "").toString().trim(),
         };
 
         if (
@@ -463,6 +474,7 @@ const RoomInforManagement = () => {
           examSession: normalizeForSearch(keyObj.examSession || "").trim(),
           examTime: normalizeForSearch(keyObj.examTime || "").trim(),
           examRoom: normalizeForSearch(keyObj.examRoom || "").trim(),
+          examType: normalizeForSearch(keyObj.examType || "").trim(),
         };
 
         // normalize date value if present (we'll need this whether room docs exist or not)
@@ -472,7 +484,8 @@ const RoomInforManagement = () => {
         }
         const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
 
-        const matches = await getMatchingRoomDocs(normKeyObj);
+  // include parsed exam date so matching requires the same calendar date
+  const matches = await getMatchingRoomDocs({ ...normKeyObj, examDate: rowDate });
         if (!matches || matches.length === 0) {
           rowsWithNoMatches++;
           // Log the no-match case with the key used so we can diagnose why rooms weren't found
@@ -520,10 +533,15 @@ const RoomInforManagement = () => {
                 examTime: keyObj.examTime,
                 examRoom: keyObj.examRoom,
               };
+              // include examType if provided in the imported row
+              if (keyObj.examType) criteria.examType = keyObj.examType;
+              // include examDate (parsed from Excel) if available to ensure strict matching by date
+              if (rowDate) criteria.examDate = rowDate;
               // attempt to update students directly
               const res = await updateStudentsByMatch(
                 criteria,
-                updatesFallback
+                updatesFallback,
+                { allowBulk: true }
               );
               if (res && typeof res.updated === "number" && res.updated > 0) {
                 studentUpdatedCount += res.updated;
@@ -578,17 +596,21 @@ const RoomInforManagement = () => {
 
             // Also update matching student_infor records so UI (which derives rooms from students)
             // reflects the imported examDate/examLink. Use the student service helper.
-            try {
+              try {
               const criteria = {
                 subject: doc.subject,
                 examSession: doc.examSession,
                 examTime: doc.examTime,
                 examRoom: doc.examRoom,
               };
+              // include examType if available on the room doc
+              if (doc.examType) criteria.examType = doc.examType;
               // include examDate in criteria if room doc has a date (prefer stricter match)
               if (doc.examDate) criteria.examDate = doc.examDate;
 
-              const res = await updateStudentsByMatch(criteria, updates);
+              const res = await updateStudentsByMatch(criteria, updates, {
+                allowBulk: true,
+              });
               if (res && typeof res.updated === "number") {
                 studentUpdatedCount += res.updated;
                 // update modal progress after each room update
@@ -677,6 +699,7 @@ const RoomInforManagement = () => {
           examSession: editing.examSession,
           examTime: editing.examTime,
           examRoom: editing.examRoom,
+          examType: editing.examType,
         });
 
         if (matches.length === 0) {
@@ -695,6 +718,8 @@ const RoomInforManagement = () => {
             examTime: editing.examTime,
             examRoom: editing.examRoom,
           };
+          // include examType if present on the original room
+          if (editing.examType) criteria.examType = editing.examType;
           // include examDate in criteria if it was set originally
           if (editing.examDate) criteria.examDate = editing.examDate;
 
@@ -706,9 +731,13 @@ const RoomInforManagement = () => {
             updates.examDate = form.examDate || "";
           if ((form.examLink || "") !== (editing.examLink || ""))
             updates.examLink = form.examLink || "";
+          if ((form.examType || "") !== (editing.examType || ""))
+            updates.examType = form.examType || "";
 
           if (Object.keys(updates).length > 0) {
-            const res = await updateStudentsByMatch(criteria, updates);
+            const res = await updateStudentsByMatch(criteria, updates, {
+              allowBulk: true,
+            });
             if (res && typeof res.updated === "number" && res.updated > 0) {
               // Let the live subscription reflect changes; optionally notify admin
               console.info(
@@ -965,7 +994,7 @@ const RoomInforManagement = () => {
                       </tr>
                     </thead>
                     <tbody>
-                        {filteredRooms.length === 0 ? (
+                      {filteredRooms.length === 0 ? (
                         <tr>
                           <td
                             colSpan={8}

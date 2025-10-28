@@ -244,16 +244,17 @@ export const parseCSV = (text) => {
 export const computePendingLinkUpdates = (records) => {
   const groups = {};
   for (const r of records) {
+    // include examDate in grouping so links are only propagated for the same calendar date
+    const dateYMD = parseDateToYMD(r.examDate || "");
     const key = [
+      dateYMD,
       (r.subject || "").trim(),
       (r.examSession || "").trim(),
       (r.examTime || "").trim(),
       (r.examRoom || "").trim(),
-      (r.course || "").trim(),
-      (r.majorCode || "").trim(),
       (r.examType || "").trim(),
     ]
-      .map((s) => s.toLowerCase())
+      .map((s) => String(s || "").toLowerCase())
       .join("||");
     if (!groups[key]) groups[key] = [];
     groups[key].push(r);

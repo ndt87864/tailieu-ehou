@@ -108,9 +108,10 @@ export const getStudentsByMatch = async (criteria = {}) => {
     return docs.filter((d) => {
       if (examDate && norm(parseDateToYMD(d.examDate || '')) !== norm(examDate)) return false;
       if (subject && norm(d.subject || '') !== norm(subject)) return false;
-      if (examSession && norm(d.examSession || '') !== norm(examSession)) return false;
-      // BỎ điều kiện kiểm tra examTime để luôn đồng bộ dù sinh viên có trường thời gian rỗng hay không
-      if (examRoom && norm(d.examRoom || '') !== norm(examRoom)) return false;
+    if (examSession && norm(d.examSession || '') !== norm(examSession)) return false;
+    // Only enforce examTime when the incoming criteria provides it (respect Excel's "thời gian" column)
+    if (examTime && norm(d.examTime || '') !== norm(examTime)) return false;
+    if (examRoom && norm(d.examRoom || '') !== norm(examRoom)) return false;
       return true;
     });
   } catch (err) {
@@ -157,8 +158,23 @@ export const updateStudentsByMatch = async (criteria = {}, updates = {}) => {
     let updated = 0;
     for (const s of matches) {
       try {
+        // If payload contains examLink, only apply the link to students that do not already have one.
+        const perStudentPayload = { ...payload };
+        if (perStudentPayload.examLink) {
+          const existingLink = s.examLink;
+          if (existingLink && String(existingLink).trim() !== "") {
+            // remove examLink from this student's payload to avoid overwriting an existing link
+            delete perStudentPayload.examLink;
+          }
+        }
+
+        // If after removing examLink there's nothing left to update, skip.
+        if (!perStudentPayload || Object.keys(perStudentPayload).length === 0) {
+          continue;
+        }
+
         // Only update the explicit payload fields to avoid overwriting other student data
-        await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, s.id), { ...payload });
+        await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, s.id), { ...perStudentPayload });
         updated++;
       } catch (e) {
         console.warn('updateStudentsByMatch: failed to update', s.id, e);
