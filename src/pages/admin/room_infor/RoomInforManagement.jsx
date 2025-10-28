@@ -90,17 +90,17 @@ const RoomInforManagement = () => {
   const computeRoomsFromStudents = (students = []) => {
     const map = new Map();
     for (const s of students) {
-      // build a composite key from the fields we care about
+      // build a composite key from the fields we care about (BỎ examTime)
       const key = `${s.examDate || ""}||${s.subject || ""}||${
         s.examSession || ""
-      }||${s.examTime || ""}||${s.examRoom || ""}||${s.examType || ""}`;
+      }||${s.examRoom || ""}||${s.examType || ""}`;
       if (!map.has(key)) {
         map.set(key, {
           id: key, // deterministic id for display only
           examDate: s.examDate || "",
           subject: s.subject || "",
           examSession: s.examSession || "",
-          examTime: s.examTime || "",
+          // examTime: s.examTime || "", // BỎ examTime khỏi object key
           examRoom: s.examRoom || "",
           examType: s.examType || "",
           examLink: s.examLink || "",
@@ -197,40 +197,51 @@ const RoomInforManagement = () => {
     setIsModalOpen(true);
   };
 
+  // BỎ examTime khỏi key
   const makeKey = (r) =>
-    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
-      r.examTime || ""
-    }||${r.examRoom || ""}||${r.examType || ""}`;
+    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${r.examRoom || ""}||${r.examType || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
       const all = await getAllRoomInfor();
 
-      // Match by subject, examSession, examTime, examRoom (normalized). Only require examDate when it's provided in roomObj.
+      // Match by subject, examSession, examRoom (normalized). BỎ examTime. Only require examDate when it's provided in roomObj.
       return all.filter((d) => {
         try {
           const norm = (v) => normalizeForSearch(String(v || "")).trim();
-
+          let logReason = [];
           // if caller provided examDate (non-empty), require date equality (normalized YMD)
           if (roomObj.examDate) {
             const a = parseDateToYMD(roomObj.examDate || "");
             const b = parseDateToYMD(d.examDate || "");
-            if (a !== b) return false;
+            if (a !== b) {
+              logReason.push(`examDate not match: excel=${a}, db=${b}`);
+              // not return yet, let log all reasons
+            }
           }
-
-          // subject/session/time/room comparisons
-          const fieldsMatch =
-            norm(d.subject) === norm(roomObj.subject) &&
-            norm(d.examSession) === norm(roomObj.examSession) &&
-            norm(d.examTime) === norm(roomObj.examTime) &&
-            norm(d.examRoom) === norm(roomObj.examRoom) &&
-            // if caller provided examType, require it to match as well; otherwise ignore
-            (roomObj.examType
-              ? norm(d.examType) === norm(roomObj.examType)
-              : true);
-
-          return fieldsMatch;
+          if (norm(d.subject) !== norm(roomObj.subject)) {
+            logReason.push(`subject not match: excel=${norm(roomObj.subject)}, db=${norm(d.subject)}`);
+          }
+          if (norm(d.examSession) !== norm(roomObj.examSession)) {
+            logReason.push(`examSession not match: excel=${norm(roomObj.examSession)}, db=${norm(d.examSession)}`);
+          }
+          if (norm(d.examRoom) !== norm(roomObj.examRoom)) {
+            logReason.push(`examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(d.examRoom)}`);
+          }
+          if (roomObj.examType && norm(d.examType) !== norm(roomObj.examType)) {
+            logReason.push(`examType not match: excel=${norm(roomObj.examType)}, db=${norm(d.examType)}`);
+          }
+          if (logReason.length > 0) {
+            console.warn('[RoomImport][NoMatch]', {
+              excel: roomObj,
+              db: d,
+              reasons: logReason
+            });
+            return false;
+          }
+          return true;
         } catch (e) {
+          console.error('[RoomImport][ErrorMatching]', e);
           return false;
         }
       });
@@ -484,8 +495,11 @@ const RoomInforManagement = () => {
         }
         const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
 
-  // include parsed exam date so matching requires the same calendar date
-  const matches = await getMatchingRoomDocs({ ...normKeyObj, examDate: rowDate });
+        // include parsed exam date so matching requires the same calendar date
+        const matches = await getMatchingRoomDocs({
+          ...normKeyObj,
+          examDate: rowDate,
+        });
         if (!matches || matches.length === 0) {
           rowsWithNoMatches++;
           // Log the no-match case with the key used so we can diagnose why rooms weren't found
@@ -596,7 +610,7 @@ const RoomInforManagement = () => {
 
             // Also update matching student_infor records so UI (which derives rooms from students)
             // reflects the imported examDate/examLink. Use the student service helper.
-              try {
+            try {
               const criteria = {
                 subject: doc.subject,
                 examSession: doc.examSession,

@@ -42,7 +42,11 @@ export const mapHeaderToKey = (h) => {
   if (n.includes("tenmon") || n.includes("mon") || n.includes("monhoc")) return "subject";
   if (n.includes("ngaythi") || (n.includes("ngay") && n.includes("thi"))) return "examDate";
   if (n.includes("cathi") || (n.includes("ca") && n.includes("thi"))) return "examSession";
+  // some Excel files may have header just labeled "thi" or "ca" (without the word 'thi' combined)
+  if (n === "thi" || n === "ca") return "examSession";
   if (n.includes("thoigian") || n.includes("thoi") || n.includes("gian")) return "examTime";
+  // Ưu tiên map "link phòng" sang examLink, còn lại có "phòng" thì là examRoom
+  if (n.includes("link") && n.includes("phong")) return "examLink";
   if (n.includes("phong")) return "examRoom";
   if (n.includes("khoa")) return "course";
   if (n.includes("manganh") || (n.includes("ma") && n.includes("nganh"))) return "majorCode";
@@ -54,10 +58,20 @@ export const mapHeaderToKey = (h) => {
 
 export const normalizeForSearch = (s = "") => {
   try {
-    return String(s)
-      .normalize("NFD")
-      .replace(/\p{Diacritic}/gu, "")
-      .toLowerCase();
+    let str = String(s || "");
+    // normalize unicode composition
+    str = str.normalize("NFKC");
+    // remove diacritics
+    str = str.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    // replace common unicode dash variants with ASCII hyphen
+    str = str.replace(/[\u2012\u2013\u2014\u2212\u2010\u2011]/g, "-");
+    // unify time separators: convert ':' to 'h' (07:30 -> 07h30)
+    str = str.replace(/\s*:\s*/g, "h");
+    // collapse whitespace
+    str = str.replace(/\s+/g, " ").trim();
+    // remove spaces around hyphen and then remove all internal spaces for time ranges like "7h30 - 8h30" -> "7h30-8h30"
+    str = str.replace(/\s*-\s*/g, "-").replace(/\s+/g, "");
+    return str.toLowerCase();
   } catch (e) {
     return String(s).toLowerCase();
   }

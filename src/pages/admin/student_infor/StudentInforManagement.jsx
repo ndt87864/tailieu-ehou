@@ -876,7 +876,6 @@ const StudentInforManagement = () => {
         }
       });
 
-
       // --- PATCH: Nếu các trường khác trùng mà trường examDate rỗng thì ghi trường dob vào examDate ---
       // Nếu import row có examDate rỗng, nhưng dob có giá trị, và DB record trùng các trường khác mà examDate rỗng, thì update examDate = dob
       const dateUpdates = [];
@@ -903,16 +902,52 @@ const StudentInforManagement = () => {
             const matches = (studentInfors || []).filter((s) => {
               const sIdNorm = normalizeId(s.studentId || "");
               return (
-                sIdNorm && sIdNorm === importedIdNorm &&
-                (!parseDateToYMD(s.examDate || "")) &&
-                (parseDateToYMD(s.dob || "") === importedDob) &&
-                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
-                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
-                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
-                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
-                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
-                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
-                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+                sIdNorm &&
+                sIdNorm === importedIdNorm &&
+                !parseDateToYMD(s.examDate || "") &&
+                parseDateToYMD(s.dob || "") === importedDob &&
+                String(s.subject || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.subject || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examSession || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examSession || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examTime || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examTime || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examRoom || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examRoom || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.course || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.course || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.majorCode || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.majorCode || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examType || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examType || "")
+                    .trim()
+                    .toLowerCase()
               );
             });
             for (const m of matches) {
@@ -930,16 +965,53 @@ const StudentInforManagement = () => {
           if (importedUsername) {
             const matches = (studentInfors || []).filter((s) => {
               return (
-                String(s.username || "").trim().toLowerCase() === importedUsername &&
-                (!parseDateToYMD(s.examDate || "")) &&
-                (parseDateToYMD(s.dob || "") === importedDob) &&
-                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
-                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
-                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
-                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
-                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
-                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
-                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+                String(s.username || "")
+                  .trim()
+                  .toLowerCase() === importedUsername &&
+                !parseDateToYMD(s.examDate || "") &&
+                parseDateToYMD(s.dob || "") === importedDob &&
+                String(s.subject || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.subject || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examSession || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examSession || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examTime || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examTime || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examRoom || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examRoom || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.course || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.course || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.majorCode || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.majorCode || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examType || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examType || "")
+                    .trim()
+                    .toLowerCase()
               );
             });
             for (const m of matches) {
@@ -958,15 +1030,51 @@ const StudentInforManagement = () => {
               const sDob = parseDateToYMD(s.dob || "");
               return (
                 sNameNorm === importedNameNorm &&
-                sDob && sDob === importedDob &&
-                (!parseDateToYMD(s.examDate || "")) &&
-                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
-                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
-                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
-                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
-                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
-                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
-                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+                sDob &&
+                sDob === importedDob &&
+                !parseDateToYMD(s.examDate || "") &&
+                String(s.subject || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.subject || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examSession || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examSession || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examTime || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examTime || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examRoom || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examRoom || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.course || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.course || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.majorCode || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.majorCode || "")
+                    .trim()
+                    .toLowerCase() &&
+                String(s.examType || "")
+                  .trim()
+                  .toLowerCase() ===
+                  String(item.examType || "")
+                    .trim()
+                    .toLowerCase()
               );
             });
             for (const m of matches) {

@@ -5,6 +5,49 @@ import { db as dbPJ } from './firebase_pj';
 const db = dbPJ;
 const STUDENT_INFOR_COLLECTION = 'student_infor';
 
+// --- Normalization helpers ---
+const replaceUnicodeDashes = (s) =>
+  s.replace(/[\u2012\u2013\u2014\u2212\u2010\u2011]/g, '-');
+
+const normalizeWhitespace = (s) => s.replace(/\s+/g, ' ').trim();
+
+// Normalize exam time strings so variants like "07h30–08h30", "7h30 - 8h30", "07:30 - 08:30" compare equal
+const normalizeExamTime = (val) => {
+  if (val === undefined || val === null) return '';
+  try {
+    let s = String(val || '');
+    s = s.normalize('NFKC'); // normalize unicode composition
+    s = replaceUnicodeDashes(s);
+    // unify separators: replace colon with 'h' for consistency if present
+    s = s.replace(/\s*:\s*/g, 'h');
+    // remove spaces around hyphen, then ensure single hyphen between times
+    s = s.replace(/\s*-\s*/g, '-');
+    // remove all spaces (so '7h30-8h30')
+    s = s.replace(/\s+/g, '');
+    // remove leading zeros for hours like 07h -> 7h
+    s = s.replace(/\b0+(\d)h/gi, '$1h');
+    // lower case
+    s = s.toLowerCase();
+    return s;
+  } catch (e) {
+    return String(val || '').trim();
+  }
+};
+
+// General string normalization for subject/room/session: collapse whitespace, normalize unicode, lowercase
+const normalizeString = (val) => {
+  if (val === undefined || val === null) return '';
+  try {
+    let s = String(val || '');
+    s = s.normalize('NFKC');
+    s = s.replace(/[\u2012\u2013\u2014\u2212\u2010\u2011]/g, '-');
+    s = normalizeWhitespace(s);
+    return s.toLowerCase();
+  } catch (e) {
+    return String(val || '').trim().toLowerCase();
+  }
+};
+
 export const getAllStudentInfor = async () => {
   const querySnapshot = await getDocs(collection(db, STUDENT_INFOR_COLLECTION));
   return querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -103,15 +146,55 @@ export const getStudentsByMatch = async (criteria = {}) => {
     const qSnap = await getDocs(collection(db, STUDENT_INFOR_COLLECTION));
     const docs = qSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    const norm = (v) => (v === undefined || v === null ? '' : String(v).trim());
+    // prepare normalized input values
+    const inputSubject = subject ? normalizeString(subject) : '';
+    const inputSession = examSession ? normalizeString(examSession) : '';
+    const inputTime = examTime ? normalizeExamTime(examTime) : '';
+    const inputRoom = examRoom ? normalizeString(examRoom) : '';
+    // Nếu examRoom là một link (bắt đầu bằng http), tách ra để so sánh cả số phòng và link phòng
+    let inputRoomLink = '';
+    let inputRoomNumber = '';
+    if (inputRoom.startsWith('http')) {
+      inputRoomLink = inputRoom;
+    } else if (inputRoom) {
+      inputRoomNumber = inputRoom;
+    }
+    // normalize incoming examDate (support dd/mm/yyyy from CSV)
+    const inputExamDate = examDate ? parseDateToYMD(examDate) : '';
 
     return docs.filter((d) => {
-      if (examDate && norm(parseDateToYMD(d.examDate || '')) !== norm(examDate)) return false;
-      if (subject && norm(d.subject || '') !== norm(subject)) return false;
-    if (examSession && norm(d.examSession || '') !== norm(examSession)) return false;
-    // Only enforce examTime when the incoming criteria provides it (respect Excel's "thời gian" column)
-    if (examTime && norm(d.examTime || '') !== norm(examTime)) return false;
-    if (examRoom && norm(d.examRoom || '') !== norm(examRoom)) return false;
+      // examDate: compare normalized ISO Y-M-D
+      if (inputExamDate) {
+        const dbDate = parseDateToYMD(d.examDate || '');
+        if (dbDate !== inputExamDate) return false;
+      }
+
+      if (inputSubject) {
+        const dbSubject = normalizeString(d.subject || '');
+        if (dbSubject !== inputSubject) return false;
+      }
+
+      if (inputSession) {
+        const dbSession = normalizeString(d.examSession || '');
+        if (dbSession !== inputSession) return false;
+      }
+
+      if (inputTime) {
+        const dbTime = normalizeExamTime(d.examTime || '');
+        if (dbTime !== inputTime) return false;
+      }
+
+      // So sánh examRoom: nếu input là link thì match nếu db cũng là link giống vậy, nếu input là số thì match nếu db là số giống vậy
+      if (inputRoomLink) {
+        const dbRoom = normalizeString(d.examRoom || '');
+        if (dbRoom !== inputRoomLink) return false;
+      } else if (inputRoomNumber) {
+        const dbRoom = normalizeString(d.examRoom || '');
+        // Nếu dbRoom là link thì bỏ qua, chỉ so sánh số phòng
+        if (dbRoom.startsWith('http')) return false;
+        if (dbRoom !== inputRoomNumber) return false;
+      }
+
       return true;
     });
   } catch (err) {
@@ -129,6 +212,27 @@ const parseDateToYMD = (val) => {
       const d = val.toDate();
       return d.toISOString().slice(0, 10);
     }
+
+    // If value already looks like YYYY-MM-DD, return normalized
+    if (typeof val === 'string') {
+      const s = val.trim();
+      // dd/mm/yyyy or dd-mm-yyyy (common in CSV)
+      const dm = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if (dm) {
+        let day = parseInt(dm[1], 10);
+        let month = parseInt(dm[2], 10);
+        let year = parseInt(dm[3], 10);
+        if (year < 100) year += 2000;
+        const d = new Date(year, month - 1, day);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      }
+      // ISO-like or other parseable strings
+      const maybe = new Date(s);
+      if (!isNaN(maybe.getTime())) return maybe.toISOString().slice(0, 10);
+      return s;
+    }
+
+    // fallback: try Date parsing for non-strings
     const d = new Date(val);
     if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
     return String(val).trim();
