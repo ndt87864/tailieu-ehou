@@ -90,7 +90,7 @@ const RoomInforManagement = () => {
   const computeRoomsFromStudents = (students = []) => {
     const map = new Map();
     for (const s of students) {
-      // build a composite key from the fields we care about (BỎ examTime)
+      // build a composite key from the fields we care about (BỎ examTime khỏi key, NHƯNG LUÔN LƯU examTime vào object)
       const key = `${s.examDate || ""}||${s.subject || ""}||${
         s.examSession || ""
       }||${s.examRoom || ""}||${s.examType || ""}`;
@@ -100,7 +100,7 @@ const RoomInforManagement = () => {
           examDate: s.examDate || "",
           subject: s.subject || "",
           examSession: s.examSession || "",
-          // examTime: s.examTime || "", // BỎ examTime khỏi object key
+          examTime: s.examTime || "", // LUÔN LƯU examTime
           examRoom: s.examRoom || "",
           examType: s.examType || "",
           examLink: s.examLink || "",
@@ -110,6 +110,9 @@ const RoomInforManagement = () => {
         const existing = map.get(key);
         if ((!existing.examLink || existing.examLink === "") && s.examLink)
           existing.examLink = s.examLink;
+        // prefer non-empty examTime if current has none
+        if ((!existing.examTime || existing.examTime === "") && s.examTime)
+          existing.examTime = s.examTime;
       }
     }
     return Array.from(map.values());
