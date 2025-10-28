@@ -11,7 +11,7 @@ import {
   limit,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from './firebase.js';
+import { db as dbPJ } from './firebase_pj.js';
 
 export const COLLECTIONS = {
   EXAM_SESSIONS: 'exam_sessions',
@@ -20,7 +20,7 @@ export const COLLECTIONS = {
 export const getAllExamSessions = async () => {
   try {
     const q = query(
-      collection(db, COLLECTIONS.EXAM_SESSIONS),
+      collection(dbPJ, COLLECTIONS.EXAM_SESSIONS),
       orderBy('startTime', 'asc')
     );
     const snap = await getDocs(q);
@@ -33,7 +33,7 @@ export const getAllExamSessions = async () => {
 
 export const getExamSessionById = async (id) => {
   try {
-    const ref = doc(db, COLLECTIONS.EXAM_SESSIONS, id);
+    const ref = doc(dbPJ, COLLECTIONS.EXAM_SESSIONS, id);
     const snap = await getDoc(ref);
     if (!snap.exists()) return null;
     return { id: snap.id, ...snap.data() };
@@ -49,7 +49,7 @@ export const addExamSession = async (data) => {
       ...data,
       createdAt: serverTimestamp(),
     };
-    const ref = await addDoc(collection(db, COLLECTIONS.EXAM_SESSIONS), payload);
+    const ref = await addDoc(collection(dbPJ, COLLECTIONS.EXAM_SESSIONS), payload);
     return { id: ref.id, ...payload };
   } catch (error) {
     console.error('addExamSession error', error);
@@ -59,7 +59,7 @@ export const addExamSession = async (data) => {
 
 export const updateExamSession = async (id, data) => {
   try {
-    const ref = doc(db, COLLECTIONS.EXAM_SESSIONS, id);
+    const ref = doc(dbPJ, COLLECTIONS.EXAM_SESSIONS, id);
     await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
     return true;
   } catch (error) {
@@ -70,7 +70,7 @@ export const updateExamSession = async (id, data) => {
 
 export const deleteExamSession = async (id) => {
   try {
-    await deleteDoc(doc(db, COLLECTIONS.EXAM_SESSIONS, id));
+    await deleteDoc(doc(dbPJ, COLLECTIONS.EXAM_SESSIONS, id));
     return true;
   } catch (error) {
     console.error('deleteExamSession error', error);
@@ -81,7 +81,7 @@ export const deleteExamSession = async (id) => {
 export const getExamSessionsByPage = async (page = 1, pageSize = 20, lastDoc = null) => {
   try {
     let q = query(
-      collection(db, COLLECTIONS.EXAM_SESSIONS),
+      collection(dbPJ, COLLECTIONS.EXAM_SESSIONS),
       orderBy('startTime', 'asc'),
       limit(pageSize)
     );

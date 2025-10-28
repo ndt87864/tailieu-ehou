@@ -1,8 +1,8 @@
 // studentInforService.js - CRUD cho collection student_infor
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp, query } from 'firebase/firestore';
-import { app } from './firebase';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp, query } from 'firebase/firestore';
+import { db as dbPJ } from './firebase_pj';
 
-const db = getFirestore(app);
+const db = dbPJ;
 const STUDENT_INFOR_COLLECTION = 'student_infor';
 
 export const getAllStudentInfor = async () => {
