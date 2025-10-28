@@ -128,8 +128,6 @@ const ConditionalHomeRoute = () => {
   return <HomePage />;
 };
 
-
-
 // Add domain redirect helper
 const redirectIfNeeded = () => {
   const currentDomain = window.location.hostname;
