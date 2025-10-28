@@ -12,6 +12,7 @@ import {
   ensureXLSX,
   mapHeaderToKey,
   parseExcelDateToYMD,
+  parseCSV,
 } from "../student_infor/studentInforHelpers";
 import { useTheme } from "../../../context/ThemeContext";
 import { useUserRole } from "../../../context/UserRoleContext";
@@ -342,16 +343,28 @@ const RoomInforManagement = () => {
     if (!proceed) return;
     setIsSaving(true);
     try {
-      const XLSX = await ensureXLSX();
-      const data = await file.arrayBuffer();
-      // request cellDates so date cells become JS Date where possible
-      const wb = XLSX.read(data, { type: "array", cellDates: true });
-      const date1904 = Boolean(
-        wb && wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904
-      );
-      const firstSheet = wb.SheetNames[0];
-      const sheet = wb.Sheets[firstSheet];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      // Support CSV as well as Excel. Use file extension/type to choose parser.
+      const isCsv = String(file.name || "").toLowerCase().endsWith(".csv") || file.type === "text/csv";
+      let json = [];
+      let date1904 = false;
+
+      if (isCsv) {
+        // Parse CSV using our helper which returns array of objects (header -> value)
+        const text = await file.text();
+        json = parseCSV(text);
+        date1904 = false;
+      } else {
+        const XLSX = await ensureXLSX();
+        const data = await file.arrayBuffer();
+        // request cellDates so date cells become JS Date where possible
+        const wb = XLSX.read(data, { type: "array", cellDates: true });
+        date1904 = Boolean(
+          wb && wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904
+        );
+        const firstSheet = wb.SheetNames[0];
+        const sheet = wb.Sheets[firstSheet];
+        json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      }
       if (!Array.isArray(json) || json.length === 0) {
         setImportModal({
           open: true,
@@ -799,7 +812,7 @@ const RoomInforManagement = () => {
                   <input
                     id="room-excel-file"
                     type="file"
-                    accept=".xls,.xlsx"
+                    accept=".xls,.xlsx,.csv"
                     onChange={(e) => {
                       const f = e.target.files && e.target.files[0];
                       if (f) handleExcelImport(f);
@@ -826,7 +839,7 @@ const RoomInforManagement = () => {
                         d="M12 5v14m7-7H5"
                       />
                     </svg>
-                    Import Excel
+                    Import Excel/CSV
                   </button>
                 </div>
               </div>
