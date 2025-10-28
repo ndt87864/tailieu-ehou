@@ -878,11 +878,9 @@ const StudentInforManagement = () => {
         }
       });
 
-      // If imported rows contain examDate but the DB record for the same
-      // studentId or (fullName+dob) (or matching username) has an empty
-      // examDate, apply the examDate update to the existing DB record
-      // instead of creating a duplicate. We'll collect updates and apply
-      // them immediately. Use more robust normalization to avoid misses.
+
+      // --- PATCH: Nếu các trường khác trùng mà trường examDate rỗng thì ghi trường dob vào examDate ---
+      // Nếu import row có examDate rỗng, nhưng dob có giá trị, và DB record trùng các trường khác mà examDate rỗng, thì update examDate = dob
       const dateUpdates = [];
       const handledImportIndexes = new Set();
       const normalizeId = (s) =>
@@ -897,6 +895,94 @@ const StudentInforManagement = () => {
       for (let i = 0; i < toImport.length; i++) {
         const item = toImport[i];
         const importedExamDate = parseDateToYMD(item.examDate || "");
+        const importedDob = parseDateToYMD(item.dob || "");
+
+        // Nếu examDate rỗng, dob có giá trị
+        if (!importedExamDate && importedDob) {
+          // attempt matching by studentId (normalized)
+          const importedIdNorm = normalizeId(item.studentId || "");
+          if (importedIdNorm) {
+            const matches = (studentInfors || []).filter((s) => {
+              const sIdNorm = normalizeId(s.studentId || "");
+              return (
+                sIdNorm && sIdNorm === importedIdNorm &&
+                (!parseDateToYMD(s.examDate || "")) &&
+                (parseDateToYMD(s.dob || "") === importedDob) &&
+                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
+                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
+                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
+                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
+                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
+                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
+                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+              );
+            });
+            for (const m of matches) {
+              // chỉ update examDate, không update dob
+              dateUpdates.push({ id: m.id, examDate: importedDob });
+              handledImportIndexes.add(i);
+            }
+            if (handledImportIndexes.has(i)) continue;
+          }
+
+          // try username match if provided
+          const importedUsername = String(item.username || "")
+            .trim()
+            .toLowerCase();
+          if (importedUsername) {
+            const matches = (studentInfors || []).filter((s) => {
+              return (
+                String(s.username || "").trim().toLowerCase() === importedUsername &&
+                (!parseDateToYMD(s.examDate || "")) &&
+                (parseDateToYMD(s.dob || "") === importedDob) &&
+                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
+                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
+                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
+                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
+                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
+                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
+                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+              );
+            });
+            for (const m of matches) {
+              // chỉ update examDate, không update dob
+              dateUpdates.push({ id: m.id, examDate: importedDob });
+              handledImportIndexes.add(i);
+            }
+            if (handledImportIndexes.has(i)) continue;
+          }
+
+          // fallback: fullName + dob
+          const importedNameNorm = normalizeName(item.fullName || "");
+          if (importedNameNorm && importedDob) {
+            const matches = (studentInfors || []).filter((s) => {
+              const sNameNorm = normalizeName(s.fullName || "");
+              const sDob = parseDateToYMD(s.dob || "");
+              return (
+                sNameNorm === importedNameNorm &&
+                sDob && sDob === importedDob &&
+                (!parseDateToYMD(s.examDate || "")) &&
+                (String(s.subject || "").trim().toLowerCase() === String(item.subject || "").trim().toLowerCase()) &&
+                (String(s.examSession || "").trim().toLowerCase() === String(item.examSession || "").trim().toLowerCase()) &&
+                (String(s.examTime || "").trim().toLowerCase() === String(item.examTime || "").trim().toLowerCase()) &&
+                (String(s.examRoom || "").trim().toLowerCase() === String(item.examRoom || "").trim().toLowerCase()) &&
+                (String(s.course || "").trim().toLowerCase() === String(item.course || "").trim().toLowerCase()) &&
+                (String(s.majorCode || "").trim().toLowerCase() === String(item.majorCode || "").trim().toLowerCase()) &&
+                (String(s.examType || "").trim().toLowerCase() === String(item.examType || "").trim().toLowerCase())
+              );
+            });
+            for (const m of matches) {
+              // chỉ update examDate, không update dob
+              dateUpdates.push({ id: m.id, examDate: importedDob });
+              handledImportIndexes.add(i);
+            }
+          }
+          continue; // đã xử lý trường hợp này
+        }
+
+        // --- END PATCH ---
+
+        // Trường hợp cũ: nếu import row có examDate, update vào DB nếu DB record examDate rỗng
         if (!importedExamDate) continue; // nothing to apply
 
         // attempt matching by studentId (normalized)
@@ -940,7 +1026,6 @@ const StudentInforManagement = () => {
 
         // fallback: fullName + dob
         const importedNameNorm = normalizeName(item.fullName || "");
-        const importedDob = parseDateToYMD(item.dob || "");
         if (importedNameNorm && importedDob) {
           const matches = (studentInfors || []).filter((s) => {
             const sNameNorm = normalizeName(s.fullName || "");

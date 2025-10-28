@@ -79,7 +79,10 @@ const ExamSessionManagement = () => {
         if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t)) {
           const d = new Date(t);
           if (d instanceof Date && !isNaN(d)) {
-            return `${d.getHours()}h${d.getMinutes().toString().padStart(2, "0")}`;
+            return `${d.getHours()}h${d
+              .getMinutes()
+              .toString()
+              .padStart(2, "0")}`;
           }
         }
         // Nếu là HH:mm hoặc HH:mm:ss thì lấy phần giờ/phút
