@@ -12,6 +12,7 @@ import {
   ensureXLSX,
   mapHeaderToKey,
   parseExcelDateToYMD,
+  isValidUrl,
   parseCSV,
 } from "../student_infor/studentInforHelpers";
 import { useTheme } from "../../../context/ThemeContext";
@@ -455,6 +456,32 @@ const RoomInforManagement = () => {
           examType: (mapped.examType || "").toString().trim(),
         };
 
+        // If the Excel cell for 'examRoom' actually contains a URL (admins sometimes paste link
+        // into the 'Phòng' column), move it to examLink and try to locate a numeric room value
+        // elsewhere in the row so matching can proceed. This makes the import tolerant to
+        // swapped columns in various Excel templates.
+        if (isValidUrl(keyObj.examRoom)) {
+          // move to mapped.examLink if not already present
+          if (!mapped.examLink || String(mapped.examLink).trim() === "") {
+            mapped.examLink = keyObj.examRoom;
+          }
+          // clear examRoom and attempt to find a numeric room value in other cells
+          keyObj.examRoom = "";
+          // Prefer any other mapped.examRoom-like fields (raw row values that look numeric)
+          for (const v of Object.values(row)) {
+            try {
+              const s = String(v || "").trim();
+              if (s && !isValidUrl(s) && /\d{1,4}/.test(s)) {
+                // pick the first plausible numeric room value
+                keyObj.examRoom = s;
+                break;
+              }
+            } catch (e) {
+              /* ignore */
+            }
+          }
+        }
+
         if (
           !keyObj.subject &&
           !keyObj.examSession &&
@@ -499,10 +526,42 @@ const RoomInforManagement = () => {
         const rowLink = mapped.examLink ? String(mapped.examLink).trim() : "";
 
         // include parsed exam date so matching requires the same calendar date
-        const matches = await getMatchingRoomDocs({
+        let matches = await getMatchingRoomDocs({
           ...normKeyObj,
           examDate: rowDate,
         });
+        // If no matches found, try a relaxed second-pass: match by room number OR by examLink directly
+        if ((!matches || matches.length === 0) && (normKeyObj.examRoom || rowLink)) {
+          try {
+            const allRooms = await getAllRoomInfor();
+            const norm = (v) => normalizeForSearch(String(v || "")).trim();
+            const roomCandidates = allRooms.filter((d) => {
+              try {
+                const dbRoomNorm = norm(d.examRoom);
+                const dbLinkNorm = normalizeForSearch(d.examLink || "").trim();
+                const roomMatch = normKeyObj.examRoom ? dbRoomNorm === normKeyObj.examRoom : false;
+                const linkMatch = rowLink ? dbLinkNorm === normalizeForSearch(rowLink) : false;
+                // also allow matching numeric room when input contains number but DB room has extra text
+                if (!roomMatch && normKeyObj.examRoom) {
+                  const digitsInDb = (dbRoomNorm || '').match(/\d+/g) || [];
+                  const digitsInInput = (normKeyObj.examRoom || '').match(/\d+/g) || [];
+                  if (digitsInDb.length && digitsInInput.length && digitsInDb.join('') === digitsInInput.join('')) {
+                    return true;
+                  }
+                }
+                return roomMatch || linkMatch;
+              } catch (e) {
+                return false;
+              }
+            });
+            if (roomCandidates && roomCandidates.length > 0) {
+              console.info('[RoomImport][RelaxedMatch] found', roomCandidates.length, 'candidates for row', rowCount);
+              matches = roomCandidates;
+            }
+          } catch (e) {
+            console.warn('handleExcelImport: relaxed matching failed', e);
+          }
+        }
         if (!matches || matches.length === 0) {
           rowsWithNoMatches++;
           // Log the no-match case with the key used so we can diagnose why rooms weren't found
@@ -719,47 +778,92 @@ const RoomInforManagement = () => {
           examType: editing.examType,
         });
 
+        // apply the room changes: update existing room docs or create a new one
+        const affectedDocs = [];
         if (matches.length === 0) {
           // nothing to update, create a new room doc
-          await addRoomInfor(form);
+          try {
+            const created = await addRoomInfor(form);
+            if (created) affectedDocs.push(created);
+          } catch (e) {
+            console.error('Failed to create room_infor document', e);
+          }
         } else {
           for (const doc of matches) {
-            await updateRoomInfor(doc.id, { ...form });
+            try {
+              await updateRoomInfor(doc.id, { ...form });
+              // push a representation of the updated doc (use form values for current state)
+              affectedDocs.push({ id: doc.id, ...form });
+            } catch (e) {
+              console.error('Failed to update room_infor document', doc.id, e);
+            }
           }
         }
-        // Additionally, update student_infor documents where subject/session/time/room match the original
+
+        // Additionally, update student_infor documents so they reflect the room edits.
+        // We'll do two passes:
+        // 1) Update students that matched the original (editing) key so they get new values.
+        // 2) Update students that match the saved/updated room documents (affectedDocs) so missing fields
+        //    like examDate/examLink are propagated.
         try {
-          const criteria = {
+          // PASS 1: update students that matched the original editing key
+          const origCriteria = {
             subject: editing.subject,
             examSession: editing.examSession,
             examTime: editing.examTime,
             examRoom: editing.examRoom,
           };
-          // include examType if present on the original room
-          if (editing.examType) criteria.examType = editing.examType;
-          // include examDate in criteria if it was set originally
-          if (editing.examDate) criteria.examDate = editing.examDate;
+          if (editing.examType) origCriteria.examType = editing.examType;
+          if (editing.examDate) origCriteria.examDate = editing.examDate;
 
-          const updates = {};
-          // only update fields that actually changed (avoid overwriting unintended values)
+          const updatesFromForm = {};
           if ((form.subject || "") !== (editing.subject || ""))
-            updates.subject = form.subject || "";
+            updatesFromForm.subject = form.subject || "";
           if ((form.examDate || "") !== (editing.examDate || ""))
-            updates.examDate = form.examDate || "";
+            updatesFromForm.examDate = form.examDate || "";
           if ((form.examLink || "") !== (editing.examLink || ""))
-            updates.examLink = form.examLink || "";
+            updatesFromForm.examLink = form.examLink || "";
           if ((form.examType || "") !== (editing.examType || ""))
-            updates.examType = form.examType || "";
+            updatesFromForm.examType = form.examType || "";
 
-          if (Object.keys(updates).length > 0) {
-            const res = await updateStudentsByMatch(criteria, updates, {
+          if (Object.keys(updatesFromForm).length > 0) {
+            const res = await updateStudentsByMatch(origCriteria, updatesFromForm, {
               allowBulk: true,
+              force: true,
             });
             if (res && typeof res.updated === "number" && res.updated > 0) {
-              // Let the live subscription reflect changes; optionally notify admin
               console.info(
-                `Updated ${res.updated} student_infor records to reflect changes.`
+                `Updated ${res.updated} student_infor records to reflect room edits (original key).`
               );
+            }
+          }
+
+          // PASS 2: for each affected (created/updated) room doc, propagate form values (propagate examDate/examLink/examType)
+          for (const savedDoc of affectedDocs) {
+            const criteria2 = {
+              subject: savedDoc.subject,
+              examSession: savedDoc.examSession,
+              examTime: savedDoc.examTime,
+              examRoom: savedDoc.examRoom,
+            };
+            if (savedDoc.examType) criteria2.examType = savedDoc.examType;
+            if (savedDoc.examDate) criteria2.examDate = savedDoc.examDate;
+
+            const updates2 = {};
+            if (form.examDate) updates2.examDate = form.examDate;
+            if (form.examLink) updates2.examLink = form.examLink;
+            if (form.examType) updates2.examType = form.examType;
+
+            if (Object.keys(updates2).length > 0) {
+              const res2 = await updateStudentsByMatch(criteria2, updates2, {
+                allowBulk: true,
+                force: true,
+              });
+              if (res2 && typeof res2.updated === "number" && res2.updated > 0) {
+                console.info(
+                  `Updated ${res2.updated} student_infor records to reflect room edits (saved doc ${savedDoc.id}).`
+                );
+              }
             }
           }
         } catch (e) {

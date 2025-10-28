@@ -243,7 +243,7 @@ const parseDateToYMD = (val) => {
 
 // Update all student documents that match the criteria with provided updates object.
 // Uses batched writes for efficiency.
-export const updateStudentsByMatch = async (criteria = {}, updates = {}) => {
+export const updateStudentsByMatch = async (criteria = {}, updates = {}, options = {}) => {
   try {
     if (!criteria || Object.keys(criteria).length === 0) return { updated: 0 };
     const matches = await getStudentsByMatch(criteria);
@@ -258,13 +258,17 @@ export const updateStudentsByMatch = async (criteria = {}, updates = {}) => {
 
     if (Object.keys(payload).length === 0) return { updated: 0 };
 
+    const force = options && options.force === true;
+
     // perform updates sequentially (could be batched if needed)
     let updated = 0;
     for (const s of matches) {
       try {
-        // If payload contains examLink, only apply the link to students that do not already have one.
+        // Clone payload per-student because we may modify it depending on options
         const perStudentPayload = { ...payload };
-        if (perStudentPayload.examLink) {
+
+        if (!force && perStudentPayload.examLink) {
+          // If payload contains examLink and we're not forcing, only apply the link to students that do not already have one.
           const existingLink = s.examLink;
           if (existingLink && String(existingLink).trim() !== "") {
             // remove examLink from this student's payload to avoid overwriting an existing link
