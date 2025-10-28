@@ -182,7 +182,7 @@ const ExamSessionManagement = () => {
                 <>
                   <br />
                   <span className="text-base font-normal text-blue-700 dark:text-blue-300">
-                    {syncingSessionInfo.title} ({syncingSessionInfo.examType})
+                    {syncingSessionInfo.title}
                   </span>
                 </>
               )}
@@ -256,7 +256,7 @@ const ExamSessionManagement = () => {
                       <th className="px-4 py-2 font-semibold">Tiêu đề</th>
                       <th className="px-4 py-2 font-semibold">Bắt đầu</th>
                       <th className="px-4 py-2 font-semibold">Kết thúc</th>
-                      <th className="px-4 py-2 font-semibold">Hình thức</th>
+                      {/* Hình thức column hidden */}
                       <th className="px-4 py-2 font-semibold">Trạng thái</th>
                       <th className="px-4 py-2 font-semibold">Hành động</th>
                     </tr>
@@ -280,7 +280,7 @@ const ExamSessionManagement = () => {
                         <td className="px-4 py-2">{s.title}</td>
                         <td className="px-4 py-2">{s.startTime || "-"}</td>
                         <td className="px-4 py-2">{s.endTime || "-"}</td>
-                        <td className="px-4 py-2">{s.examType || "-"}</td>
+                        {/* examType hidden in UI */}
                         <td className="px-4 py-2">
                           {s.isActive ? (
                             <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">

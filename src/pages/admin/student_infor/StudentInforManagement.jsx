@@ -41,7 +41,6 @@ const columns = [
   { key: "examRoom", label: "Phòng thi" },
   { key: "course", label: "Khóa" },
   { key: "majorCode", label: "Mã ngành" },
-  { key: "examType", label: "Hình thức thi" },
   { key: "examLink", label: "Link phòng" },
 ];
 

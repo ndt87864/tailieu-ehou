@@ -210,22 +210,7 @@ const StudentFormModal = ({
                 />
               </div>
 
-              <div>
-                <label
-                  htmlFor="examType"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Hình thức thi
-                </label>
-                <input
-                  id="examType"
-                  name="examType"
-                  value={form.examType}
-                  onChange={(e) => handleChange("examType", e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  placeholder="Ví dụ: Trực tiếp / Trực tuyến"
-                />
-              </div>
+              {/* examType hidden in UI */}
 
               <div className="md:col-span-2">
                 <label

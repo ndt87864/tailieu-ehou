@@ -1104,9 +1104,6 @@ const RoomInforManagement = () => {
                           Phòng
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Hình thức thi
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                           Link phòng
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -1118,7 +1115,7 @@ const RoomInforManagement = () => {
                       {filteredRooms.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={7}
                             className="p-6 text-center text-sm text-gray-500"
                           >
                             Không có dữ liệu
@@ -1155,9 +1152,7 @@ const RoomInforManagement = () => {
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examRoom || "-"}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.examType || "-"}
-                            </td>
+                            {/* examType column hidden as requested */}
                             <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400 break-all">
                               {r.examLink ? (
                                 <a
