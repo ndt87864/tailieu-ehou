@@ -1,5 +1,5 @@
 // studentInforService.js - CRUD cho collection student_infor
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, Timestamp, query } from 'firebase/firestore';
 import { app } from './firebase';
 
 const db = getFirestore(app);
@@ -53,23 +53,31 @@ export const addStudentInfor = async (data) => {
 
 export const updateStudentInfor = async (id, data) => {
   const payload = { ...data };
-  if (payload.dob) {
-    try {
-      const d = (payload.dob instanceof Date) ? payload.dob : new Date(payload.dob);
-      if (!isNaN(d.getTime())) payload.dob = Timestamp.fromDate(d);
-    } catch (e) {
-      console.warn('updateStudentInfor: failed to convert dob to Timestamp', e);
+  try {
+    // Debug log
+    console.log('[updateStudentInfor] id:', id, 'payload:', payload);
+    if (payload.dob) {
+      try {
+        const d = (payload.dob instanceof Date) ? payload.dob : new Date(payload.dob);
+        if (!isNaN(d.getTime())) payload.dob = Timestamp.fromDate(d);
+      } catch (e) {
+        console.warn('updateStudentInfor: failed to convert dob to Timestamp', e);
+      }
     }
-  }
-  if (payload.examDate) {
-    try {
-      const ed = (payload.examDate instanceof Date) ? payload.examDate : new Date(payload.examDate);
-      if (!isNaN(ed.getTime())) payload.examDate = Timestamp.fromDate(ed);
-    } catch (e) {
-      console.warn('updateStudentInfor: failed to convert examDate to Timestamp', e);
+    if (payload.examDate) {
+      try {
+        const ed = (payload.examDate instanceof Date) ? payload.examDate : new Date(payload.examDate);
+        if (!isNaN(ed.getTime())) payload.examDate = Timestamp.fromDate(ed);
+      } catch (e) {
+        console.warn('updateStudentInfor: failed to convert examDate to Timestamp', e);
+      }
     }
+    await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), payload);
+    console.log('[updateStudentInfor] SUCCESS for id:', id);
+  } catch (err) {
+    console.error('[updateStudentInfor] ERROR for id:', id, err);
+    throw err;
   }
-  await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), payload);
 };
 
 export const deleteStudentInfor = async (id) => {
@@ -101,7 +109,7 @@ export const getStudentsByMatch = async (criteria = {}) => {
       if (examDate && norm(parseDateToYMD(d.examDate || '')) !== norm(examDate)) return false;
       if (subject && norm(d.subject || '') !== norm(subject)) return false;
       if (examSession && norm(d.examSession || '') !== norm(examSession)) return false;
-      if (examTime && norm(d.examTime || '') !== norm(examTime)) return false;
+      // BỎ điều kiện kiểm tra examTime để luôn đồng bộ dù sinh viên có trường thời gian rỗng hay không
       if (examRoom && norm(d.examRoom || '') !== norm(examRoom)) return false;
       return true;
     });

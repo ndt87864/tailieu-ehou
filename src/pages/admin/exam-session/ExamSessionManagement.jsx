@@ -73,10 +73,27 @@ const ExamSessionManagement = () => {
   const formatExamTime = (start, end) => {
     const toHM = (t) => {
       if (!t) return "";
-      const d = typeof t === "string" ? new Date(t) : t.toDate ? t.toDate() : t;
-      return d instanceof Date && !isNaN(d)
-        ? `${d.getHours()}h${d.getMinutes().toString().padStart(2, "0")}`
-        : "";
+      // Nếu là string dạng HH:mm hoặc HH:mm:ss thì trả về luôn
+      if (typeof t === "string") {
+        // Nếu là ISO string, chuyển sang Date
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(t)) {
+          const d = new Date(t);
+          if (d instanceof Date && !isNaN(d)) {
+            return `${d.getHours()}h${d.getMinutes().toString().padStart(2, "0")}`;
+          }
+        }
+        // Nếu là HH:mm hoặc HH:mm:ss thì lấy phần giờ/phút
+        const match = t.match(/^(\d{1,2}):(\d{2})/);
+        if (match) {
+          return `${match[1]}h${match[2]}`;
+        }
+        return t; // fallback: trả về nguyên text
+      }
+      if (t && typeof t.toDate === "function") t = t.toDate();
+      if (t instanceof Date && !isNaN(t)) {
+        return `${t.getHours()}h${t.getMinutes().toString().padStart(2, "0")}`;
+      }
+      return "";
     };
     return `${toHM(start)} - ${toHM(end)}`;
   };
@@ -84,30 +101,37 @@ const ExamSessionManagement = () => {
   // Đồng bộ examTime cho student_infor khi thêm/sửa ca thi
   const syncExamTimeForStudents = async (session) => {
     setSyncing(true);
-    setSyncingSessionInfo({ title: session.title, examType: session.examType || "Onsite" });
+    setSyncingSessionInfo({
+      title: session.title,
+      examType: session.examType || "Onsite",
+    });
     try {
       const students = await getAllStudentInfor();
       // Lọc ra sinh viên cùng ca thi (cùng examSession, examType)
-      const related = students.filter(student =>
-        student.examSession === session.title &&
-        (student.examType || "Onsite") === (session.examType || "Onsite")
+      const related = students.filter(
+        (student) =>
+          student.examSession === session.title &&
+          (student.examType || "Onsite") === (session.examType || "Onsite")
       );
-      // Lọc ra sinh viên thực sự cần đồng bộ (chưa có examTime)
-      const toSync = related.filter(student => !student.examTime);
+      // Luôn đồng bộ lại examTime cho tất cả sinh viên thuộc ca thi này
       let updated = 0;
       let total = related.length;
       let done = 0;
       setSyncProgress({ done: 0, total });
-      for (const student of toSync) {
-        const newExamTime = formatExamTime(session.startTime, session.endTime);
-        if (newExamTime) {
-          await updateStudentInfor(student.id, { examTime: newExamTime });
-          updated++;
-        }
-        done++;
-        setSyncProgress({ done, total });
+      const batchSize = 10;
+      const newExamTime = formatExamTime(session.startTime, session.endTime);
+      for (let i = 0; i < related.length; i += batchSize) {
+        const batch = related.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map((student) =>
+            updateStudentInfor(student.id, { examTime: newExamTime })
+          )
+        );
+        updated += batch.length;
+        done += batch.length;
+        setSyncProgress({ done: Math.min(done, related.length), total });
       }
-      setSyncProgress({ done: toSync.length, total });
+      setSyncProgress({ done: related.length, total });
       if (updated > 0) {
         alert(`Đã đồng bộ thời gian cho ${updated} sinh viên.`);
       }
@@ -125,7 +149,8 @@ const ExamSessionManagement = () => {
       let session;
       if (editing && editing.id) {
         await updateExamSession(editing.id, payload);
-        session = { ...payload, title: editing.title, id: editing.id };
+        // Sử dụng title mới (payload.title) để đồng bộ đúng sinh viên thuộc ca thi mới
+        session = { ...payload, title: payload.title, id: editing.id };
       } else {
         const added = await addExamSession(payload);
         session = { ...payload, ...added };
@@ -162,14 +187,24 @@ const ExamSessionManagement = () => {
             <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
               <div
                 className="bg-blue-600 h-4 rounded-full transition-all"
-                style={{ width: `${syncProgress.total ? Math.round((syncProgress.done / syncProgress.total) * 100) : 0}%` }}
+                style={{
+                  width: `${
+                    syncProgress.total
+                      ? Math.round(
+                          (syncProgress.done / syncProgress.total) * 100
+                        )
+                      : 0
+                  }%`,
+                }}
               ></div>
             </div>
             <div className="text-sm text-gray-700 dark:text-gray-200">
               {syncProgress.done} / {syncProgress.total} sinh viên cùng ca thi
             </div>
             {syncProgress.total === 0 && (
-              <div className="text-xs text-gray-500 mt-1">Không có sinh viên nào thuộc ca thi này.</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Không có sinh viên nào thuộc ca thi này.
+              </div>
             )}
           </div>
         </div>

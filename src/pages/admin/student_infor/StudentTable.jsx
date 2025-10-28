@@ -271,6 +271,10 @@ const StudentTable = ({
                         ) : (
                           ""
                         )
+                      ) : col.key === "examTime" ? (
+                        row[col.key] && typeof row[col.key] === "string" && row[col.key].trim() !== ""
+                          ? row[col.key]
+                          : <span className="text-gray-400">-</span>
                       ) : (
                         row[col.key] ?? ""
                       )}
