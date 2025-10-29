@@ -231,7 +231,8 @@ const RoomInforManagement = () => {
 
       // Process each selected room sequentially
       for (const id of selectedIds) {
-        const room = (rooms || []).find((x) => x.id === id) ||
+        const room =
+          (rooms || []).find((x) => x.id === id) ||
           (filteredRooms || []).find((x) => x.id === id);
         if (!room) continue;
 
@@ -250,7 +251,7 @@ const RoomInforManagement = () => {
             await deleteRoomInfor(doc.id);
             totalDeletedRooms++;
           } catch (e) {
-            console.warn('Failed to delete room_infor', doc.id, e);
+            console.warn("Failed to delete room_infor", doc.id, e);
           }
         }
 
@@ -268,7 +269,7 @@ const RoomInforManagement = () => {
           const res = await deleteStudentsByMatch(criteria);
           totalDeletedStudents += res.deleted || 0;
         } catch (e) {
-          console.error('Failed to delete students for room', id, e);
+          console.error("Failed to delete students for room", id, e);
         }
       }
 
@@ -277,8 +278,8 @@ const RoomInforManagement = () => {
       );
       clearSelection();
     } catch (err) {
-      console.error('handleDeleteSelected error', err);
-      alert('Lỗi khi xóa các bản ghi đã chọn. Xem console để biết chi tiết.');
+      console.error("handleDeleteSelected error", err);
+      alert("Lỗi khi xóa các bản ghi đã chọn. Xem console để biết chi tiết.");
     } finally {
       setIsSaving(false);
     }
@@ -362,7 +363,7 @@ const RoomInforManagement = () => {
     const sessFilter = normalizeForSearch(filterSession || "");
     const dateFilter = filterDate || ""; // YYYY-MM-DD from input
 
-    return (rooms || []).filter((r) => {
+    const filtered = (rooms || []).filter((r) => {
       // subject
       if (sFilter) {
         const subj = normalizeForSearch(r.subject || "");
@@ -385,6 +386,57 @@ const RoomInforManagement = () => {
       }
       return true;
     });
+
+    // Sorting: examDate (asc), examSession (asc), examRoom (asc)
+    const normalizeEmptyDate = (d) => {
+      const y = parseDateToYMD(d || "") || "";
+      // Treat empty dates as far-future so they appear last
+      return y === "" ? "9999-12-31" : y;
+    };
+
+    const extractNumber = (s) => {
+      if (!s) return null;
+      const m = String(s).match(/\d+/);
+      return m ? parseInt(m[0], 10) : null;
+    };
+
+    const compareAlphaNum = (a, b) => {
+      if (a === b) return 0;
+      const aNum = extractNumber(a);
+      const bNum = extractNumber(b);
+      if (aNum !== null && bNum !== null) {
+        return aNum - bNum;
+      }
+      // fallback to localeCompare for strings
+      return String(a || "").localeCompare(String(b || ""), undefined, {
+        sensitivity: "base",
+        numeric: true,
+      });
+    };
+
+    filtered.sort((x, y) => {
+      try {
+        const dx = normalizeEmptyDate(x.examDate);
+        const dy = normalizeEmptyDate(y.examDate);
+        if (dx < dy) return -1;
+        if (dx > dy) return 1;
+
+        // examSession compare (allow numeric comparison when possible)
+        const sessCmp = compareAlphaNum(x.examSession || "", y.examSession || "");
+        if (sessCmp !== 0) return sessCmp;
+
+        // examRoom compare (allow numeric comparison when possible)
+        const roomCmp = compareAlphaNum(x.examRoom || "", y.examRoom || "");
+        if (roomCmp !== 0) return roomCmp;
+
+        // final fallback: compare subject to have deterministic order
+        return String(x.subject || "").localeCompare(String(y.subject || ""), undefined, { sensitivity: "base" });
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    return filtered;
   }, [rooms, filterSubject, filterRoom, filterDate, filterSession]);
 
   // Import unique room metadata from existing student_infor records
@@ -1036,7 +1088,7 @@ const RoomInforManagement = () => {
           await deleteRoomInfor(doc.id);
           deletedRooms++;
         } catch (e) {
-          console.warn('Failed to delete room_infor', doc.id, e);
+          console.warn("Failed to delete room_infor", doc.id, e);
         }
       }
 
@@ -1053,11 +1105,15 @@ const RoomInforManagement = () => {
       const res = await deleteStudentsByMatch(criteria);
 
       alert(
-        `Hoàn thành. Đã xóa ${deletedRooms} phòng (nếu có) và ${res.deleted || 0} bản ghi thí sinh.`
+        `Hoàn thành. Đã xóa ${deletedRooms} phòng (nếu có) và ${
+          res.deleted || 0
+        } bản ghi thí sinh.`
       );
     } catch (err) {
-      console.error('handleDeleteRoom error', err);
-      alert('Lỗi khi xóa phòng hoặc bản ghi thí sinh. Xem console để biết chi tiết.');
+      console.error("handleDeleteRoom error", err);
+      alert(
+        "Lỗi khi xóa phòng hoặc bản ghi thí sinh. Xem console để biết chi tiết."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -1170,7 +1226,9 @@ const RoomInforManagement = () => {
                   </button>
                   <button
                     onClick={handleDeleteSelected}
-                    disabled={!selectedIds || selectedIds.length === 0 || isSaving}
+                    disabled={
+                      !selectedIds || selectedIds.length === 0 || isSaving
+                    }
                     className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow-sm text-sm"
                   >
                     Xóa đã chọn
@@ -1277,10 +1335,13 @@ const RoomInforManagement = () => {
                             type="checkbox"
                             checked={
                               (filteredRooms || []).length > 0 &&
-                              selectedIds.length === (filteredRooms || []).length
+                              selectedIds.length ===
+                                (filteredRooms || []).length
                             }
                             onChange={(e) =>
-                              e.target.checked ? selectAllVisible() : clearSelection()
+                              e.target.checked
+                                ? selectAllVisible()
+                                : clearSelection()
                             }
                           />
                         </th>
@@ -1327,13 +1388,13 @@ const RoomInforManagement = () => {
                                 : "bg-gray-50 dark:bg-gray-700"
                             } hover:bg-gray-100 dark:hover:bg-gray-600`}
                           >
-                              <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedIds.includes(r.id)}
-                                  onChange={() => toggleSelect(r.id)}
-                                />
-                              </td>
+                            <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(r.id)}
+                                onChange={() => toggleSelect(r.id)}
+                              />
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examDate ? (
                                 formatDate(r.examDate)
