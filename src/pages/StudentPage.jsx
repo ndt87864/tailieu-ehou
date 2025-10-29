@@ -35,6 +35,7 @@ const StudentPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [pendingSearch, setPendingSearch] = useState("");
   const { isDarkMode } = useTheme();
   const [sidebarData, setSidebarData] = useState([]);
   const [documents, setDocuments] = useState({});
@@ -81,6 +82,7 @@ const StudentPage = () => {
       const q = params.get("query") || "";
       if (q && q !== search) {
         setSearch(q);
+        setPendingSearch(q);
       }
     } catch (e) {
       // ignore malformed URL
@@ -204,16 +206,20 @@ const StudentPage = () => {
           )}
 
           <div className="flex-1 p-6 min-w-0">
+            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
+              Danh sách sinh viên
+            </h2>
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-semibold text-white">
-                Danh sách thí sinh
-              </h1>
-
               <div className="flex items-center gap-3">
-                <div className="w-64">
+                <div className="w-64 flex items-center gap-1">
                   <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    value={pendingSearch}
+                    onChange={(e) => setPendingSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setSearch(pendingSearch);
+                      }
+                    }}
                     placeholder="Tìm theo họ và tên , Tài khoản..."
                     className={`w-full px-3 py-2 rounded border focus:outline-none sm:text-sm ${
                       isDarkMode
@@ -221,61 +227,88 @@ const StudentPage = () => {
                         : "bg-white border-gray-300 placeholder-gray-500"
                     }`}
                   />
-                </div>
-
-                <div className="flex items-center gap-2">
                   <button
-                    onClick={async () => {
-                      try {
-                        const XLSX = await import("xlsx");
-                        // Export only visible fields (hide studentId, dob, examType)
-                        const data = filtered.map((r) => ({
-                          "Họ và tên": r.fullName || "",
-                          "Tài khoản": r.username || "",
-                          "Tên môn học": r.subject || "",
-                          "Ca thi": r.examSession || "",
-                          "Thời gian": r.examTime || "",
-                          "Phòng thi": r.examRoom || "",
-                          Khóa: r.course || "",
-                          "Mã ngành": r.majorCode || "",
-                          "Link phòng": r.examLink || "",
-                        }));
-
-                        const wb = XLSX.utils.book_new();
-                        const ws = XLSX.utils.json_to_sheet(data);
-                        XLSX.utils.book_append_sheet(
-                          wb,
-                          ws,
-                          "Danh sách thí sinh"
-                        );
-                        const wbout = XLSX.write(wb, {
-                          bookType: "xlsx",
-                          type: "array",
-                        });
-                        const blob = new Blob([wbout], {
-                          type: "application/octet-stream",
-                        });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `students_${new Date()
-                          .toISOString()
-                          .slice(0, 19)
-                          .replace(/[:T]/g, "-")}.xlsx`;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        URL.revokeObjectURL(url);
-                      } catch (e) {
-                        console.error("Export XLSX failed", e);
-                        alert("Lỗi export XLSX: " + (e?.message || e));
-                      }
-                    }}
-                    className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                    type="button"
+                    aria-label="Tìm kiếm"
+                    onClick={() => setSearch(pendingSearch)}
+                    className={`p-2 rounded border ${
+                      isDarkMode
+                        ? "bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-200"
+                    }`}
+                    style={{ minWidth: 36, minHeight: 36 }}
                   >
-                    Export XLSX
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z"
+                      />
+                    </svg>
                   </button>
                 </div>
+                {/* Xuất file excel button moved below table in mobile mode */}
+                {windowWidth >= 770 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const XLSX = await import("xlsx");
+                          // Export only visible fields (hide studentId, dob, examType)
+                          const data = filtered.map((r) => ({
+                            "Họ và tên": r.fullName || "",
+                            "Tài khoản": r.username || "",
+                            "Tên môn học": r.subject || "",
+                            "Ca thi": r.examSession || "",
+                            "Thời gian": r.examTime || "",
+                            "Phòng thi": r.examRoom || "",
+                            Khóa: r.course || "",
+                            "Mã ngành": r.majorCode || "",
+                            "Link phòng": r.examLink || "",
+                          }));
+                          const wb = XLSX.utils.book_new();
+                          const ws = XLSX.utils.json_to_sheet(data);
+                          XLSX.utils.book_append_sheet(
+                            wb,
+                            ws,
+                            "Danh sách thí sinh"
+                          );
+                          const wbout = XLSX.write(wb, {
+                            bookType: "xlsx",
+                            type: "array",
+                          });
+                          const blob = new Blob([wbout], {
+                            type: "application/octet-stream",
+                          });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `students_${new Date()
+                            .toISOString()
+                            .slice(0, 19)
+                            .replace(/[:T]/g, "-")}.xlsx`;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          URL.revokeObjectURL(url);
+                        } catch (e) {
+                          console.error("Export XLSX failed", e);
+                          alert("Lỗi xuất file excel: " + (e?.message || e));
+                        }
+                      }}
+                      className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      Xuất file excel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -368,6 +401,8 @@ const StudentPage = () => {
                       </div>
                     ))
                   )}
+                  {/* Xuất file excel button for mobile mode - Ẩn trên mobile */}
+                  {/* Không hiển thị nút xuất file excel ở mobile mode */}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -485,7 +520,7 @@ const StudentPage = () => {
                         : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
                     }`}
                   >
-                    &laquo; Prev
+                    &laquo; Trước
                   </button>
 
                   <div className="text-sm text-gray-700 dark:text-gray-200 px-2">
@@ -503,7 +538,7 @@ const StudentPage = () => {
                         : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
                     }`}
                   >
-                    Next &raquo;
+                    Sau &raquo;
                   </button>
                 </div>
               </div>

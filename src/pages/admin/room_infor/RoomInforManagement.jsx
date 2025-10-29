@@ -1553,7 +1553,9 @@ const RoomInforManagement = () => {
                                 onChange={() => toggleSelect(r.id)}
                               />
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">{idx + 1}</td>
+                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                              {idx + 1}
+                            </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examDate ? (
                                 formatDate(r.examDate)
