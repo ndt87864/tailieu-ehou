@@ -289,7 +289,13 @@ const StudentPage = () => {
                     type="text"
                     placeholder="Tìm kiếm thí sinh"
                     value={pendingSearch}
-                    onChange={(e) => setPendingSearch(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPendingSearch(v);
+                      if (v === "") {
+                        setSearch("");
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         setSearch(pendingSearch);
