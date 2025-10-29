@@ -69,6 +69,7 @@ const RoomInforManagement = () => {
   const [filterDate, setFilterDate] = useState("");
   const [filterSession, setFilterSession] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
+  const [groupByLink, setGroupByLink] = useState(false);
 
   // in-app confirmation popup state (replaces window.confirm)
   const [confirmState, setConfirmState] = useState({
@@ -212,7 +213,8 @@ const RoomInforManagement = () => {
   };
 
   const selectAllVisible = () => {
-    const ids = (filteredRooms || []).map((r) => r.id);
+    // when grouping is on, select all visible member ids
+    const ids = (visibleRooms || filteredRooms || []).map((r) => r.id);
     setSelectedIds(ids);
   };
 
@@ -422,7 +424,10 @@ const RoomInforManagement = () => {
         if (dx > dy) return 1;
 
         // examSession compare (allow numeric comparison when possible)
-        const sessCmp = compareAlphaNum(x.examSession || "", y.examSession || "");
+        const sessCmp = compareAlphaNum(
+          x.examSession || "",
+          y.examSession || ""
+        );
         if (sessCmp !== 0) return sessCmp;
 
         // examRoom compare (allow numeric comparison when possible)
@@ -430,7 +435,11 @@ const RoomInforManagement = () => {
         if (roomCmp !== 0) return roomCmp;
 
         // final fallback: compare subject to have deterministic order
-        return String(x.subject || "").localeCompare(String(y.subject || ""), undefined, { sensitivity: "base" });
+        return String(x.subject || "").localeCompare(
+          String(y.subject || ""),
+          undefined,
+          { sensitivity: "base" }
+        );
       } catch (e) {
         return 0;
       }
@@ -438,6 +447,21 @@ const RoomInforManagement = () => {
 
     return filtered;
   }, [rooms, filterSubject, filterRoom, filterDate, filterSession]);
+
+  // visibleRooms is either the flat filtered list or the flattened groups when grouping is enabled
+  const visibleRooms = useMemo(() => {
+    if (!groupByLink) return filteredRooms || [];
+    // group by exact examLink (normalized)
+    const groupsMap = new Map();
+    const normalizeLink = (s) => (s || "").toString().trim();
+    (filteredRooms || []).forEach((r) => {
+      const key = normalizeLink(r.examLink) || "(no-link)";
+      if (!groupsMap.has(key)) groupsMap.set(key, []);
+      groupsMap.get(key).push(r);
+    });
+    // flatten groups but keep group boundaries info not needed here; return flattened array for selection/counts
+    return Array.from(groupsMap.values()).flat();
+  }, [filteredRooms, groupByLink]);
 
   // Import unique room metadata from existing student_infor records
   const importFromStudents = async () => {
@@ -1287,7 +1311,7 @@ const RoomInforManagement = () => {
                 <div className="mt-3 flex items-center justify-between">
                   <div className="text-sm text-gray-700 dark:text-gray-300">
                     Tổng: <strong>{rooms.length}</strong> — Hiển thị:{" "}
-                    <strong>{filteredRooms.length}</strong>
+                    <strong>{visibleRooms.length}</strong>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -1301,12 +1325,14 @@ const RoomInforManagement = () => {
                     >
                       Xóa bộ lọc
                     </button>
-                    <button
-                      onClick={importFromStudents}
-                      className="px-3 py-1 rounded border text-sm"
-                    >
-                      Nhập từ thí sinh
-                    </button>
+                    <label className="px-3 py-1 rounded border text-sm flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={groupByLink}
+                        onChange={(e) => setGroupByLink(e.target.checked)}
+                      />
+                      Nhóm theo link phòng
+                    </label>
                   </div>
                 </div>
               </div>
@@ -1369,7 +1395,7 @@ const RoomInforManagement = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredRooms.length === 0 ? (
+                      {visibleRooms.length === 0 ? (
                         <tr>
                           <td
                             colSpan={8}
@@ -1378,7 +1404,133 @@ const RoomInforManagement = () => {
                             Không có dữ liệu
                           </td>
                         </tr>
+                      ) : groupByLink ? (
+                        // grouped view: render clusters by identical examLink
+                        (() => {
+                          const groups = new Map();
+                          const normalizeLink = (s) =>
+                            (s || "").toString().trim();
+                          (filteredRooms || []).forEach((r) => {
+                            const key =
+                              normalizeLink(r.examLink) || "(no-link)";
+                            if (!groups.has(key)) groups.set(key, []);
+                            groups.get(key).push(r);
+                          });
+
+                          const rows = [];
+                          let rowIndex = 0;
+                          groups.forEach((members, link) => {
+                            // group header row
+                            rows.push(
+                              <tr
+                                key={`group-${link}`}
+                                className="bg-gray-100 dark:bg-gray-700"
+                              >
+                                <td
+                                  colSpan={8}
+                                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200"
+                                >
+                                  Link:{" "}
+                                  {link === "(no-link)" ? (
+                                    <span className="text-gray-500">
+                                      (không)
+                                    </span>
+                                  ) : (
+                                    <a
+                                      href={link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                                    >
+                                      {link}
+                                    </a>
+                                  )}{" "}
+                                  — Số phòng: {members.length}
+                                </td>
+                              </tr>
+                            );
+
+                            members.forEach((r, idx) => {
+                              const cls =
+                                rowIndex % 2 === 0
+                                  ? "bg-white dark:bg-gray-800"
+                                  : "bg-gray-50 dark:bg-gray-700";
+                              rows.push(
+                                <tr
+                                  key={r.id}
+                                  className={`${cls} hover:bg-gray-100 dark:hover:bg-gray-600`}
+                                >
+                                  <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedIds.includes(r.id)}
+                                      onChange={() => toggleSelect(r.id)}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {r.examDate ? (
+                                      formatDate(r.examDate)
+                                    ) : (
+                                      <span className="text-sm text-gray-500">
+                                        chưa cập nhật
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {r.subject || "-"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {r.examSession || "-"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {r.examTime || "-"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {r.examRoom || "-"}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400 break-all">
+                                    {r.examLink ? (
+                                      <a
+                                        href={r.examLink}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="hover:underline break-words"
+                                      >
+                                        {r.examLink}
+                                      </a>
+                                    ) : (
+                                      <span className="text-sm text-gray-500">
+                                        (không)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => openEdit(r)}
+                                        className="px-2 py-1 rounded bg-yellow-400 text-xs text-white hover:opacity-90"
+                                      >
+                                        Sửa
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteRoom(r)}
+                                        disabled={isSaving}
+                                        className="px-2 py-1 rounded bg-red-600 text-xs text-white hover:opacity-90"
+                                      >
+                                        Xóa
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                              rowIndex++;
+                            });
+                          });
+
+                          return rows;
+                        })()
                       ) : (
+                        // flat view
                         filteredRooms.map((r, idx) => (
                           <tr
                             key={r.id}
