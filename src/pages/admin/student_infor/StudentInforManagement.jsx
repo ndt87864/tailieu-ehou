@@ -112,6 +112,25 @@ const StudentInforManagement = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Map numeric/short examSession values to canonical examTime strings
+  const mapExamSessionToTime = (sess) => {
+    if (sess === undefined || sess === null) return null;
+    const s = String(sess).trim().toLowerCase();
+    // look for a digit 1-6 anywhere in the string
+    const m = s.match(/[1-6]/);
+    if (!m) return null;
+    const k = m[0];
+    const map = {
+      "1": "7h30 - 8h30",
+      "2": "8h45 - 9h45",
+      "3": "10h - 11h",
+      "4": "13h - 14h30",
+      "5": "15h15 - 16h15",
+      "6": "16h30 - 17h30",
+    };
+    return map[k] || null;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -733,6 +752,20 @@ const StudentInforManagement = () => {
             ? String(vals[headerMap.examLink]).trim()
             : "",
         };
+
+        // If examTime is missing but examSession is provided and maps to a known
+        // time slot (1-6), fill examTime automatically.
+        try {
+          if (
+            (!item.examTime || String(item.examTime).trim() === "") &&
+            item.examSession
+          ) {
+            const mapped = mapExamSessionToTime(item.examSession);
+            if (mapped) item.examTime = mapped;
+          }
+        } catch (e) {
+          // silent fallback: do not block import on mapping errors
+        }
 
         // Keep all rows for further processing. We will separate identity-rows
         // (rows that can be imported as student records) from link-only rows
