@@ -68,6 +68,7 @@ const RoomInforManagement = () => {
   const [filterRoom, setFilterRoom] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterSession, setFilterSession] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // in-app confirmation popup state (replaces window.confirm)
   const [confirmState, setConfirmState] = useState({
@@ -201,6 +202,86 @@ const RoomInforManagement = () => {
     setEditingKey(null);
     setForm(emptyRoom);
     setIsModalOpen(true);
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      if (!prev) return [id];
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    });
+  };
+
+  const selectAllVisible = () => {
+    const ids = (filteredRooms || []).map((r) => r.id);
+    setSelectedIds(ids);
+  };
+
+  const clearSelection = () => setSelectedIds([]);
+
+  const handleDeleteSelected = async () => {
+    if (!selectedIds || selectedIds.length === 0) return;
+    const proceed = await showConfirm(
+      `Xóa ${selectedIds.length} phòng đã chọn và tất cả bản ghi thí sinh trùng? Hành động không thể hoàn tác. Tiếp tục?`
+    );
+    if (!proceed) return;
+    setIsSaving(true);
+    try {
+      let totalDeletedStudents = 0;
+      let totalDeletedRooms = 0;
+
+      // Process each selected room sequentially
+      for (const id of selectedIds) {
+        const room = (rooms || []).find((x) => x.id === id) ||
+          (filteredRooms || []).find((x) => x.id === id);
+        if (!room) continue;
+
+        // delete matching room_infor docs if any
+        const matches = await getMatchingRoomDocs({
+          examDate: room.examDate,
+          subject: room.subject,
+          examSession: room.examSession,
+          examTime: room.examTime,
+          examRoom: room.examRoom,
+          examType: room.examType,
+        });
+
+        for (const doc of matches) {
+          try {
+            await deleteRoomInfor(doc.id);
+            totalDeletedRooms++;
+          } catch (e) {
+            console.warn('Failed to delete room_infor', doc.id, e);
+          }
+        }
+
+        // delete matching students
+        const criteria = {
+          subject: room.subject,
+          examSession: room.examSession,
+          examTime: room.examTime,
+          examRoom: room.examRoom,
+        };
+        if (room.examDate) criteria.examDate = room.examDate;
+        if (room.examType) criteria.examType = room.examType;
+
+        try {
+          const res = await deleteStudentsByMatch(criteria);
+          totalDeletedStudents += res.deleted || 0;
+        } catch (e) {
+          console.error('Failed to delete students for room', id, e);
+        }
+      }
+
+      alert(
+        `Hoàn thành. Đã xóa ${totalDeletedRooms} phòng (nếu có) và ${totalDeletedStudents} bản ghi thí sinh.`
+      );
+      clearSelection();
+    } catch (err) {
+      console.error('handleDeleteSelected error', err);
+      alert('Lỗi khi xóa các bản ghi đã chọn. Xem console để biết chi tiết.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // BỎ examTime khỏi key
@@ -1087,6 +1168,13 @@ const RoomInforManagement = () => {
                     </svg>
                     Import Excel/CSV
                   </button>
+                  <button
+                    onClick={handleDeleteSelected}
+                    disabled={!selectedIds || selectedIds.length === 0 || isSaving}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow-sm text-sm"
+                  >
+                    Xóa đã chọn
+                  </button>
                 </div>
               </div>
 
@@ -1184,6 +1272,18 @@ const RoomInforManagement = () => {
                   <table className="min-w-max table-auto">
                     <thead className="bg-gray-50 dark:bg-gray-900">
                       <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={
+                              (filteredRooms || []).length > 0 &&
+                              selectedIds.length === (filteredRooms || []).length
+                            }
+                            onChange={(e) =>
+                              e.target.checked ? selectAllVisible() : clearSelection()
+                            }
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                           Ngày thi
                         </th>
@@ -1211,7 +1311,7 @@ const RoomInforManagement = () => {
                       {filteredRooms.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             className="p-6 text-center text-sm text-gray-500"
                           >
                             Không có dữ liệu
@@ -1227,6 +1327,13 @@ const RoomInforManagement = () => {
                                 : "bg-gray-50 dark:bg-gray-700"
                             } hover:bg-gray-100 dark:hover:bg-gray-600`}
                           >
+                              <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.includes(r.id)}
+                                  onChange={() => toggleSelect(r.id)}
+                                />
+                              </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examDate ? (
                                 formatDate(r.examDate)
