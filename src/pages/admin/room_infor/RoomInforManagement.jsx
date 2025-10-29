@@ -1372,6 +1372,9 @@ const RoomInforManagement = () => {
                           />
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                          STT
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                           Ngày thi
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -1398,7 +1401,7 @@ const RoomInforManagement = () => {
                       {visibleRooms.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={8}
+                            colSpan={9}
                             className="p-6 text-center text-sm text-gray-500"
                           >
                             Không có dữ liệu
@@ -1427,7 +1430,7 @@ const RoomInforManagement = () => {
                                 className="bg-gray-100 dark:bg-gray-700"
                               >
                                 <td
-                                  colSpan={8}
+                                  colSpan={9}
                                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200"
                                 >
                                   Link:{" "}
@@ -1466,6 +1469,9 @@ const RoomInforManagement = () => {
                                       checked={selectedIds.includes(r.id)}
                                       onChange={() => toggleSelect(r.id)}
                                     />
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
+                                    {rowIndex + 1}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                                     {r.examDate ? (
@@ -1547,6 +1553,7 @@ const RoomInforManagement = () => {
                                 onChange={() => toggleSelect(r.id)}
                               />
                             </td>
+                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">{idx + 1}</td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examDate ? (
                                 formatDate(r.examDate)
