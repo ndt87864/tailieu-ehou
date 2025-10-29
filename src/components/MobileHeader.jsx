@@ -282,7 +282,7 @@ const getHeaderTextColor = (isDarkMode, themeColor) => {
   }
 };
 
-export const HomeMobileHeader = () => {
+export const HomeMobileHeader = ({ title }) => {
   const { isDarkMode, toggleDarkMode, themeColor } = useTheme();
   const { isAdmin } = useUserRole();
   const { showSidebar } = useSidebar();
@@ -333,7 +333,7 @@ export const HomeMobileHeader = () => {
             <path d="M4 11.5l8 4 8-4M4 15l8 4 8-4" />
           </svg>
         </div>
-        <span className="font-medium">Tài liệu HOU</span>
+        <span className="font-medium">{title || 'Tài liệu HOU'}</span>
       </div>
       
       <div className="flex items-center gap-2">
