@@ -591,7 +591,7 @@ const RoomInforManagement = () => {
       // Debug: log header map so admins can verify Excel headers map to expected fields
       console.info("handleExcelImport: headerMap", headerMap);
 
-      // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
+  // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
       let updatedCount = 0;
       let studentUpdatedCount = 0;
       let rowCount = 0;
@@ -615,6 +615,181 @@ const RoomInforManagement = () => {
         studentUpdatedCount: 0,
         done: false,
       }));
+
+      // SPECIAL CASE: file contains only links (or most rows have no matching key fields)
+      // Detect if rows don't include subject/session/time/room but do include at least one URL per row.
+      const extractMappedRow = (row) => {
+        const mapped = {};
+        Object.entries(row).forEach(([k, v]) => {
+          const key = headerMap[k];
+          if (key) mapped[key] = v;
+        });
+        return { raw: row, mapped };
+      };
+
+      const rowsMapped = json.map((r) => extractMappedRow(r));
+
+      const rowHasKeyFields = (m) => {
+        return (
+          (m.mapped.subject && String(m.mapped.subject).trim() !== "") ||
+          (m.mapped.examSession && String(m.mapped.examSession).trim() !== "") ||
+          (m.mapped.examTime && String(m.mapped.examTime).trim() !== "") ||
+          (m.mapped.examRoom && String(m.mapped.examRoom).trim() !== "")
+        );
+      };
+
+      const findUrlInAnyCell = (rawRow) => {
+        for (const v of Object.values(rawRow)) {
+          try {
+            const s = String(v || "").trim();
+            if (isValidUrl(s)) return s;
+          } catch (e) {
+            /* ignore */
+          }
+        }
+        return null;
+      };
+
+      const allRowsHaveNoKeyAndHaveLink = rowsMapped.length > 0 && rowsMapped.every((m) => {
+        const hasKey = rowHasKeyFields(m);
+        const link = (m.mapped.examLink && String(m.mapped.examLink).trim() !== "") || Boolean(findUrlInAnyCell(m.raw));
+        return !hasKey && link;
+      });
+
+      if (allRowsHaveNoKeyAndHaveLink) {
+        // Build ordered list of links from the file
+        const links = rowsMapped.map((m) => (String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim())).filter(Boolean);
+
+        if (links.length === 0) {
+          setImportModal((m) => ({
+            ...m,
+            open: true,
+            title: "Hoàn tất nhập Excel",
+            message: "Không tìm thấy link hợp lệ trong file.",
+            processed: json.length,
+            total: json.length,
+            updatedCount: 0,
+            studentUpdatedCount: 0,
+            done: true,
+          }));
+        } else {
+          // Build groups from current filteredRooms ordering (distinct clusters)
+          const groups = [];
+          const seen = new Set();
+          (filteredRooms || []).forEach((r) => {
+            const k = makeKey(r);
+            if (!seen.has(k)) {
+              seen.add(k);
+              groups.push({
+                key: k,
+                example: r,
+              });
+            }
+          });
+
+          if (groups.length === 0) {
+            setImportModal((m) => ({
+              ...m,
+              open: true,
+              title: "Hoàn tất nhập Excel",
+              message: "Không có nhóm phòng để cập nhật (danh sách phòng trống).",
+              processed: json.length,
+              total: json.length,
+              updatedCount: 0,
+              studentUpdatedCount: 0,
+              done: true,
+            }));
+          } else {
+            let applied = 0;
+            let studentsSynced = 0;
+            // Assign links sequentially: group 0 -> links[0], group1 -> links[1], ...
+            const limit = Math.min(links.length, groups.length);
+            for (let i = 0; i < limit; i++) {
+              const link = links[i];
+              const grp = groups[i];
+              // build match criteria from group's example record
+              const example = grp.example;
+              const criteriaForRooms = {
+                examDate: example.examDate,
+                subject: example.subject,
+                examSession: example.examSession,
+                examTime: example.examTime,
+                examRoom: example.examRoom,
+                examType: example.examType,
+              };
+              // find matching room_infor docs and update their examLink
+              const matches = await getMatchingRoomDocs(criteriaForRooms);
+              if (!matches || matches.length === 0) {
+                // No room_infor docs found: update student_infor directly for this group
+                try {
+                  const studentCriteria = {
+                    subject: example.subject,
+                    examSession: example.examSession,
+                    examTime: example.examTime,
+                    examRoom: example.examRoom,
+                  };
+                  if (example.examDate) studentCriteria.examDate = example.examDate;
+                  if (example.examType) studentCriteria.examType = example.examType;
+
+                  const res = await updateStudentsByMatch(studentCriteria, { examLink: link }, { allowBulk: true });
+                  if (res && typeof res.updated === 'number') {
+                    studentsSynced += res.updated;
+                    if (res.updated > 0) applied++;
+                  }
+                } catch (e) {
+                  console.warn('Failed to update students for group (no room_infor docs)', grp, e);
+                }
+                continue;
+              }
+              for (const doc of matches) {
+                try {
+                  if (!doc.examLink || String(doc.examLink).trim() === "") {
+                    await updateRoomInfor(doc.id, { ...doc, examLink: link });
+                    applied++;
+                  } else {
+                    // still overwrite? The user requested only update link; they didn't request to avoid overwriting.
+                    // We'll overwrite empty links only to be safe. If you want forced overwrite, change here.
+                  }
+
+                  // sync to students
+                  try {
+                    const studentCriteria = {
+                      subject: doc.subject,
+                      examSession: doc.examSession,
+                      examTime: doc.examTime,
+                      examRoom: doc.examRoom,
+                    };
+                    if (doc.examDate) studentCriteria.examDate = doc.examDate;
+                    if (doc.examType) studentCriteria.examType = doc.examType;
+
+                    const res = await updateStudentsByMatch(studentCriteria, { examLink: link }, { allowBulk: true });
+                    if (res && typeof res.updated === 'number') studentsSynced += res.updated;
+                  } catch (e) {
+                    console.warn('Failed to sync students for room doc', doc.id, e);
+                  }
+                } catch (e) {
+                  console.warn('Failed to update room_infor doc', doc.id, e);
+                }
+              }
+            }
+
+            setImportModal((m) => ({
+              ...m,
+              open: true,
+              title: "Hoàn tất nhập Excel",
+              message: `Áp dụng ${applied} phòng từ ${limit} nhóm đầu, đồng bộ ${studentsSynced} bản ghi thí sinh.`,
+              processed: json.length,
+              total: json.length,
+              updatedCount: applied,
+              studentUpdatedCount: studentsSynced,
+              done: true,
+            }));
+          }
+        }
+
+        setIsSaving(false);
+        return; // finish special-case flow
+      }
 
       for (const row of json) {
         rowCount++;
