@@ -23,7 +23,6 @@ const columns = [
   { key: "examDate", label: "Ngày thi" },
   { key: "subject", label: "Tên môn học" },
   { key: "examSession", label: "Ca thi" },
-  { key: "examTime", label: "Thời gian" },
   { key: "examRoom", label: "Phòng thi" },
   { key: "course", label: "Khóa" },
   { key: "majorCode", label: "Mã ngành" },
@@ -229,7 +228,6 @@ const StudentPage = () => {
                           "Tài khoản": r.username || "",
                           "Tên môn học": r.subject || "",
                           "Ca thi": r.examSession || "",
-                          "Thời gian": r.examTime || "",
                           "Phòng thi": r.examRoom || "",
                           Khóa: r.course || "",
                           "Mã ngành": r.majorCode || "",
@@ -287,7 +285,7 @@ const StudentPage = () => {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Tìm kiếm thí sinh"
+                    placeholder="Nhập họ và tên,tên tài khoản"
                     value={pendingSearch}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -382,10 +380,6 @@ const StudentPage = () => {
                             {r.examSession || "-"}
                           </div>
                           <div>
-                            <span className="font-medium">Giờ:</span>{" "}
-                            {r.examTime || "-"}
-                          </div>
-                          <div>
                             <span className="font-medium">Phòng:</span>{" "}
                             {r.examRoom || "-"}
                           </div>
@@ -471,9 +465,6 @@ const StudentPage = () => {
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.examSession || ""}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
-                            {r.examTime || ""}
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-800 dark:text-gray-200">
                             {r.examRoom || ""}
