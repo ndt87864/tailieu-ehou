@@ -10,7 +10,7 @@ import {
 } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import LoadingSpinner from "./components/LoadingSpinner";
+import LoadingSpinner from "./components/content/LoadingSpinner";
 import DocumentView from "./pages/DocumentView";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -32,9 +32,9 @@ import RoomInforManagement from "./pages/admin/room_infor/RoomInforManagement";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase/firebase";
 import { useUserRole } from "./context/UserRoleContext";
-import ZaloContact from "./components/ZaloContact";
-import CalendarReminder from "./components/CalendarReminder";
-import AdSenseComponent from "./components/RealAdSenseComponent";
+import ZaloContact from "./components/content/ZaloContact";
+import CalendarReminder from "./components/content/CalendarReminder";
+import AdSenseComponent from "./components/ads/RealAdSenseComponent";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import {
   setUserOnline,

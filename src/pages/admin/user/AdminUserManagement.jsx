@@ -24,7 +24,7 @@ import {
   updateUserExcelPermission,
   updateUserExcelPercentage,
 } from "../../../firebase/userService";
-import UserAddForm from "../../../components/admin/UserAddForm";
+import UserAddForm from "../../../components/admin/user_management/UserAddForm";
 import Sidebar from "../../../components/Sidebar";
 import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import UserHeader from "../../../components/UserHeader";

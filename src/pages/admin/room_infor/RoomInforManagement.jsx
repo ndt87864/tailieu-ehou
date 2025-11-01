@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import LoadingSpinner from "../../../components/LoadingSpinner";
+import LoadingSpinner from "../../../components/content/LoadingSpinner";
 import {
   getAllStudentInfor,
   subscribeStudentInfor,
@@ -591,7 +591,7 @@ const RoomInforManagement = () => {
       // Debug: log header map so admins can verify Excel headers map to expected fields
       console.info("handleExcelImport: headerMap", headerMap);
 
-  // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
+      // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
       let updatedCount = 0;
       let studentUpdatedCount = 0;
       let rowCount = 0;
@@ -632,7 +632,8 @@ const RoomInforManagement = () => {
       const rowHasKeyFields = (m) => {
         return (
           (m.mapped.subject && String(m.mapped.subject).trim() !== "") ||
-          (m.mapped.examSession && String(m.mapped.examSession).trim() !== "") ||
+          (m.mapped.examSession &&
+            String(m.mapped.examSession).trim() !== "") ||
           (m.mapped.examTime && String(m.mapped.examTime).trim() !== "") ||
           (m.mapped.examRoom && String(m.mapped.examRoom).trim() !== "")
         );
@@ -650,15 +651,23 @@ const RoomInforManagement = () => {
         return null;
       };
 
-      const allRowsHaveNoKeyAndHaveLink = rowsMapped.length > 0 && rowsMapped.every((m) => {
-        const hasKey = rowHasKeyFields(m);
-        const link = (m.mapped.examLink && String(m.mapped.examLink).trim() !== "") || Boolean(findUrlInAnyCell(m.raw));
-        return !hasKey && link;
-      });
+      const allRowsHaveNoKeyAndHaveLink =
+        rowsMapped.length > 0 &&
+        rowsMapped.every((m) => {
+          const hasKey = rowHasKeyFields(m);
+          const link =
+            (m.mapped.examLink && String(m.mapped.examLink).trim() !== "") ||
+            Boolean(findUrlInAnyCell(m.raw));
+          return !hasKey && link;
+        });
 
       if (allRowsHaveNoKeyAndHaveLink) {
         // Build ordered list of links from the file
-        const links = rowsMapped.map((m) => (String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim())).filter(Boolean);
+        const links = rowsMapped
+          .map((m) =>
+            String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim()
+          )
+          .filter(Boolean);
 
         if (links.length === 0) {
           setImportModal((m) => ({
@@ -692,7 +701,8 @@ const RoomInforManagement = () => {
               ...m,
               open: true,
               title: "Hoàn tất nhập Excel",
-              message: "Không có nhóm phòng để cập nhật (danh sách phòng trống).",
+              message:
+                "Không có nhóm phòng để cập nhật (danh sách phòng trống).",
               processed: json.length,
               total: json.length,
               updatedCount: 0,
@@ -728,16 +738,26 @@ const RoomInforManagement = () => {
                     examTime: example.examTime,
                     examRoom: example.examRoom,
                   };
-                  if (example.examDate) studentCriteria.examDate = example.examDate;
-                  if (example.examType) studentCriteria.examType = example.examType;
+                  if (example.examDate)
+                    studentCriteria.examDate = example.examDate;
+                  if (example.examType)
+                    studentCriteria.examType = example.examType;
 
-                  const res = await updateStudentsByMatch(studentCriteria, { examLink: link }, { allowBulk: true });
-                  if (res && typeof res.updated === 'number') {
+                  const res = await updateStudentsByMatch(
+                    studentCriteria,
+                    { examLink: link },
+                    { allowBulk: true }
+                  );
+                  if (res && typeof res.updated === "number") {
                     studentsSynced += res.updated;
                     if (res.updated > 0) applied++;
                   }
                 } catch (e) {
-                  console.warn('Failed to update students for group (no room_infor docs)', grp, e);
+                  console.warn(
+                    "Failed to update students for group (no room_infor docs)",
+                    grp,
+                    e
+                  );
                 }
                 continue;
               }
@@ -762,13 +782,22 @@ const RoomInforManagement = () => {
                     if (doc.examDate) studentCriteria.examDate = doc.examDate;
                     if (doc.examType) studentCriteria.examType = doc.examType;
 
-                    const res = await updateStudentsByMatch(studentCriteria, { examLink: link }, { allowBulk: true });
-                    if (res && typeof res.updated === 'number') studentsSynced += res.updated;
+                    const res = await updateStudentsByMatch(
+                      studentCriteria,
+                      { examLink: link },
+                      { allowBulk: true }
+                    );
+                    if (res && typeof res.updated === "number")
+                      studentsSynced += res.updated;
                   } catch (e) {
-                    console.warn('Failed to sync students for room doc', doc.id, e);
+                    console.warn(
+                      "Failed to sync students for room doc",
+                      doc.id,
+                      e
+                    );
                   }
                 } catch (e) {
-                  console.warn('Failed to update room_infor doc', doc.id, e);
+                  console.warn("Failed to update room_infor doc", doc.id, e);
                 }
               }
             }

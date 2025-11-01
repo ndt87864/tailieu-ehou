@@ -1,6 +1,6 @@
 // Đối tượng React.memo để tối ưu hiệu suất cho các component con
 import React, { memo, useState } from "react";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
 
 // Component MainContent được wrap bởi React.memo để tránh render lại khi props không thay đổi
 export const MemoizedMainContent = memo(({ filteredQuestions }) => {

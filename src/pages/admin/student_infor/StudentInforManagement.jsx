@@ -17,7 +17,7 @@ import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import StudentFormModal from "./StudentFormModal";
 import Modal from "../../../components/Modal";
-import LoadingSpinner from "../../../components/LoadingSpinner";
+import LoadingSpinner from "../../../components/content/LoadingSpinner";
 import StudentTable from "./StudentTable";
 import {
   ensureXLSX,
@@ -121,12 +121,12 @@ const StudentInforManagement = () => {
     if (!m) return null;
     const k = m[0];
     const map = {
-      "1": "7h30 - 8h30",
-      "2": "8h45 - 9h45",
-      "3": "10h - 11h",
-      "4": "13h - 14h30",
-      "5": "15h15 - 16h15",
-      "6": "16h30 - 17h30",
+      1: "7h30 - 8h30",
+      2: "8h45 - 9h45",
+      3: "10h - 11h",
+      4: "13h - 14h30",
+      5: "15h15 - 16h15",
+      6: "16h30 - 17h30",
     };
     return map[k] || null;
   };

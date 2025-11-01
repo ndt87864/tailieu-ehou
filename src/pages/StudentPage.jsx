@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
-import LoadingSpinner from "../components/LoadingSpinner";
+import LoadingSpinner from "../components/content/LoadingSpinner";
 import { subscribeStudentInfor } from "../firebase/studentInforService";
 import { getAllCategoriesWithDocuments } from "../firebase/firestoreService";
 import {
