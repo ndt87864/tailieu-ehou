@@ -22,6 +22,10 @@ const toSlug = (str) => {
 
 const HomePage = () => {
   // Add search state
+  // `searchInput` is the immediate controlled input value.
+  // `searchQuery` is the actual query used for searching and will only
+  // be updated when the user presses Enter or clicks the magnifier.
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   // search type: 'doc' = tài liệu, 'exam' = lịch thi (default)
   const [searchType, setSearchType] = useState("exam");
@@ -419,9 +423,28 @@ const HomePage = () => {
     navigate(`/${categorySlug}/${document.slug}`);
   };
 
-  // Add a function to handle search input changes
+  // Add a function to handle search input changes (updates input only)
+  // If the input becomes empty, reset the active search immediately.
   const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
+    const value = e.target.value;
+    setSearchInput(value);
+
+    // If user cleared the input, clear the active search results
+    if (value.trim() === "") {
+      setSearchQuery("");
+    }
+  };
+
+  // Trigger the actual search: copy searchInput -> searchQuery
+  const triggerSearch = useCallback(() => {
+    setSearchQuery(searchInput.trim());
+  }, [searchInput]);
+
+  // Handle Enter key on the input to trigger search
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      triggerSearch();
+    }
   };
 
   // load student infors when switching to exam search (do it once)
@@ -545,9 +568,10 @@ const HomePage = () => {
     });
   };
 
-  const allMatchingExamRecords = searchQuery.trim()
-    ? getAllMatchingExamRecords()
-    : [];
+  // Ensure returned exam records do not expose `examTime` in the UI
+  const allMatchingExamRecords = (
+    searchQuery.trim() ? getAllMatchingExamRecords() : []
+  ).map(({ examTime, ...rest }) => rest);
 
   return (
     <div
@@ -650,8 +674,9 @@ const HomePage = () => {
                     >
                       <input
                         type="text"
-                        value={searchQuery}
+                        value={searchInput}
                         onChange={handleSearchChange}
+                        onKeyDown={handleSearchKeyDown}
                         placeholder={
                           searchType === "exam"
                             ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
@@ -663,22 +688,30 @@ const HomePage = () => {
                             : "bg-white text-gray-900 placeholder-gray-500"
                         } focus:outline-none`}
                       />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <svg
-                          className={`h-5 w-5 ${
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                        <button
+                          onClick={triggerSearch}
+                          aria-label="Tìm kiếm"
+                          className={`h-8 w-8 flex items-center justify-center rounded focus:outline-none ${
                             isDarkMode ? "text-gray-400" : "text-gray-500"
                           }`}
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
                         >
-                          <path
-                            fillRule="evenodd"
-                            d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                          <svg
+                            className={`h-5 w-5 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </button>
                       </div>
                     </div>
 
