@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '../firebase/firebase';
+import { auth, db } from '../../firebase/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { getAllCategoriesWithDocuments, getQuestionsByDocument } from '../firebase/firestoreService';
+import { getAllCategoriesWithDocuments, getQuestionsByDocument } from '../../firebase/firestoreService';
 import { useNavigate } from 'react-router-dom';
-import { getUserRole } from '../firebase/firestoreService';
+import { getUserRole } from '../../firebase/firestoreService';
 
 /**
  * Custom hook to safely check if a user is an admin
@@ -48,7 +48,7 @@ export const useSafeAdminCheck = () => {
 export const fetchCategoriesWithDocumentsOptimized = async () => {
   try {
     // Import the optimized function
-    const { getAllCategoriesWithDocumentsOptimized } = await import('./queryOptimizer');
+    const { getAllCategoriesWithDocumentsOptimized } = await import('../storage/queryOptimizer');
     
     // Use the optimized function
     return await getAllCategoriesWithDocumentsOptimized();
@@ -93,7 +93,7 @@ export const loadCategoriesOptimized = async (setLoading, setError, setCategorie
     setLoading(true);
     
     // Gọi hàm tối ưu từ firestoreService
-    const { getAllCategories } = await import('../firebase/firestoreService');
+    const { getAllCategories } = await import('../../firebase/firestoreService');
     const categoriesData = await getAllCategories();
     
     setCategories(categoriesData);

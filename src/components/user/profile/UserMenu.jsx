@@ -1,7 +1,7 @@
-import React from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { logoutUser } from '../../firebase/authService';
-import { getBaseUrl } from '../../utils/domainRedirect';
+import React from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { logoutUser } from "../../firebase/authService";
+import { getBaseUrl } from "../../../utils/domainRedirect";
 
 const UserMenu = ({ user, onLogout }) => {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ const UserMenu = ({ user, onLogout }) => {
       const result = await logoutUser();
       if (result.success) {
         // Có thể thêm xử lý sau khi đăng xuất thành công nếu cần
-        navigate('/login');
+        navigate("/login");
       } else {
         console.error("Lỗi đăng xuất:", result.error);
       }
@@ -25,10 +25,10 @@ const UserMenu = ({ user, onLogout }) => {
       {/* Use relative paths for internal links */}
       <Link to="/profile" className="...">
         {/* If you need an absolute URL for an image */}
-        <img 
-          src={user.photoURL || `${getBaseUrl()}/assets/default-avatar.png`} 
-          alt="User avatar" 
-          className="..." 
+        <img
+          src={user.photoURL || `${getBaseUrl()}/assets/default-avatar.png`}
+          alt="User avatar"
+          className="..."
         />
         {/* ... */}
       </Link>

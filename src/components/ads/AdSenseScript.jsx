@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { initializeAdSense } from "../../utils/adSenseManager";
+import { initializeAdSense } from "../../utils/ads/adSenseManager";
 
 const AdSenseScript = () => {
   useEffect(() => {

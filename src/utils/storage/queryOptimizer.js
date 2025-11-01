@@ -2,7 +2,7 @@ import {
   getAllCategories, 
   getDocumentsByCategory,
   getQuestionsByDocument
-} from '../firebase/firestoreService';
+} from '../../firebase/firestoreService';
 
 import { 
   collection, 
@@ -15,8 +15,8 @@ import {
   limit,
   serverTimestamp
 } from "firebase/firestore";
-import { db } from "../firebase/firebase";
-import { COLLECTIONS } from '../firebase/firestoreService';
+import { db } from "../../firebase/firebase";
+import { COLLECTIONS } from '../../firebase/firestoreService';
 
 // Định nghĩa các hàm cache utility trước khi sử dụng
 /**
@@ -205,7 +205,7 @@ export const getAllCategoriesWithDocumentsOptimized = async () => {
     // Fallback to original implementation if available
     try {
       console.log("Falling back to original getAllCategoriesWithDocuments function");
-      const { getAllCategoriesWithDocuments } = await import('../firebase/firestoreService');
+      const { getAllCategoriesWithDocuments } = await import('../../firebase/firestoreService');
       return await getAllCategoriesWithDocuments();
     } catch (fallbackError) {
       console.error("Even fallback to original function failed:", fallbackError);
@@ -621,7 +621,7 @@ export const loadMoreDocumentsForCategory = async (categoryId, skip = 0, limit =
     
     // Import necessary functions from Firestore service
     const { collection, query, where, orderBy, limit: firestoreLimit, getDocs, getDoc, doc } = await import('firebase/firestore');
-    const { db } = await import('../firebase/firebase');
+    const { db } = await import('../../firebase/firebase');
     
     // Get category data first to get the logo
     const categoryRef = doc(db, 'categories', categoryId);

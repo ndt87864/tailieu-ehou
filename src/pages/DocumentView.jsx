@@ -11,12 +11,12 @@ import * as XLSX from "xlsx";
 import UserHeader from "../components/UserHeader";
 import UserManagementContent from "../components/admin/user_management/UserManagementContent";
 import { useUserRole } from "../context/UserRoleContext";
-import { registerScreenshotDetection } from "../utils/screenshotDetection";
+import { registerScreenshotDetection } from "../utils/event/screenshotDetection";
 import ThemeColorPicker from "../components/ThemeColorPicker";
 import Footer from "../components/Footer";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import { checkExcelDownloadPermission } from "../utils/downloadPermissions";
+import { checkExcelDownloadPermission } from "../utils/permission/downloadPermissions";
 import { checkVipDocumentAccess } from "../firebase/documentService";
 
 const noCopyStyles = {
@@ -331,7 +331,7 @@ function DocumentView() {
         setError(null);
 
         const documentViewOptimizer = await import(
-          "../utils/documentViewOptimizer"
+          "../utils/storage/documentViewOptimizer"
         );
         const startTime = performance.now();
 
@@ -339,7 +339,7 @@ function DocumentView() {
           documentViewOptimizer.getCachedCategories(),
           idleCallback(() => {
             import("../components/ThemeColorPicker");
-            import("../utils/excelUploader");
+            import("../utils/storage/excelUploader");
           }),
         ]);
 
@@ -549,7 +549,7 @@ function DocumentView() {
       setError(null);
 
       const documentViewOptimizer = await import(
-        "../utils/documentViewOptimizer"
+        "../utils/storage/documentViewOptimizer"
       );
       documentViewOptimizer.clearQuestionsCache(selectedDocument.id);
 

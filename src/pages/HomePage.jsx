@@ -350,7 +350,7 @@ const HomePage = () => {
       const fetchMoreDocuments = async () => {
         try {
           const { optimizedGetDocumentsByCategory } = await import(
-            "../utils/queryOptimizer"
+            "../utils/storage/queryOptimizer"
           );
           const allDocs = await optimizedGetDocumentsByCategory(categoryId);
 

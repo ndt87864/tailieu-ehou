@@ -2,9 +2,9 @@
  * DocumentView Performance Optimizer Module
  * Cung cấp các hàm tối ưu hóa hiệu suất cho trang DocumentView
  */
-import { db } from '../firebase/firebase';
+import { db } from '../../firebase/firebase';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, serverTimestamp, updateDoc, writeBatch, orderBy } from 'firebase/firestore';
-import { COLLECTIONS } from '../firebase/firestoreService';
+import { COLLECTIONS } from '../../firebase/firestoreService';
 
 // Cache cho dữ liệu để tránh truy vấn lặp lại
 const cache = {
@@ -319,7 +319,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
     if (document?.isVip) {
       
       // Import checkVipDocumentAccess function
-      const { checkVipDocumentAccess } = await import('../firebase/documentService');
+      const { checkVipDocumentAccess } = await import('../../firebase/documentService');
       const vipAccessResult = checkVipDocumentAccess(user, document);
     
       

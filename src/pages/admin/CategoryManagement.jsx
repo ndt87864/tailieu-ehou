@@ -16,7 +16,7 @@ import {
   useSafeAdminCheck,
   protectAdminRoute,
   loadCategoriesOptimized,
-} from "../../utils/adminHelper";
+} from "../../utils/permission/adminHelper";
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);

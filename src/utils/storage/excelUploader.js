@@ -3,8 +3,8 @@ import {
   collection, addDoc, getDocs, query, where, 
   doc, setDoc, serverTimestamp, writeBatch
 } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
-import { slugify } from './stringUtils';
+import { db } from '../../firebase/firebase';
+import { slugify } from '../type/stringUtils';
 
 /**
  * Process Excel file and upload data to Firestore

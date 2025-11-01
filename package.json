@@ -10,7 +10,7 @@
   "build": "node scripts/clear-cache.js && node scripts/build-extension.js --production && vite build",
   "build:force": "node scripts/clear-cache.js && node scripts/build-extension.js --production && vite build",
     "preview": "vite preview",
-    "seed-data": "vite-node src/utils/seedData.js",
+    "seed-data": "vite-node src/utils/permissions/seedData.js",
     "deploy": "npm run build && firebase deploy --only hosting --force",
     "deploy:full": "npm run build:force && firebase deploy --only hosting --force",
     "deploy:functions": "firebase deploy --only functions",

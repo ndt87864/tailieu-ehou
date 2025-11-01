@@ -135,7 +135,7 @@ export async function checkExcelDownloadPermission(user, categories) {
     if (!userPaidCategories || Object.keys(userPaidCategories).length === 0) {
       try {
         const { doc, getDoc } = await import('firebase/firestore');
-        const { db } = await import('../firebase/firebase');
+        const { db } = await import('../../firebase/firebase');
         
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);

@@ -5,8 +5,8 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebase/firebase";
 import ThemeColorPicker from "./ThemeColorPicker";
-import { useSafeAdminCheck } from "../utils/adminHelper"; // Sử dụng helper function
-import { optimizedGetDocumentsByCategory } from "../utils/queryOptimizer";
+import { useSafeAdminCheck } from "../utils/permission/adminHelper"; // Sử dụng helper function
+import { optimizedGetDocumentsByCategory } from "../utils/storage/queryOptimizer";
 
 // Helper function to convert string to slug
 const toSlug = (str) => {

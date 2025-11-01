@@ -47,13 +47,16 @@ import CalendarNoteManagement from "./pages/admin/CalendarNoteManagement";
 import PremiumUserManagement from "./pages/admin/PremiumUserManagement";
 import FooterManagement from "./pages/admin/FooterManagement";
 import { redirectToCustomDomain } from "./utils/domainRedirect";
-import { clearApplicationCache } from "./utils/domainSync";
+import { clearApplicationCache } from "./utils/storage/domainSync";
 import {
   redirectToPrimaryDomain,
   initUpdateChecker,
   clearAppCache,
-} from "./utils/cacheControl";
-import { checkAndHandleUpdate, forceRefresh } from "./utils/cacheManager";
+} from "./utils/storage/cacheControl";
+import {
+  checkAndHandleUpdate,
+  forceRefresh,
+} from "./utils/storage/cacheManager";
 import PricingContentManagement from "./pages/admin/PricingContentManagement";
 
 // Component bảo vệ route admin đơn giản
