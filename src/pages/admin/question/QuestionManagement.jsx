@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../firebase/firebase";
 import { useUserRole } from "../../../context/UserRoleContext";
 import { useTheme } from "../../../context/ThemeContext";
+import {
+  saveSelectionToCache,
+  getCachedCategoryId,
+  getCachedDocumentId,
+  clearQuestionManagementCache,
+  validateAndCleanCache,
+  updateCurrentPath,
+} from "../../../utils/questionCacheUtils";
 import {
   getAllQuestionsWithDocumentInfo,
   addQuestion,
@@ -39,6 +47,7 @@ const QuestionManagement = () => {
   const { isAdmin } = useUserRole();
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
 
   const [sidebarData, setSidebarData] = useState([]);
@@ -122,6 +131,17 @@ const QuestionManagement = () => {
     };
   }, []);
 
+  // 🔄 Xử lý cache và path khi navigate
+  useEffect(() => {
+    // Cập nhật current path
+    updateCurrentPath(location.pathname);
+
+    // Kiểm tra nếu rời khỏi trang /admin/questions
+    if (location.pathname !== "/admin/questions") {
+      clearQuestionManagementCache();
+    }
+  }, [location.pathname]);
+
   useEffect(() => {
     const loadData = async () => {
       if (!isAdmin) {
@@ -182,53 +202,101 @@ const QuestionManagement = () => {
           return;
         }
 
-        const firstCategory = sortedCategories[0];
+        // 💾 Lấy từ cache hoặc sử dụng danh mục đầu tiên
+        let cachedCategoryId = getCachedCategoryId();
+        let cachedDocumentId = getCachedDocumentId();
 
-        if (!firstCategory.documents || firstCategory.documents.length === 0) {
-          setError("Không tìm thấy tài liệu trong danh mục đầu tiên");
-          setLoading(false);
-          return;
+        // Kiểm tra nếu cache hợp lệ
+        let selectedCategoryToUse = null;
+        let selectedDocumentToUse = null;
+
+        if (cachedCategoryId && cachedDocumentId) {
+          // Kiểm tra xem cache có tồn tại trong dữ liệu hiện tại không
+          const cachedCategory = sortedCategories.find(
+            (cat) => cat.id === cachedCategoryId
+          );
+
+          if (cachedCategory && docsMap[cachedCategoryId]) {
+            const cachedDoc = docsMap[cachedCategoryId].find(
+              (doc) => doc.id === cachedDocumentId
+            );
+
+            if (cachedDoc) {
+              selectedCategoryToUse = cachedCategory;
+              selectedDocumentToUse = cachedDoc;
+              console.log(
+                "✅ Sử dụng cache: Category",
+                cachedCategoryId,
+                "Document",
+                cachedDocumentId
+              );
+            }
+          }
         }
 
-        const firstDocument = firstCategory.documents[0];
+        // Nếu không có cache hợp lệ, sử dụng danh mục và tài liệu đầu tiên
+        if (!selectedCategoryToUse || !selectedDocumentToUse) {
+          selectedCategoryToUse = sortedCategories[0];
+
+          if (
+            !selectedCategoryToUse.documents ||
+            selectedCategoryToUse.documents.length === 0
+          ) {
+            setError("Không tìm thấy tài liệu trong danh mục đầu tiên");
+            setLoading(false);
+            return;
+          }
+
+          selectedDocumentToUse = selectedCategoryToUse.documents[0];
+          console.log(
+            "📌 Sử dụng danh mục và tài liệu đầu tiên:",
+            selectedCategoryToUse.id,
+            selectedDocumentToUse.id
+          );
+        }
 
         try {
-          const questionsData = await getQuestionsByDocument(firstDocument.id);
+          const questionsData = await getQuestionsByDocument(
+            selectedDocumentToUse.id
+          );
 
           const questionsWithInfo = questionsData.map((question) => ({
             ...question,
-            documentTitle: firstDocument.title || "",
-            documentId: firstDocument.id || "",
-            categoryId: firstCategory.id || "",
-            categoryTitle: firstCategory.title || "",
-            categoryLogo: firstCategory.logo || null,
+            documentTitle: selectedDocumentToUse.title || "",
+            documentId: selectedDocumentToUse.id || "",
+            categoryId: selectedCategoryToUse.id || "",
+            categoryTitle: selectedCategoryToUse.title || "",
+            categoryLogo: selectedCategoryToUse.logo || null,
             url_question: question.url_question || "",
             url_answer: question.url_answer || "",
           }));
 
           const formattedCategories = [
             {
-              id: firstCategory.id,
-              title: firstCategory.title,
-              logo: firstCategory.logo || null,
+              id: selectedCategoryToUse.id,
+              title: selectedCategoryToUse.title,
+              logo: selectedCategoryToUse.logo || null,
             },
           ];
 
           const formattedDocuments = {
-            [firstCategory.id]: [firstDocument],
+            [selectedCategoryToUse.id]: [selectedDocumentToUse],
           };
 
-          setSelectedDocumentFilter(firstDocument.id);
-          setSelectedCategory(firstCategory.id);
-          setSelectedDocument(firstDocument.id);
+          // 💾 Lưu vào cache
+          saveSelectionToCache(selectedCategoryToUse.id, selectedDocumentToUse.id);
+
+          setSelectedDocumentFilter(selectedDocumentToUse.id);
+          setSelectedCategory(selectedCategoryToUse.id);
+          setSelectedDocument(selectedDocumentToUse.id);
           setOpenMain(0);
 
           setSidebarData(formattedCategories);
           setSidebarDocuments(formattedDocuments);
           setQuestions(questionsWithInfo || []);
-          setDocuments([firstDocument]);
-          setFilterCategory([firstCategory.id]);
-          setFilterDocument([firstDocument.id]);
+          setDocuments([selectedDocumentToUse]);
+          setFilterCategory([selectedCategoryToUse.id]);
+          setFilterDocument([selectedDocumentToUse.id]);
         } catch (questionsError) {
           console.error("Error loading questions:", questionsError);
           setError(
@@ -254,8 +322,33 @@ const QuestionManagement = () => {
   }, [isAdmin, loading, navigate]);
 
   const handleDocumentFilterChange = (e) => {
-    setSelectedDocumentFilter(e.target.value);
+    const newDocumentId = e.target.value;
+    setSelectedDocumentFilter(newDocumentId);
+
+    // 💾 Lưu cache khi thay đổi document
+    if (selectedCategory && newDocumentId) {
+      saveSelectionToCache(selectedCategory, newDocumentId);
+      console.log(
+        "💾 Cache updated via document select: Category",
+        selectedCategory,
+        "Document",
+        newDocumentId
+      );
+    }
   };
+
+  // 💾 Lắng nghe sự thay đổi của selectedCategory để lưu cache (khi chọn từ sidebar)
+  useEffect(() => {
+    if (selectedCategory && selectedDocumentFilter) {
+      saveSelectionToCache(selectedCategory, selectedDocumentFilter);
+      console.log(
+        "💾 Cache updated via category change: Category",
+        selectedCategory,
+        "Document",
+        selectedDocumentFilter
+      );
+    }
+  }, [selectedCategory]);
 
   const handleInputChange = (e) => {
     setNewQuestion({
@@ -897,6 +990,17 @@ const QuestionManagement = () => {
 
       if (categoriesToFilter.length > 0) {
         setSelectedCategory(categoriesToFilter[0]);
+      }
+
+      // 💾 Lưu cache khi thay đổi filter (xóa cache cũ, lưu cache mới)
+      if (documentsToFilter.length > 0 && categoriesToFilter.length > 0) {
+        saveSelectionToCache(categoriesToFilter[0], documentsToFilter[0]);
+        console.log(
+          "💾 Cache updated: Category",
+          categoriesToFilter[0],
+          "Document",
+          documentsToFilter[0]
+        );
       }
 
       setDocuments(allDocumentDetails);
