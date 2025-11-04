@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getAllCategoriesWithDocuments } from "../firebase/firestoreService";
+import { getAllCategories } from "../firebase/firestoreService";
+import { getDocumentsByCategory } from "../firebase/firestoreService";
 import { getAllStudentInfor } from "../firebase/studentInforService";
 import { formatDate } from "./admin/student_infor/studentInforHelpers";
 import { useTheme } from "../context/ThemeContext";
@@ -59,38 +60,39 @@ const HomePage = () => {
   }, []);
 
   // Sử dụng useEffect để tải dữ liệu với một chiến lược cache
+  // Tối ưu: chỉ load categories khi vào trang, không load documents
   useEffect(() => {
     let isMounted = true;
-    const fetchData = async () => {
+    const fetchCategories = async () => {
       try {
         setLoading(true);
-        // Kiểm tra xem có dữ liệu trong localStorage không
-        const cachedContent = localStorage.getItem("homePageData");
-        if (cachedContent) {
-          setCachedData(JSON.parse(cachedContent));
+        // Dùng cache IndexedDB nếu có
+        const cached = sessionStorage.getItem("homepageCategories");
+        const cachedTime = sessionStorage.getItem("homepageCategoriesTime");
+        const now = Date.now();
+        if (
+          cached &&
+          cachedTime &&
+          now - parseInt(cachedTime) < 15 * 60 * 1000
+        ) {
+          const cats = JSON.parse(cached);
+          if (isMounted) setCategories(cats);
           setLoading(false);
+          return;
         }
-
-        // Truy vấn dữ liệu mới từ Firestore
-        // Lưu ý: Cần thiết lập các chỉ mục phù hợp
-        // và giới hạn số lượng dữ liệu trả về
-        // const newData = await fetchHomePageData();
-
-        // if (isMounted) {
-        //   setCachedData(newData);
-        //   localStorage.setItem('homePageData', JSON.stringify(newData));
-        //   setLoading(false);
-        // }
+        const cats = await getAllCategories();
+        if (isMounted) setCategories(cats);
+        sessionStorage.setItem("homepageCategories", JSON.stringify(cats));
+        sessionStorage.setItem("homepageCategoriesTime", now.toString());
+        setLoading(false);
       } catch (err) {
         if (isMounted) {
-          setError(err.message);
+          setError(err.message || "Lỗi tải danh mục");
           setLoading(false);
         }
       }
     };
-
-    fetchData();
-
+    fetchCategories();
     return () => {
       isMounted = false;
     };
@@ -105,7 +107,7 @@ const HomePage = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [categoriesWithDocs, setCategoriesWithDocs] = useState([]);
+  const [categoriesWithDocs, setCategoriesWithDocs] = useState([]); // [{...cat, documents: []}]
 
   // Add state to track which categories have been expanded
   const [expandedCategories, setExpandedCategories] = useState({});
@@ -155,247 +157,71 @@ const HomePage = () => {
     };
   }, []);
 
+  // Khi categories thay đổi, reset categoriesWithDocs (chỉ chứa documents khi expand)
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Check for cached data first
-        const cachedData = sessionStorage.getItem("homepageData");
-        const cachedTimestamp = sessionStorage.getItem("homepageDataTimestamp");
-        const now = new Date();
-
-        // Use cached data if available and less than 30 minutes old
-        if (cachedData && cachedTimestamp) {
-          const timestamp = new Date(parseInt(cachedTimestamp));
-          const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
-
-          if (timestamp > thirtyMinutesAgo) {
-            let parsedData = JSON.parse(cachedData);
-            // Filter out adminOnly categories for non-admin users
-            if (!user?.role || user.role !== "admin") {
-              parsedData = parsedData.filter((cat) => !cat.adminOnly);
-            }
-            setCategoriesWithDocs(parsedData);
-            setLoading(false);
-            return;
-          }
-        }
-
-        setLoading(true);
-
-        // 1. Fetch all categories and sort by stt
-        const categoriesRef = collection(db, "categories");
-        const categoriesSnapshot = await getDocs(
-          query(categoriesRef, limit(100))
-        );
-
-        if (categoriesSnapshot.empty) {
-          setError("Không tìm thấy danh mục nào.");
-          setLoading(false);
-          return;
-        }
-
-        // Extract category data and sort by stt
-        let categoriesData = categoriesSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          documents: [], // Will be populated later
-          allDocuments: [], // Store all documents
-          hasMoreDocuments: false,
-        }));
-
-        // Filter out adminOnly categories for non-admin users
-        if (!user?.role || user.role !== "admin") {
-          categoriesData = categoriesData.filter((cat) => !cat.adminOnly);
-        }
-
-        // Sort categories by stt (order)
-        categoriesData = categoriesData.sort(
-          (a, b) => (a.stt || 0) - (b.stt || 0)
-        );
-
-        // 2. Fetch documents for each category in parallel
-        const fetchDocumentsPromises = categoriesData.map(async (category) => {
+    if (!categories || categories.length === 0) {
+      setCategoriesWithDocs([]);
+      return;
+    }
+    // Khi load trang: chỉ lấy 5 tài liệu đầu tiên cho mỗi danh mục, không load allDocuments
+    const fetchInitialDocs = async () => {
+      const results = await Promise.all(
+        categories.map(async (cat) => {
           try {
-            const documentsRef = collection(db, "documents");
-            const documentsQuery = query(
-              documentsRef,
-              where("categoryId", "==", category.id),
-              limit(100)
+            const docs = await getDocumentsByCategory(cat.id);
+            const sortedDocs = (docs || []).sort(
+              (a, b) => (a.stt || 0) - (b.stt || 0)
             );
-
-            const documentsSnapshot = await getDocs(documentsQuery);
-
-            if (!documentsSnapshot.empty) {
-              // Get all documents and sort by stt
-              const allDocs = documentsSnapshot.docs
-                .map((doc) => ({
-                  id: doc.id,
-                  ...doc.data(),
-                }))
-                .sort((a, b) => (a.stt || 0) - (b.stt || 0));
-
-              // Take first 5 documents for initial display
-              const initialDocs = allDocs.slice(0, 5);
-
-              return {
-                categoryId: category.id,
-                documents: initialDocs,
-                allDocuments: allDocs,
-                hasMoreDocuments: allDocs.length > 5,
-              };
-            }
-
             return {
-              categoryId: category.id,
+              ...cat,
+              documents: sortedDocs.slice(0, 5),
+              allDocuments: undefined, // Chỉ load khi ấn Xem thêm
+              hasMoreDocuments: sortedDocs.length > 5,
+            };
+          } catch (e) {
+            return {
+              ...cat,
               documents: [],
-              allDocuments: [],
+              allDocuments: undefined,
               hasMoreDocuments: false,
             };
-          } catch (error) {
-            console.error(
-              `Lỗi khi tải tài liệu cho danh mục ${category.title}:`,
-              error
-            );
-
-            // Thêm hướng dẫn tạo index nếu là lỗi index Firebase
-            if (error.message && error.message.includes("index")) {
-              console.error(
-                "Lỗi index Firebase: Truy vấn yêu cầu chỉ mục trên trường 'categoryId'.",
-                "\nTạo index Firebase bằng cách truy cập:",
-                "\nhttps://console.firebase.google.com/project/_/firestore/indexes",
-                "\nHoặc nhấp vào URL trong lỗi ở trên để tạo index tự động"
-              );
-            }
           }
-        });
-
-        // Wait for all document fetching to complete
-        const documentsResults = await Promise.all(fetchDocumentsPromises);
-
-        // 3. Merge documents with their categories
-        const categoriesWithDocuments = categoriesData.map((category) => {
-          const docResult = documentsResults.find(
-            (result) => result.categoryId === category.id
-          );
-          if (docResult) {
-            return {
-              ...category,
-              documents: docResult.documents,
-              allDocuments: docResult.allDocuments,
-              hasMoreDocuments: docResult.hasMoreDocuments,
-            };
-          }
-          return category;
-        });
-
-        // 4. Set state with the processed data
-        setCategoriesWithDocs(categoriesWithDocuments);
-
-        // 5. Cache the data for future use
-        sessionStorage.setItem(
-          "homepageData",
-          JSON.stringify(categoriesWithDocuments)
-        );
-        sessionStorage.setItem("homepageDataTimestamp", now.toString());
-        console.log("Cached homepage data");
-
-        // Fetch popular documents
-        setLoadingPopular(true);
-      } catch (err) {
-        console.error("Error loading homepage data:", err);
-        setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
-      } finally {
-        setLoading(false);
-      }
+        })
+      );
+      setCategoriesWithDocs(results);
     };
-
-    fetchData();
-  }, [user]);
+    fetchInitialDocs();
+  }, [categories]);
 
   // Function to load more documents for a specific category
-  const handleLoadMore = (categoryId) => {
-    setLoadingCategories((prev) => ({
-      ...prev,
-      [categoryId]: true,
-    }));
 
-    // Find the category
-    const category = categoriesWithDocs.find((cat) => cat.id === categoryId);
-
-    if (category && category.allDocuments) {
-      // Update this category with all its documents
-      const updatedCategories = categoriesWithDocs.map((cat) => {
-        if (cat.id === categoryId) {
-          return {
-            ...cat,
-            documents: cat.allDocuments,
-            hasMoreDocuments: false,
-          };
-        }
-        return cat;
-      });
-
-      setCategoriesWithDocs(updatedCategories);
-
-      // Update expanded categories state
-      setExpandedCategories((prev) => ({
-        ...prev,
-        [categoryId]: true,
-      }));
-
-      // Set flag to show that at least one category is expanded
-      setHasExpandedCategory(true);
-    } else {
-      // If allDocuments is not available, fetch them
-      const fetchMoreDocuments = async () => {
-        try {
-          const { optimizedGetDocumentsByCategory } = await import(
-            "../utils/storage/queryOptimizer"
-          );
-          const allDocs = await optimizedGetDocumentsByCategory(categoryId);
-
-          // Update the category with all documents
-          const updatedCategories = categoriesWithDocs.map((cat) => {
-            if (cat.id === categoryId) {
-              return {
-                ...cat,
-                documents: allDocs,
-                hasMoreDocuments: false,
-              };
+  // Lazy load documents for a category when user expands or clicks "Load More"
+  const handleLoadMore = async (categoryId) => {
+    setLoadingCategories((prev) => ({ ...prev, [categoryId]: true }));
+    try {
+      // Luôn fetch lại toàn bộ tài liệu khi ấn Xem thêm
+      const docs = await getDocumentsByCategory(categoryId);
+      const sortedDocs = (docs || []).sort(
+        (a, b) => (a.stt || 0) - (b.stt || 0)
+      );
+      const updated = categoriesWithDocs.map((c) =>
+        c.id === categoryId
+          ? {
+              ...c,
+              documents: sortedDocs,
+              allDocuments: sortedDocs,
+              hasMoreDocuments: false,
             }
-            return cat;
-          });
-
-          setCategoriesWithDocs(updatedCategories);
-
-          // Update expanded categories state
-          setExpandedCategories((prev) => ({
-            ...prev,
-            [categoryId]: true,
-          }));
-        } catch (error) {
-          console.error(
-            `Error loading more documents for ${categoryId}:`,
-            error
-          );
-        } finally {
-          setLoadingCategories((prev) => ({
-            ...prev,
-            [categoryId]: false,
-          }));
-        }
-      };
-
-      fetchMoreDocuments();
+          : c
+      );
+      setCategoriesWithDocs(updated);
+      setExpandedCategories((prev) => ({ ...prev, [categoryId]: true }));
+      setHasExpandedCategory(true);
+    } catch (err) {
+      console.error("Lỗi tải tài liệu cho danh mục", categoryId, err);
+    } finally {
+      setLoadingCategories((prev) => ({ ...prev, [categoryId]: false }));
     }
-
-    // Set loading to false after a short delay if using cached data
-    setTimeout(() => {
-      setLoadingCategories((prev) => ({
-        ...prev,
-        [categoryId]: false,
-      }));
-    }, 300);
   };
 
   // Function to collapse all expanded document lists
@@ -631,16 +457,6 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Debug info */}
-            {categoriesWithDocs.length === 0 && !loading && !error && (
-              <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
-                <p>
-                  Không có danh mục nào được hiển thị. Vui lòng kiểm tra console
-                  để biết thêm chi tiết.
-                </p>
-              </div>
-            )}
-
             <div className="container mx-auto px-4 py-8">
               <div className="text-center">
                 <h1
@@ -678,46 +494,39 @@ const HomePage = () => {
                         onChange={handleSearchChange}
                         onKeyDown={handleSearchKeyDown}
                         placeholder={
-                          // Tối ưu: chỉ load categories khi vào trang, lazy load documents khi expand
-                          useEffect(() => {
-                            let isMounted = true;
-                            setLoading(true);
-                            setError(null);
-                            import("../firebase/categoryService.js").then(({ getAllCategories }) => {
-                              getAllCategories()
-                                .then((cats) => {
-                                  if (isMounted) {
-                                    setCategories(cats || []);
-                                    setCachedData(null); // reset cache
-                                    setLoading(false);
-                                  }
-                                })
-                                .catch((err) => {
-                                  setError("Không thể tải danh mục. Vui lòng thử lại.");
-                                  setLoading(false);
-                                });
-                            });
-                            return () => {
-                              isMounted = false;
-                            };
-                          }, [user]);
-
-                          // Khi expand 1 category, lazy load documents cho category đó (nếu chưa có)
-                          const handleExpand = useCallback(async (categoryId) => {
-                            setIsAnyExpanded(true);
-                            setHasExpandedCategory(true);
-                            if (!categoryId) return;
-                            // Nếu đã có documents cho category này thì không load lại
-                            if (documents[categoryId]) return;
-                            // Lazy load documents
-                            import("../firebase/categoryService.js").then(({ getDocumentsByCategory }) => {
-                              getDocumentsByCategory(categoryId)
-                                .then((docs) => {
-                                  setDocuments((prev) => ({ ...prev, [categoryId]: docs || [] }));
-                                })
-                                .catch(() => {});
-                            });
-                          }, [documents]);
+                          searchType === "exam"
+                            ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
+                            : "Tìm kiếm tài liệu..."
+                        }
+                        className={`w-full px-4 py-3 pr-10 ${
+                          isDarkMode
+                            ? "bg-gray-800 text-white placeholder-gray-400 focus:bg-gray-700"
+                            : "bg-white text-gray-900 placeholder-gray-500"
+                        } focus:outline-none`}
+                      />
+                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                        <button
+                          onClick={triggerSearch}
+                          aria-label="Tìm kiếm"
+                          className={`h-8 w-8 flex items-center justify-center rounded focus:outline-none ${
+                            isDarkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          <svg
+                            className={`h-5 w-5 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
                         </button>
                       </div>
                     </div>

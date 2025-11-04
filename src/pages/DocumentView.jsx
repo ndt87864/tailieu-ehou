@@ -49,11 +49,65 @@ function DocumentView() {
   const [userDataCache, setUserDataCache] = useState(null);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [documents, setDocuments] = useState({});
+  const [documents, setDocuments] = useState([]); // Chỉ lưu documents của category hiện tại
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Tối ưu: chỉ load categories và document cần thiết khi vào trang
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    setError(null);
+    // Lấy categories
+    import("../firebase/categoryService.js").then(
+      ({ getAllCategories, getDocumentsByCategory }) => {
+        getAllCategories()
+          .then((cats) => {
+            if (!isMounted) return;
+            setCategories(cats || []);
+            // Tìm category từ slug
+            const cat = (cats || []).find((c) => c.slug === categorySlug);
+            setSelectedCategory(cat || null);
+            if (cat) {
+              // Lấy documents cho category này
+              getDocumentsByCategory(cat.id)
+                .then((docs) => {
+                  if (!isMounted) return;
+                  setDocuments(docs || []);
+                  // Tìm document từ slug
+                  const doc = (docs || []).find((d) => d.slug === documentSlug);
+                  setSelectedDocument(doc || null);
+                  setLoading(false);
+                })
+                .catch(() => setLoading(false));
+            } else {
+              setLoading(false);
+            }
+          })
+          .catch(() => {
+            setError("Không thể tải danh mục hoặc tài liệu.");
+            setLoading(false);
+          });
+      }
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [categorySlug, documentSlug]);
+
+  // Khi đã có selectedDocument, lazy load questions khi cần
+  useEffect(() => {
+    if (!selectedDocument || !selectedDocument.id) return;
+    setQuestions([]);
+    import("../firebase/questionService.js").then(
+      ({ getQuestionsByDocument }) => {
+        getQuestionsByDocument(selectedDocument.id)
+          .then((qs) => setQuestions(qs || []))
+          .catch(() => setQuestions([]));
+      }
+    );
+  }, [selectedDocument]);
   const [openMain, setOpenMain] = useState(-1);
   const [search, setSearch] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
