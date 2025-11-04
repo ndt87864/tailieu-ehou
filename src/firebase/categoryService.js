@@ -26,7 +26,7 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 phút
 const isBrowser = () => typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
 
 /**
- * ✅ OPTIMIZED: Lấy categories KHÔNG có documents (lightweight)
+ *  OPTIMIZED: Lấy categories KHÔNG có documents (lightweight)
  * Tốc độ: ~50-150ms (thay vì 300-600ms)
  * Dùng cho initial load, sau đó lazy load documents khi cần
  */
@@ -38,7 +38,6 @@ export const getAllCategories = async () => {
     if (isBrowser()) {
       const cached = await cacheDB.get(STORES.CATEGORIES, 'all_categories', CACHE_TTL);
       if (cached) {
-        console.log(`✅ Categories cache HIT (${(performance.now() - startTime).toFixed(1)}ms)`);
         return cached;
       }
     }
@@ -66,9 +65,6 @@ export const getAllCategories = async () => {
     if (isBrowser()) {
       await cacheDB.set(STORES.CATEGORIES, 'all_categories', sortedCategories);
     }
-    
-    console.log(`✅ Loaded ${sortedCategories.length} categories in ${(performance.now() - startTime).toFixed(1)}ms`);
-    
     return sortedCategories;
   } catch (error) {
     console.error('❌ Error loading categories:', error);
@@ -77,7 +73,7 @@ export const getAllCategories = async () => {
 };
 
 /**
- * ✅ OPTIMIZED: Lấy categories + documents (với cache và parallel loading)
+ *  OPTIMIZED: Lấy categories + documents (với cache và parallel loading)
  * Tốc độ: ~100-300ms (giảm từ 400-800ms)
  * Chỉ dùng khi THỰC SỰ cần documents
  */
@@ -89,7 +85,6 @@ export const getAllCategoriesWithDocuments = async () => {
     if (isBrowser()) {
       const cached = await cacheDB.get(STORES.CATEGORIES, 'categories_with_docs', CACHE_TTL);
       if (cached) {
-        console.log(`✅ Categories+Docs cache HIT (${(performance.now() - startTime).toFixed(1)}ms)`);
         return cached;
       }
     }
@@ -111,7 +106,7 @@ export const getAllCategoriesWithDocuments = async () => {
     
     categoriesData = categoriesData.sort((a, b) => (a.stt || 0) - (b.stt || 0));
     
-    // ✅ Load documents PARALLEL cho tất cả categories
+    //  Load documents PARALLEL cho tất cả categories
     const documentQueries = categoriesData.map(category => ({
       categoryId: category.id,
       query: query(
@@ -157,8 +152,6 @@ export const getAllCategoriesWithDocuments = async () => {
     }
     
     const loadTime = performance.now() - startTime;
-    console.log(`✅ Loaded ${categoriesData.length} categories with documents in ${loadTime.toFixed(1)}ms`);
-    
     return categoriesData;
   } catch (error) {
     console.error("❌ Error loading categories with documents:", error);
@@ -167,7 +160,7 @@ export const getAllCategoriesWithDocuments = async () => {
 };
 
 /**
- * ✅ NEW: Lấy documents cho 1 category cụ thể (lazy loading)
+ *  NEW: Lấy documents cho 1 category cụ thể (lazy loading)
  * Tốc độ: ~30-100ms
  */
 export const getDocumentsByCategory = async (categoryId) => {
@@ -180,7 +173,6 @@ export const getDocumentsByCategory = async (categoryId) => {
     if (isBrowser()) {
       const cached = await cacheDB.get(STORES.DOCUMENTS, categoryId, CACHE_TTL);
       if (cached) {
-        console.log(`✅ Documents cache HIT for ${categoryId} (${(performance.now() - startTime).toFixed(1)}ms)`);
         return cached;
       }
     }
@@ -209,9 +201,6 @@ export const getDocumentsByCategory = async (categoryId) => {
     if (isBrowser()) {
       await cacheDB.set(STORES.DOCUMENTS, categoryId, sortedDocuments);
     }
-    
-    console.log(`✅ Loaded ${sortedDocuments.length} documents for category in ${(performance.now() - startTime).toFixed(1)}ms`);
-    
     return sortedDocuments;
   } catch (error) {
     console.error(`❌ Error loading documents for category ${categoryId}:`, error);
@@ -220,7 +209,7 @@ export const getDocumentsByCategory = async (categoryId) => {
 };
 
 /**
- * ✅ OPTIMIZED: Add category với cache invalidation
+ *  OPTIMIZED: Add category với cache invalidation
  */
 export const addCategory = async (categoryData) => {
   try {
@@ -256,7 +245,7 @@ export const addCategory = async (categoryData) => {
 };
 
 /**
- * ✅ OPTIMIZED: Update category với cache invalidation
+ *  OPTIMIZED: Update category với cache invalidation
  */
 export const updateCategory = async (categoryId, categoryData) => {
   try {
@@ -285,7 +274,7 @@ export const updateCategory = async (categoryId, categoryData) => {
 };
 
 /**
- * ✅ OPTIMIZED: Delete category với cascade và cache invalidation
+ *  OPTIMIZED: Delete category với cascade và cache invalidation
  */
 export const deleteCategory = async (categoryId) => {
   try {
@@ -328,7 +317,7 @@ export const deleteCategory = async (categoryId) => {
 };
 
 /**
- * ✅ Get category by ID
+ *  Get category by ID
  */
 export const getCategoryById = async (categoryId) => {
   try {
@@ -349,7 +338,7 @@ export const getCategoryById = async (categoryId) => {
 };
 
 /**
- * ✅ Get categories with pagination
+ *  Get categories with pagination
  */
 export const getCategoriesByPage = async (page = 1, limitCount = 10, lastDoc = null) => {
   try {
@@ -379,18 +368,17 @@ export const getCategoriesByPage = async (page = 1, limitCount = 10, lastDoc = n
 };
 
 /**
- * ✅ NEW: Clear cache
+ *  NEW: Clear cache
  */
 export const clearCategoriesCache = async () => {
   try {
     if (isBrowser()) {
       await cacheDB.clearStore(STORES.CATEGORIES);
       await cacheDB.clearStore(STORES.DOCUMENTS);
-      console.log('🔄 Categories cache cleared');
     }
     return true;
   } catch (error) {
-    console.error('❌ Error clearing cache:', error);
+    console.error(' Error clearing cache:', error);
     return false;
   }
 };

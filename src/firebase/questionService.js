@@ -40,14 +40,10 @@ export const getQuestionsByDocument = async (documentId) => {
     if (isBrowser()) {
       const cachedQuestions = await cacheDB.get(STORES.QUESTIONS, documentId, CACHE_TTL);
       if (cachedQuestions) {
-        console.log(`✅ Cache HIT: ${documentId} (${(performance.now() - startTime).toFixed(1)}ms)`);
         return cachedQuestions;
       }
     }
-    
-    console.log(`⚠️ Cache MISS: ${documentId}, loading from Firestore...`);
-    
-    // ✅ Query với index optimization
+    // Query với index optimization
     const questionsQuery = query(
       collection(db, COLLECTIONS.QUESTIONS),
       where("documentId", "==", documentId),
@@ -79,7 +75,6 @@ export const getQuestionsByDocument = async (documentId) => {
       }
       
       const loadTime = performance.now() - startTime;
-      console.log(`✅ Loaded ${questions.length} questions in ${loadTime.toFixed(1)}ms`);
       
       return questions;
       
@@ -141,19 +136,16 @@ export const getQuestionsByDocuments = async (documentIds) => {
     );
     
     const allQuestions = questionsArrays.flat();
-    
-    console.log(`✅ Loaded ${allQuestions.length} questions from ${documentIds.length} docs in ${(performance.now() - startTime).toFixed(1)}ms`);
-    
     return allQuestions;
     
   } catch (error) {
-    console.error('❌ Error loading multiple documents:', error);
+    console.error(' Error loading multiple documents:', error);
     return [];
   }
 };
 
 /**
- * ✅ OPTIMIZED: Thêm question với cache invalidation
+ *  OPTIMIZED: Thêm question với cache invalidation
  */
 export const addQuestion = async (questionData) => {
   try {
@@ -168,18 +160,17 @@ export const addQuestion = async (questionData) => {
     // Invalidate cache
     if (questionData.documentId && isBrowser()) {
       await cacheDB.delete(STORES.QUESTIONS, questionData.documentId);
-      console.log(`🔄 Cache cleared for: ${questionData.documentId}`);
     }
     
     return { id: docRef.id, ...questionData };
   } catch (error) {
-    console.error('❌ Error adding question:', error);
+    console.error(' Error adding question:', error);
     throw error;
   }
 };
 
 /**
- * ✅ OPTIMIZED: Update với cache invalidation
+ *  OPTIMIZED: Update với cache invalidation
  */
 export const updateQuestion = async (questionId, questionData) => {
   try {
@@ -198,13 +189,13 @@ export const updateQuestion = async (questionId, questionData) => {
     
     return { id: questionId, ...questionData };
   } catch (error) {
-    console.error('❌ Error updating question:', error);
+    console.error(' Error updating question:', error);
     throw error;
   }
 };
 
 /**
- * ✅ OPTIMIZED: Delete với cache invalidation
+ *  OPTIMIZED: Delete với cache invalidation
  */
 export const deleteQuestion = async (questionId) => {
   try {
@@ -226,13 +217,13 @@ export const deleteQuestion = async (questionId) => {
     }
     
   } catch (error) {
-    console.error('❌ Error deleting question:', error);
+    console.error(' Error deleting question:', error);
     throw error;
   }
 };
 
 /**
- * ✅ NEW: Bulk delete với optimization
+ * NEW: Bulk delete với optimization
  * Tốc độ: ~200-500ms cho 50 questions
  */
 export const bulkDeleteQuestions = async (questionIds) => {
@@ -291,8 +282,6 @@ export const bulkDeleteQuestions = async (questionIds) => {
     }
     
     const totalTime = performance.now() - startTime;
-    console.log(`✅ Bulk deleted ${successCount}/${questionIds.length} in ${totalTime.toFixed(1)}ms`);
-    
     return { success: successCount, failed: failedCount };
     
   } catch (error) {
@@ -301,25 +290,22 @@ export const bulkDeleteQuestions = async (questionIds) => {
   }
 };
 
-/**
- * ✅ NEW: Clear all cache
- */
+
 export const clearQuestionsCache = async () => {
   try {
     if (isBrowser()) {
       await cacheDB.clearStore(STORES.QUESTIONS);
-      console.log('🔄 Questions cache cleared');
+      console.log(' Questions cache cleared');
     }
     return true;
   } catch (error) {
-    console.error('❌ Error clearing cache:', error);
+    console.error(' Error clearing cache:', error);
     return false;
   }
 };
 
-// ⚠️ DEPRECATED functions (để backward compatibility)
+//  DEPRECATED functions (để backward compatibility)
 export const getAllQuestionsWithDocumentInfo = async () => {
-  console.warn('⚠️ DEPRECATED: Use getQuestionsByDocument instead');
   try {
     const questionsQuery = query(
       collection(db, 'questions'),

@@ -678,39 +678,46 @@ const HomePage = () => {
                         onChange={handleSearchChange}
                         onKeyDown={handleSearchKeyDown}
                         placeholder={
-                          searchType === "exam"
-                            ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
-                            : "Tìm kiếm tài liệu..."
-                        }
-                        className={`w-full px-4 py-3 pr-10 ${
-                          isDarkMode
-                            ? "bg-gray-800 text-white placeholder-gray-400 focus:bg-gray-700"
-                            : "bg-white text-gray-900 placeholder-gray-500"
-                        } focus:outline-none`}
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                        <button
-                          onClick={triggerSearch}
-                          aria-label="Tìm kiếm"
-                          className={`h-8 w-8 flex items-center justify-center rounded focus:outline-none ${
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          <svg
-                            className={`h-5 w-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+                          // Tối ưu: chỉ load categories khi vào trang, lazy load documents khi expand
+                          useEffect(() => {
+                            let isMounted = true;
+                            setLoading(true);
+                            setError(null);
+                            import("../firebase/categoryService.js").then(({ getAllCategories }) => {
+                              getAllCategories()
+                                .then((cats) => {
+                                  if (isMounted) {
+                                    setCategories(cats || []);
+                                    setCachedData(null); // reset cache
+                                    setLoading(false);
+                                  }
+                                })
+                                .catch((err) => {
+                                  setError("Không thể tải danh mục. Vui lòng thử lại.");
+                                  setLoading(false);
+                                });
+                            });
+                            return () => {
+                              isMounted = false;
+                            };
+                          }, [user]);
+
+                          // Khi expand 1 category, lazy load documents cho category đó (nếu chưa có)
+                          const handleExpand = useCallback(async (categoryId) => {
+                            setIsAnyExpanded(true);
+                            setHasExpandedCategory(true);
+                            if (!categoryId) return;
+                            // Nếu đã có documents cho category này thì không load lại
+                            if (documents[categoryId]) return;
+                            // Lazy load documents
+                            import("../firebase/categoryService.js").then(({ getDocumentsByCategory }) => {
+                              getDocumentsByCategory(categoryId)
+                                .then((docs) => {
+                                  setDocuments((prev) => ({ ...prev, [categoryId]: docs || [] }));
+                                })
+                                .catch(() => {});
+                            });
+                          }, [documents]);
                         </button>
                       </div>
                     </div>
