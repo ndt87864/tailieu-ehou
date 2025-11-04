@@ -14,6 +14,7 @@ import {
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "./firebase.js";
+import { cacheDB, STORES } from "./indexedDBCache.js";
 export const COLLECTIONS = {
   CATEGORIES: "categories",
   DOCUMENTS: "documents",
@@ -194,13 +195,25 @@ export const getUserRole = async (userId) => {
 };
 
 export const getAllUsers = async () => {
+  const CACHE_KEY = 'all_users';
+  const CACHE_TTL = 15 * 60 * 1000;
   try {
+    // Check cache first
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      const cached = await cacheDB.get(STORES.METADATA, CACHE_KEY, CACHE_TTL);
+      if (cached) return cached;
+    }
     const q = query(collection(db, COLLECTIONS.USERS));
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const users = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    // Save to cache
+    if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+      await cacheDB.set(STORES.METADATA, CACHE_KEY, users);
+    }
+    return users;
   } catch (error) {
     console.error("Error getting users:", error);
     throw error;
@@ -208,6 +221,10 @@ export const getAllUsers = async () => {
 };
 
 export const updateUserSubscriptionType = async (userId, subscriptionType) => {
+  // Invalidate user list cache
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+    await cacheDB.delete(STORES.METADATA, 'all_users');
+  }
   try {
     const userRef = doc(db, COLLECTIONS.USERS, userId);
     await updateDoc(userRef, {
@@ -222,6 +239,10 @@ export const updateUserSubscriptionType = async (userId, subscriptionType) => {
 };
 
 export const updateUserRole = async (userId, newRole) => {
+  // Invalidate user list cache
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+    await cacheDB.delete(STORES.METADATA, 'all_users');
+  }
   try {
     const userRef = doc(db, COLLECTIONS.USERS, userId);
     const updateData = {
@@ -244,6 +265,10 @@ export const updateUserRole = async (userId, newRole) => {
 };
 
 export const deleteUserFromFirestore = async (userId) => {
+  // Invalidate user list cache
+  if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
+    await cacheDB.delete(STORES.METADATA, 'all_users');
+  }
   try {
     await deleteDoc(doc(db, COLLECTIONS.USERS, userId));
     return true;

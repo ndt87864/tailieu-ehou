@@ -51,16 +51,27 @@ export const getAllCategories = async () => {
       return [];
     }
     
-    const categoriesData = categoriesSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      documentCount: 0 // Sẽ được update khi cần
-    }));
-    
-    const sortedCategories = [...categoriesData].sort(
-      (a, b) => (a.stt || 0) - (b.stt || 0)
+    // Đếm số lượng documents cho từng category song song
+    const categoriesData = await Promise.all(
+      categoriesSnapshot.docs.map(async doc => {
+        const categoryId = doc.id;
+        let documentCount = 0;
+        try {
+          const docsSnap = await getDocs(query(collection(db, COLLECTIONS.DOCUMENTS), where("categoryId", "==", categoryId)));
+          documentCount = docsSnap.size;
+        } catch (e) {
+          documentCount = 0;
+        }
+        return {
+          id: categoryId,
+          ...doc.data(),
+          documentCount
+        };
+      })
     );
-    
+
+    const sortedCategories = [...categoriesData].sort((a, b) => (a.stt || 0) - (b.stt || 0));
+
     // Cache kết quả
     if (isBrowser()) {
       await cacheDB.set(STORES.CATEGORIES, 'all_categories', sortedCategories);
