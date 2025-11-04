@@ -16,7 +16,6 @@ const SimpleAdSenseComponent = () => {
     // Hiển thị quảng cáo sau 2 giây (thay vì 3)
     const timer = setTimeout(() => {
       setShowAds(true);
-      console.log("AdSense: Showing ads after content check");
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -25,15 +24,7 @@ const SimpleAdSenseComponent = () => {
   const hideAds = () => {
     setIsHidden(true);
     localStorage.setItem("hideAds", "true");
-    console.log("AdSense: Ads hidden by user");
   };
-
-  // Thêm debug log
-  console.log("AdSense Debug:", {
-    showAds,
-    isHidden,
-    pathname: location.pathname,
-  });
 
   if (isHidden || !showAds) {
     return null;

@@ -17,8 +17,6 @@ import UserHeader from "../../components/UserHeader";
 import ThemeColorPicker from "../../components/ThemeColorPicker";
 
 const DocumentManagement = () => {
-  console.log("DocumentManagement component is rendering");
-
   const [categories, setCategories] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,16 +75,12 @@ const DocumentManagement = () => {
   }, []);
   useEffect(() => {
     const loadData = async () => {
-      console.log("Loading data, isAdmin:", isAdmin);
-
       if (!isAdmin) {
-        console.log("User is not admin, returning early");
         return;
       }
 
       try {
         setLoading(true);
-        console.log("Fetching categories and documents");
         const categoriesWithDocs = await getAllCategoriesWithDocuments();
 
         const categoriesData = await getAllCategories();
@@ -166,8 +160,6 @@ const DocumentManagement = () => {
         isVip: newDocument.isVip, // Đảm bảo truyền isVip
       };
 
-      console.log("📝 Sending document data:", documentData); // Debug log
-
       const addedDocument = await addDocument(documentData);
 
       const category = categories.find(
@@ -218,8 +210,6 @@ const DocumentManagement = () => {
         categoryId: editDocument.categoryId,
         isVip: editDocument.isVip, // Đảm bảo truyền isVip
       };
-
-      console.log("📝 Updating document data:", documentData); // Debug log
 
       const updatedDocument = await updateDocument(
         editDocument.id,

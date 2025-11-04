@@ -352,15 +352,6 @@ function App() {
       // Kiểm tra cập nhật thông thường
       checkAndHandleUpdate();
     }
-
-    // Hiển thị thông tin phiên bản trong console (để debug)
-    console.log(`App version: ${window.APP_VERSION || "unknown"}`);
-    console.log(
-      `Build time: ${
-        new Date(parseInt(window.BUILD_TIMESTAMP || "0")).toLocaleString() ||
-        "unknown"
-      }`
-    );
   }, [location.search]);
 
   // Kiểm tra phiên bản và xóa cache khi cần
@@ -386,14 +377,12 @@ function App() {
 
         // Nếu không có phiên bản lưu trữ hoặc phiên bản mới khác với phiên bản lưu trữ
         if (!storedVersion || storedVersion !== data.version) {
-          console.log(`Phát hiện phiên bản mới: ${data.version}`);
           localStorage.setItem("app_version", data.version);
 
           // Xóa cache nếu trình duyệt hỗ trợ
           if ("caches" in window) {
             const cacheKeys = await caches.keys();
             await Promise.all(cacheKeys.map((key) => caches.delete(key)));
-            console.log("Đã xóa tất cả cache");
           }
 
           // Tải lại trang nếu _fresh không phải tham số trong URL

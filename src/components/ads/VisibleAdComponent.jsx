@@ -7,7 +7,6 @@ const VisibleAdComponent = () => {
     // Hiển thị ngay lập tức sau 1 giây
     const timer = setTimeout(() => {
       setVisible(true);
-      console.log("Ad component now visible!");
     }, 1000);
 
     return () => clearTimeout(timer);

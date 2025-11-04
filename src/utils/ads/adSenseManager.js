@@ -22,7 +22,6 @@ export const initializeAdSense = () => {
       enable_page_level_ads: true
     });
     initialized = true;
-    console.log('AdSense initialized successfully');
   } catch (error) {
     console.error('Failed to initialize AdSense:', error);
   } finally {

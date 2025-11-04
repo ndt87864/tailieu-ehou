@@ -26,7 +26,6 @@ const RealAdSenseComponent = () => {
         "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4282799215996734";
 
       script.onload = () => {
-        console.log("AdSense script loaded");
         initializeAd();
       };
 
@@ -36,7 +35,6 @@ const RealAdSenseComponent = () => {
 
       document.head.appendChild(script);
     } else {
-      console.log("AdSense script already exists");
       initializeAd();
     }
   };
@@ -44,7 +42,6 @@ const RealAdSenseComponent = () => {
   const initializeAd = () => {
     // Kiểm tra nếu đã được khởi tạo rồi thì không làm gì
     if (initialized.current || !adRef.current) {
-      console.log("Ad already initialized or ref not ready");
       return;
     }
 
@@ -52,10 +49,6 @@ const RealAdSenseComponent = () => {
       // Kiểm tra xem ins element đã có ads chưa
       const insElement = adRef.current;
       if (insElement.dataset.adsbygoogleStatus) {
-        console.log(
-          "Ad already has status:",
-          insElement.dataset.adsbygoogleStatus
-        );
         setAdLoaded(true);
         return;
       }
@@ -66,7 +59,6 @@ const RealAdSenseComponent = () => {
           (window.adsbygoogle = window.adsbygoogle || []).push({});
           initialized.current = true;
           setAdLoaded(true);
-          console.log("AdSense ad initialized successfully");
         } catch (error) {
           console.error("AdSense push error:", error);
         }

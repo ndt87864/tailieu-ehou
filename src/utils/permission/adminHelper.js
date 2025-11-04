@@ -125,7 +125,6 @@ export const loadCategoriesWithDocumentsOptimized = async (
   try {
     setLoading(true);
     
-    console.log("Starting optimized categories with documents load...");
     const startTime = performance.now();
     
     // Get all categories with documents
@@ -168,7 +167,6 @@ export const loadCategoriesWithDocumentsOptimized = async (
     setDocuments(allDocuments);
     
     const endTime = performance.now();
-    console.log(`Optimized categories with documents load: ${endTime - startTime}ms`);
     
   } catch (error) {
     console.error("Error in loadCategoriesWithDocumentsOptimized:", error);

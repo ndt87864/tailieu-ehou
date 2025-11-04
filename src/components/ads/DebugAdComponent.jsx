@@ -1,8 +1,6 @@
 import React from "react";
 
 const DebugAdComponent = () => {
-  console.log("DebugAdComponent: Component rendered!");
-
   return (
     <div
       style={{

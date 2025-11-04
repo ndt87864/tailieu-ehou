@@ -436,10 +436,6 @@ function DocumentView() {
             }
           }
         }
-
-        console.log(
-          `⏱ fetchData completed in ${performance.now() - startTime}ms`
-        );
       } catch (err) {
         console.error("❌ fetchData error:", err);
         if (!isCancelled) setError(err.message || "Không thể tải dữ liệu.");
@@ -579,14 +575,13 @@ function DocumentView() {
           );
 
         if (result.vipAccessDenied) {
-          console.log("🚫 VIP access denied in reload result");
           setQuestions([]);
           setViewState({
             limitedView: false,
             viewLimitExceeded: false,
             viewsRemaining: 0,
           });
-          // ✅ Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
+          // Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
           setVipAccessResult({
             hasAccess: false,
             reason:

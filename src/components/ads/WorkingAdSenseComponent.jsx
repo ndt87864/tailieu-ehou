@@ -10,13 +10,11 @@ const WorkingAdSenseComponent = () => {
     setIsHidden(hideAds);
 
     if (hideAds) {
-      console.log("AdSense: Ads hidden by user setting");
       return;
     }
 
     // Hiển thị quảng cáo sau 2 giây
     const timer = setTimeout(() => {
-      console.log("AdSense: Showing ads now");
       setShowAds(true);
 
       // Load AdSense script
@@ -27,11 +25,8 @@ const WorkingAdSenseComponent = () => {
   }, []);
 
   const loadAdSenseScript = () => {
-    console.log("AdSense: Loading script...");
-
     // Kiểm tra nếu script đã có
     if (document.querySelector('script[src*="adsbygoogle.js"]')) {
-      console.log("AdSense: Script already loaded, pushing ad");
       pushAd();
       return;
     }
@@ -44,7 +39,6 @@ const WorkingAdSenseComponent = () => {
       "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4282799215996734";
 
     script.onload = () => {
-      console.log("AdSense: Script loaded successfully");
       pushAd();
     };
 
@@ -59,20 +53,15 @@ const WorkingAdSenseComponent = () => {
     try {
       window.adsbygoogle = window.adsbygoogle || [];
       window.adsbygoogle.push({});
-      console.log("AdSense: Ad pushed to queue");
     } catch (error) {
       console.error("AdSense: Error pushing ad:", error);
     }
   };
 
   const hideAds = () => {
-    console.log("AdSense: User clicked hide");
     setIsHidden(true);
     localStorage.setItem("hideAds", "true");
   };
-
-  // Debug log
-  console.log("AdSense: Render state", { showAds, isHidden });
 
   if (isHidden || !showAds) {
     return null;

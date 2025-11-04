@@ -720,29 +720,16 @@ function Sidebar({
     // Chỉ tải tài liệu nếu danh mục được mở và chưa có dữ liệu
     if (!documents[category.id] || documents[category.id].length === 0) {
       try {
-        console.log(
-          `Đang tải tài liệu cho danh mục: ${category.title} (${category.id})`
-        );
-
         // Sử dụng hàm tối ưu
         const docsData = await optimizedGetDocumentsByCategory(category.id);
 
         if (docsData && Array.isArray(docsData) && docsData.length > 0) {
-          console.log(
-            `Đã tải ${docsData.length} tài liệu cho danh mục: ${category.title}`
-          );
-
-          // Hiển thị tài liệu đầu tiên để debug
-          console.log("Example document:", docsData[0]);
-
           // Cập nhật state với dữ liệu mới
           setDocuments((prev) => ({
             ...prev,
             [category.id]: docsData,
           }));
         } else {
-          console.log(`Không có tài liệu nào cho danh mục: ${category.title}`);
-
           // Đặt mảng rỗng để tránh tải lại trong tương lai
           setDocuments((prev) => ({
             ...prev,
@@ -802,7 +789,10 @@ function Sidebar({
     try {
       // If we're currently on the questions admin page and clicking a different sidebar link,
       // clear the question management cache before navigating away.
-      if (location.pathname === "/admin/questions" && path !== "/admin/questions") {
+      if (
+        location.pathname === "/admin/questions" &&
+        path !== "/admin/questions"
+      ) {
         clearQuestionManagementCache();
       }
     } catch (err) {

@@ -33,7 +33,6 @@ const initializeFirestoreConnection = async () => {
     // Enable network if needed
     await enableNetwork(db);
     isFirestoreInitialized = true;
-    console.log('Firestore network enabled successfully');
   } catch (error) {
     console.warn('Firestore network enable failed:', error);
     // Try to disable and re-enable network

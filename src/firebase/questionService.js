@@ -58,7 +58,6 @@ export const getQuestionsByDocument = async (documentId) => {
         const startTime = performance.now();
         const snapshot = await getDocs(questionsQuery);
         const endTime = performance.now();
-        console.log(`Questions query completed in ${endTime - startTime}ms`);
         return snapshot;
       });
         

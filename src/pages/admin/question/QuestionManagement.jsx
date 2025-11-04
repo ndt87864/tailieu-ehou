@@ -106,6 +106,8 @@ const QuestionManagement = () => {
   const fileInputRef = useRef(null);
   const questionImageInputRef = useRef(null);
   const answerImageInputRef = useRef(null);
+  // Prevent duplicate load/restore when React StrictMode mounts effects twice in dev
+  const cacheAppliedRef = useRef(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingExcel, setProcessingExcel] = useState(false);
@@ -148,6 +150,12 @@ const QuestionManagement = () => {
 
   useEffect(() => {
     const loadData = async () => {
+      // Prevent duplicate concurrent runs (React StrictMode mounts twice).
+      // Mark as applied immediately so a second parallel invocation will exit early.
+      if (cacheAppliedRef.current) {
+        return;
+      }
+      cacheAppliedRef.current = true;
       if (!isAdmin) {
         setLoading(false);
         return;
@@ -254,14 +262,6 @@ const QuestionManagement = () => {
             selectedDocumentToUse = docsMap[validCategoryIds[0]]?.find(
               (doc) => doc.id === validDocumentIds[0]
             );
-
-            console.log(
-              "✅ Khôi phục từ cache (Multiple):",
-              "Categories:",
-              selectedCategoryIdsToUse,
-              "Documents:",
-              selectedDocumentIdsToUse
-            );
           }
         }
 
@@ -281,12 +281,6 @@ const QuestionManagement = () => {
 
           selectedDocumentToUse = selectedCategoryToUse.documents[0];
           selectedDocumentIdsToUse = [selectedDocumentToUse.id];
-
-          console.log(
-            "📌 Sử dụng danh mục và tài liệu đầu tiên:",
-            selectedCategoryToUse.id,
-            selectedDocumentToUse.id
-          );
         }
 
         try {
@@ -368,13 +362,17 @@ const QuestionManagement = () => {
           setSidebarData(formattedCategories);
           setSidebarDocuments(formattedDocuments);
           setQuestions(allQuestionsData || []);
-          setDocuments(selectedDocumentIdsToUse.map((docId) => {
-            for (const categoryId of selectedCategoryIdsToUse) {
-              const doc = docsMap[categoryId]?.find((d) => d.id === docId);
-              if (doc) return doc;
-            }
-            return null;
-          }).filter(Boolean));
+          setDocuments(
+            selectedDocumentIdsToUse
+              .map((docId) => {
+                for (const categoryId of selectedCategoryIdsToUse) {
+                  const doc = docsMap[categoryId]?.find((d) => d.id === docId);
+                  if (doc) return doc;
+                }
+                return null;
+              })
+              .filter(Boolean)
+          );
           setFilterCategory(selectedCategoryIdsToUse);
           setFilterDocument(selectedDocumentIdsToUse);
         } catch (questionsError) {
@@ -384,10 +382,13 @@ const QuestionManagement = () => {
           );
         }
 
+        // Completed initial load and applied cache
         setLoading(false);
       } catch (err) {
         console.error("Error loading data:", err);
         setError("Không thể tải danh sách câu hỏi và tài liệu: " + err.message);
+        // Allow retry if load failed
+        cacheAppliedRef.current = false;
         setLoading(false);
       }
     };
@@ -405,28 +406,16 @@ const QuestionManagement = () => {
     const newDocumentId = e.target.value;
     setSelectedDocumentFilter(newDocumentId);
 
-    // 💾 Lưu cache khi thay đổi document
+    // Lưu cache khi thay đổi document
     if (selectedCategory && newDocumentId) {
       saveSelectionToCache(selectedCategory, newDocumentId);
-      console.log(
-        "💾 Cache updated via document select: Category",
-        selectedCategory,
-        "Document",
-        newDocumentId
-      );
     }
   };
 
-  // 💾 Lắng nghe sự thay đổi của selectedCategory để lưu cache (khi chọn từ sidebar)
+  // Lắng nghe sự thay đổi của selectedCategory để lưu cache (khi chọn từ sidebar)
   useEffect(() => {
     if (selectedCategory && selectedDocumentFilter) {
       saveSelectionToCache(selectedCategory, selectedDocumentFilter);
-      console.log(
-        "💾 Cache updated via category change: Category",
-        selectedCategory,
-        "Document",
-        selectedDocumentFilter
-      );
     }
   }, [selectedCategory]);
 
@@ -1072,18 +1061,11 @@ const QuestionManagement = () => {
         setSelectedCategory(categoriesToFilter[0]);
       }
 
-      // 💾 Lưu cache cho nhiều categories và documents
+      // Lưu cache cho nhiều categories và documents
       if (documentsToFilter.length > 0 && categoriesToFilter.length > 0) {
         // Lưu mảng đầy đủ
         saveMultipleCategoryIdsTocache(categoriesToFilter);
         saveMultipleDocumentIdsToCache(documentsToFilter);
-        console.log(
-          "💾 Cache updated with multiple selections:",
-          "Categories:",
-          categoriesToFilter,
-          "Documents:",
-          documentsToFilter
-        );
       }
 
       setDocuments(allDocumentDetails);
@@ -1100,8 +1082,6 @@ const QuestionManagement = () => {
     try {
       setLoading(true);
 
-      console.log(" Bắt đầu quá trình phân tích và xóa trùng lặp...");
-
       // Sử dụng câu hỏi hiện tại đang hiển thị
       const questionsToCheck = filteredQuestions;
 
@@ -1109,9 +1089,6 @@ const QuestionManagement = () => {
         alert("Không có câu hỏi nào đang hiển thị để kiểm tra trùng lặp.");
         return;
       }
-
-      console.log(` Phân tích ${questionsToCheck.length} câu hỏi...`);
-
       // Tìm các câu hỏi trùng lặp (dựa trên cả câu hỏi VÀ đáp án)
       const questionGroups = {};
 
@@ -1159,10 +1136,6 @@ const QuestionManagement = () => {
       const questionsToKeep = [];
 
       duplicateGroups.forEach((group, groupIndex) => {
-        console.log(
-          `Nhóm ${groupIndex + 1}: ${group.length} câu hỏi trùng lặp`
-        );
-
         // Sắp xếp theo thời gian tạo (giữ lại câu cũ nhất)
         group.sort((a, b) => {
           const timeA = a.createdAt?.seconds || a.createdAt || 0;
@@ -1173,26 +1146,11 @@ const QuestionManagement = () => {
         // Câu hỏi đầu tiên sẽ được giữ lại
         const questionToKeep = group[0];
         questionsToKeep.push(questionToKeep);
-        console.log(
-          `  Giữ lại: "${questionToKeep.question?.substring(0, 50)}..." (ID: ${
-            questionToKeep.id
-          })`
-        );
 
         // Thêm tất cả câu hỏi còn lại vào danh sách xóa
         const questionsToDeleteInGroup = group.slice(1);
         questionsToDelete.push(...questionsToDeleteInGroup);
-
-        questionsToDeleteInGroup.forEach((q, idx) => {
-          console.log(
-            `   Xóa: "${q.question?.substring(0, 50)}..." (ID: ${q.id})`
-          );
-        });
       });
-
-      console.log(
-        `Tổng kết: Giữ lại ${questionsToKeep.length} câu hỏi, xóa ${questionsToDelete.length} câu hỏi`
-      );
 
       // ✅ KIỂM TRA LOGIC: Đảm bảo tổng số đúng
       const totalOriginalDuplicates = duplicateGroups.reduce(
@@ -1227,11 +1185,6 @@ const QuestionManagement = () => {
         return;
       }
 
-      // Thực hiện xóa song song tất cả câu hỏi từ Firestore với batch processing
-      console.log(
-        `Bắt đầu xóa song song ${questionsToDelete.length} câu hỏi có cả câu hỏi và đáp án trùng lặp hoàn toàn...`
-      );
-
       const startTime = performance.now();
 
       // Cấu hình batch để tránh quá tải Firestore
@@ -1241,11 +1194,6 @@ const QuestionManagement = () => {
       // Chia thành các batch và xử lý tuần tự từng batch
       for (let i = 0; i < questionsToDelete.length; i += BATCH_SIZE) {
         const batch = questionsToDelete.slice(i, i + BATCH_SIZE);
-        console.log(
-          `Xử lý batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(
-            questionsToDelete.length / BATCH_SIZE
-          )} (${batch.length} câu hỏi)`
-        );
 
         // Tạo mảng các Promise xóa cho batch hiện tại
         const batchDeletePromises = batch.map(async (question, batchIndex) => {
@@ -1255,12 +1203,6 @@ const QuestionManagement = () => {
             if (!question.id) {
               throw new Error("Question ID is missing");
             }
-
-            console.log(
-              `[${globalIndex + 1}/${questionsToDelete.length}] Đang xóa: ${
-                question.id
-              } - ${question.question?.substring(0, 50)}...`
-            );
 
             // Xóa câu hỏi từ Firestore
             await deleteQuestion(question.id);
@@ -1285,10 +1227,6 @@ const QuestionManagement = () => {
           }
         });
 
-        // Chạy batch hiện tại song song
-        console.log(
-          `⏱Đang thực hiện ${batchDeletePromises.length} thao tác xóa song song...`
-        );
         const batchResults = await Promise.allSettled(batchDeletePromises);
         allResults.push(...batchResults);
 
@@ -1310,7 +1248,6 @@ const QuestionManagement = () => {
           const { success, question, error } = result.value;
           if (success) {
             successfulDeletes.push(question);
-            console.log(` [${index + 1}] Thành công: ${question.id}`);
           } else {
             failedDeletes.push({
               id: question.id,
@@ -1333,10 +1270,6 @@ const QuestionManagement = () => {
       const endTime = performance.now();
       const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-      console.log(
-        `Hoàn thành trong ${duration}s: ${successfulDeletes.length} thành công, ${failedDeletes.length} thất bại`
-      );
-
       // Xóa tất cả cache câu hỏi để đảm bảo dữ liệu mới được tải
       try {
         // Xóa cache cho tất cả documents liên quan
@@ -1356,14 +1289,9 @@ const QuestionManagement = () => {
 
         // Xóa cache hiện tại nếu có
         clearQuestionsCache();
-
-        console.log(`🧹 Đã xóa cache cho ${documentIds.length} documents`);
       } catch (e) {
         console.warn("⚠️ Không thể xóa cache:", e);
       }
-
-      // 🔄 RELOAD DỮ LIỆU TỪ FIRESTORE để đảm bảo đồng bộ hoàn toàn
-      console.log(" Đang reload dữ liệu từ Firestore...");
 
       try {
         // Đợi một chút để Firestore sync hoàn toàn
@@ -1371,9 +1299,6 @@ const QuestionManagement = () => {
 
         // Reload lại tất cả câu hỏi từ database
         await reloadQuestions();
-
-        console.log(" Đã reload dữ liệu thành công từ Firestore");
-        console.log(`State hiện tại có ${questions.length} câu hỏi`);
       } catch (reloadError) {
         console.error("Lỗi khi reload dữ liệu:", reloadError);
         // Fallback: Cập nhật state thủ công nếu reload thất bại
@@ -1382,7 +1307,6 @@ const QuestionManagement = () => {
           setQuestions((prevQuestions) =>
             prevQuestions.filter((q) => !successfullyDeletedIds.includes(q.id))
           );
-          console.log("🔧 Đã fallback cập nhật state thủ công");
         }
       }
 
@@ -1419,11 +1343,6 @@ const QuestionManagement = () => {
             ` Dữ liệu đã được đồng bộ lại từ database.`
         );
       }
-
-      console.log(` Hoàn tất quá trình xóa trùng lặp trong ${duration}s`);
-      console.log(
-        `Thống kê cuối: ${questionsToKeep.length} câu hỏi được giữ lại, ${successfulDeletes.length} câu hỏi đã xóa`
-      );
     } catch (error) {
       console.error("Lỗi khi xóa câu hỏi trùng lặp:", error);
       alert("Có lỗi xảy ra khi xóa câu hỏi trùng lặp: " + error.message);
@@ -1505,7 +1424,6 @@ const QuestionManagement = () => {
     )
       return;
 
-    console.log(" Bắt đầu reload questions...");
     setLoading(true);
 
     try {
@@ -1514,18 +1432,11 @@ const QuestionManagement = () => {
         filterDocument && filterDocument.length > 0
           ? filterDocument
           : [selectedDocumentFilter];
-
-      console.log(
-        ` Reload ${documentsToReload.length} documents:`,
-        documentsToReload
-      );
-
       let allQuestionsData = [];
 
       // Reload từng document
       for (const docId of documentsToReload) {
         try {
-          console.log(` Đang reload document: ${docId}`);
           const questionsData = await getQuestionsByDocument(docId);
 
           // Tìm thông tin document và category
@@ -1572,30 +1483,16 @@ const QuestionManagement = () => {
           }));
 
           allQuestionsData = [...allQuestionsData, ...questionsWithInfo];
-          console.log(
-            `Reload thành công ${questionsWithInfo.length} câu hỏi từ document ${docId}`
-          );
         } catch (docError) {
           console.error(` Lỗi reload document ${docId}:`, docError);
         }
       }
 
-      console.log(`Tổng cộng reload được ${allQuestionsData.length} câu hỏi`);
       setQuestions(allQuestionsData || []);
 
-      // 🔍 DEBUG: Kiểm tra câu hỏi trùng lặp sau reload
+      //DEBUG: Kiểm tra câu hỏi trùng lặp sau reload
       setTimeout(() => {
         const reloadedDuplicates = groupDuplicatesBoth(allQuestionsData);
-        console.log(
-          ` Sau reload: Tìm thấy ${reloadedDuplicates.length} nhóm câu hỏi trùng lặp`
-        );
-        reloadedDuplicates.forEach((group, idx) => {
-          console.log(
-            `   Nhóm ${idx + 1}: ${
-              group.length
-            } câu hỏi - "${group[0]?.question?.substring(0, 30)}..."`
-          );
-        });
       }, 500);
     } catch (err) {
       console.error("❌ Lỗi khi reload questions:", err);

@@ -98,7 +98,6 @@ export const updateStudentInfor = async (id, data) => {
   const payload = { ...data };
   try {
     // Debug log
-    console.log('[updateStudentInfor] id:', id, 'payload:', payload);
     if (payload.dob) {
       try {
         const d = (payload.dob instanceof Date) ? payload.dob : new Date(payload.dob);
@@ -116,7 +115,6 @@ export const updateStudentInfor = async (id, data) => {
       }
     }
     await updateDoc(doc(db, STUDENT_INFOR_COLLECTION, id), payload);
-    console.log('[updateStudentInfor] SUCCESS for id:', id);
   } catch (err) {
     console.error('[updateStudentInfor] ERROR for id:', id, err);
     throw err;
