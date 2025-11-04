@@ -62,28 +62,30 @@ import PricingContentManagement from "./pages/admin/PricingContentManagement";
 // Component bảo vệ route admin đơn giản
 const ProtectedAdminRoute = ({ children }) => {
   const [user, loading] = useAuthState(auth);
-  const { isAdmin } = useUserRole();
+  const { isAdmin, roleLoading } = useUserRole();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Lưu đường dẫn admin hiện tại vào localStorage
   useEffect(() => {
-    if (user && isAdmin && !loading) {
+    if (user && isAdmin && !loading && !roleLoading) {
       localStorage.setItem("lastAdminRoute", location.pathname);
     }
-  }, [user, isAdmin, location.pathname, loading]);
+  }, [user, isAdmin, location.pathname, loading, roleLoading]);
 
   useEffect(() => {
-    if (!loading) {
+    // Đợi cho đến khi cả auth loading và role loading xong
+    if (!loading && !roleLoading) {
       if (!user) {
         navigate("/login", { state: { from: location.pathname } });
       } else if (!isAdmin) {
         navigate("/");
       }
     }
-  }, [user, loading, isAdmin, navigate, location]);
+  }, [user, loading, isAdmin, roleLoading, navigate, location]);
 
-  if (loading) {
+  // Nếu đang load auth hoặc role, hiển thị loading
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500"></div>
@@ -97,7 +99,7 @@ const ProtectedAdminRoute = ({ children }) => {
 // Xử lý trang chủ cho admin với cải tiến lưu đường dẫn
 const ConditionalHomeRoute = () => {
   const [user] = useAuthState(auth);
-  const { isAdmin } = useUserRole();
+  const { isAdmin, roleLoading } = useUserRole();
   const location = useLocation();
 
   // Kiểm tra cả state và localStorage để phục hồi đường dẫn admin
@@ -106,6 +108,15 @@ const ConditionalHomeRoute = () => {
     location.state.from &&
     location.state.from.startsWith("/admin");
   const lastAdminRoute = localStorage.getItem("lastAdminRoute");
+
+  // Nếu role đang load, hiển thị loading screen
+  if (roleLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
 
   if (user && isAdmin) {
     // Ưu tiên sử dụng state nếu có

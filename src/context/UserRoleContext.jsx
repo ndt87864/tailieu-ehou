@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getUserData } from '../firebase/firestoreService';
 import { useAuth } from './AuthContext';
 
@@ -48,60 +48,82 @@ export function UserRoleProvider({ children }) {
   const [paidCategories, setPaidCategories] = useState([]);
   const [roleLoading, setRoleLoading] = useState(true);
   const { currentUser } = useAuth();
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    // Mark component as mounted
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchUserRole() {
-      setRoleLoading(true);
-      
+      // Kiểm tra cache ngay lập tức trước tiên
       if (currentUser) {
-        try {
-          // Kiểm tra cache trước
-          const cachedSession = getCachedAdminSession(currentUser.uid);
-          if (cachedSession && cachedSession.role === 'admin') {
-            // Sử dụng cache nếu là admin
+        const cachedSession = getCachedAdminSession(currentUser.uid);
+        if (cachedSession && cachedSession.role === 'admin') {
+          // Sử dụng cache nếu là admin - KHÔNG SET LOADING
+          if (isMountedRef.current) {
             setUserRole(cachedSession.role);
             setPaidCategories(cachedSession.paidCategories);
             setRoleLoading(false);
-            return;
           }
+          return;
+        }
+      }
 
-          // Nếu không có cache hoặc không phải admin, fetch từ Firestore
+      // Nếu không có cache admin, phải fetch từ Firestore
+      setRoleLoading(true);
+
+      if (currentUser) {
+        try {
+          // Fetch từ Firestore
           const userData = await getUserData(currentUser.uid);
-          if (userData) {
-            const role = userData.role || 'user';
-            const paid = userData.paidCategories || [];
-            
-            setUserRole(role);
-            setPaidCategories(paid);
-            
-            // Cache nếu là admin
-            if (role === 'admin') {
-              cacheAdminSession(currentUser.uid, role, paid);
-            } else {
-              clearAdminSession();
+          
+          if (isMountedRef.current) {
+            if (userData) {
+              const role = userData.role || 'user';
+              const paid = userData.paidCategories || [];
+              
+              setUserRole(role);
+              setPaidCategories(paid);
+              
+              // Cache nếu là admin
+              if (role === 'admin') {
+                cacheAdminSession(currentUser.uid, role, paid);
+              } else {
+                clearAdminSession();
+              }
             }
+            setRoleLoading(false);
           }
         } catch (error) {
           console.error('Error fetching user role:', error);
           
-          // Fallback: sử dụng cache nếu fetch fail
-          const cachedSession = getCachedAdminSession(currentUser.uid);
-          if (cachedSession) {
-            setUserRole(cachedSession.role);
-            setPaidCategories(cachedSession.paidCategories);
-          } else {
-            setUserRole('user');
-            setPaidCategories([]);
+          if (isMountedRef.current) {
+            // Fallback: sử dụng cache nếu fetch fail
+            const cachedSession = getCachedAdminSession(currentUser.uid);
+            if (cachedSession) {
+              setUserRole(cachedSession.role);
+              setPaidCategories(cachedSession.paidCategories);
+            } else {
+              setUserRole('user');
+              setPaidCategories([]);
+            }
+            setRoleLoading(false);
           }
         }
       } else {
         // Reset to default if no user is logged in
-        setUserRole('user');
-        setPaidCategories([]);
-        clearAdminSession();
+        if (isMountedRef.current) {
+          setUserRole('user');
+          setPaidCategories([]);
+          clearAdminSession();
+          setRoleLoading(false);
+        }
       }
-      
-      setRoleLoading(false);
     }
 
     fetchUserRole();
