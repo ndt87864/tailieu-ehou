@@ -7,6 +7,7 @@ import { auth } from "../firebase/firebase";
 import ThemeColorPicker from "./ThemeColorPicker";
 import { useSafeAdminCheck } from "../utils/permission/adminHelper"; // Sử dụng helper function
 import { optimizedGetDocumentsByCategory } from "../utils/storage/queryOptimizer";
+import { clearQuestionManagementCache } from "../utils/questionCacheUtils";
 
 // Helper function to convert string to slug
 const toSlug = (str) => {
@@ -798,12 +799,22 @@ function Sidebar({
 
   // Add function to handle refresh for admin pages
   const handleAdminRefresh = (e, path) => {
+    try {
+      // If we're currently on the questions admin page and clicking a different sidebar link,
+      // clear the question management cache before navigating away.
+      if (location.pathname === "/admin/questions" && path !== "/admin/questions") {
+        clearQuestionManagementCache();
+      }
+    } catch (err) {
+      console.warn("Error clearing question cache from sidebar click:", err);
+    }
+
     // If we're already on the path, prevent default and just refresh the current page
     if (location.pathname === path) {
       e.preventDefault();
       window.location.reload();
     }
-    // Otherwise, let the normal navigation happen
+    // Otherwise, allow normal navigation
   };
 
   // Improved sidebar classes with better responsive behavior

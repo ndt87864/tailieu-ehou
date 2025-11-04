@@ -303,6 +303,9 @@ function App() {
     initApp();
   }, [location.search, location.pathname, location.hash]);
 
+  // NOTE: Question cache clearing is handled directly by sidebar click handlers
+  // to avoid running on every route change. See `Sidebar.jsx` for the logic.
+
   useEffect(() => {
     // Chuyển hướng domain nếu cần
     if (redirectToPrimaryDomain()) {
