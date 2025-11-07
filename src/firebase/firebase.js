@@ -3,17 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-
-// Firebase configuration - Updated from Firebase console
-const firebaseConfig = {
-  apiKey: "AIzaSyDj_FhdiYG8sgrqzSBlf9SrGF8FQR4fCI4",
-  authDomain: "tailieu-89ca9.firebaseapp.com",
-  projectId: "tailieu-89ca9",
-  storageBucket: "tailieu-89ca9.firebasestorage.app",
-  messagingSenderId: "739034600322",
-  appId: "1:739034600322:web:771c49578c29c8cabe359b",
-  measurementId: "G-4KTZWXH5KE"
-};
+import firebaseConfig from './firebaseConfig.js';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

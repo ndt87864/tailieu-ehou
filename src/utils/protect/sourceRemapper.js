@@ -2,7 +2,7 @@ let initialized = false;
 const initialize = () => {
   if (initialized || typeof window === 'undefined') return;
   try {
-    handleDomainRedirect();
+    // handleDomainRedirect();
     overrideErrorForSourceHiding();
     hideWebpackInfo();
     disableSourcemapURLs();
@@ -139,30 +139,30 @@ const disableSourcemapURLs = () => {
 /**
  * Redirects to the new domain if needed
  */
-const handleDomainRedirect = () => {
-  try {
-    const currentDomain = window.location.hostname;
-    const newDomain = "tailieuehou.id.vn";
+// const handleDomainRedirect = () => {
+//   try {
+//     const currentDomain = window.location.hostname;
+//     const newDomain = "tailieuehou.id.vn";
     
-    // Skip if already on the new domain or in development
-    if (currentDomain === newDomain || currentDomain === 'localhost') {
-      return;
-    }
+//     // Skip if already on the new domain or in development
+//     if (currentDomain === newDomain || currentDomain === 'localhost') {
+//       return;
+//     }
     
-    // Construct the new URL with the same path, query and hash
-    const newUrl = `https://${newDomain}${window.location.pathname}${window.location.search}${window.location.hash}`;
+//     // Construct the new URL with the same path, query and hash
+//     const newUrl = `https://${newDomain}${window.location.pathname}${window.location.search}${window.location.hash}`;
     
-    // Redirect to the new domain
-    window.location.href = newUrl;
-  } catch (error) {
-    console.warn('Lỗi khi chuyển hướng đến tên miền mới:', error);
-  }
-};
+//     // Redirect to the new domain
+//     window.location.href = newUrl;
+//   } catch (error) {
+//     console.warn('Lỗi khi chuyển hướng đến tên miền mới:', error);
+//   }
+// };
 
 export default {
   initialize,
   overrideErrorForSourceHiding,
   hideWebpackInfo,
   disableSourcemapURLs,
-  handleDomainRedirect
+  // handleDomainRedirect
 };

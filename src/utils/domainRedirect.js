@@ -19,11 +19,11 @@ const CUSTOM_DOMAIN = 'tailieuehou.id.vn';
 export const redirectToCustomDomain = () => {
   const hostname = window.location.hostname;
   
-  if (FIREBASE_DOMAINS.includes(hostname) && hostname !== CUSTOM_DOMAIN) {
-    // Use window.location.replace for cleaner redirects (no entry in browser history)
-    window.location.replace(`https://${CUSTOM_DOMAIN}${window.location.pathname}${window.location.search}${window.location.hash}`);
-    return true; // Redirect was performed
-  }
+  // if (FIREBASE_DOMAINS.includes(hostname) && hostname !== CUSTOM_DOMAIN) {
+  //   // Use window.location.replace for cleaner redirects (no entry in browser history)
+  //   window.location.replace(`https://${CUSTOM_DOMAIN}${window.location.pathname}${window.location.search}${window.location.hash}`);
+  //   return true; // Redirect was performed
+  // }
   
   return false; // No redirect needed
 };
@@ -70,8 +70,8 @@ export const getAbsoluteUrl = (path) => {
  * Check if the current domain is the custom domain
  * @returns {boolean} True if current domain is the custom domain
  */
-export const isCustomDomain = () => {
-  if (typeof window === 'undefined') return false;
+// export const isCustomDomain = () => {
+//   if (typeof window === 'undefined') return false;
   
-  return window.location.hostname === CUSTOM_DOMAIN;
-};
+//   return window.location.hostname === CUSTOM_DOMAIN;
+// };

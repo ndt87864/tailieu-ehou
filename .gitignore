@@ -7,3 +7,6 @@ scripts/
 .vite*
 public/
 vite*
+src/firebase/firebaseConfig.js
+src/firebase/firebase_pj.js
+

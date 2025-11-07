@@ -34,9 +34,9 @@ const logoutUser = async () => {
 
 const UserHeader = ({ title }) => {
   // Run domain check on component mount
-  useEffect(() => {
-    checkDomainAndRedirect();
-  }, []);
+  // useEffect(() => {
+  //   checkDomainAndRedirect();
+  // }, []);
 
   const { isDarkMode, toggleDarkMode } = useTheme();
   const { isAdmin } = useUserRole();

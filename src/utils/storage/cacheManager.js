@@ -9,8 +9,8 @@ const FIREBASE_DOMAINS = [
   'tailieuehou.firebaseapp.com'
 ];
 
-// Domain chính
-const PRIMARY_DOMAIN = 'tailieuehou.id.vn';
+// // Domain chính
+// const PRIMARY_DOMAIN = 'tailieuehou.id.vn';
 
 // Khoảng thời gian kiểm tra cập nhật (15 phút)
 const CHECK_INTERVAL = 15 * 60 * 1000;
@@ -19,32 +19,32 @@ const CHECK_INTERVAL = 15 * 60 * 1000;
  * Chuyển hướng từ domain Firebase sang domain chính
  * @returns {boolean} Trả về true nếu đã chuyển hướng
  */
-export const redirectToPrimaryDomain = () => {
-  if (typeof window === 'undefined') return false;
+// export const redirectToPrimaryDomain = () => {
+//   if (typeof window === 'undefined') return false;
   
-  const hostname = window.location.hostname;
+//   const hostname = window.location.hostname;
   
-  if (FIREBASE_DOMAINS.includes(hostname) && hostname !== PRIMARY_DOMAIN) {
-    // Tạo timestamp mới để phá vỡ cache
-    const timestamp = new Date().getTime();
+//   if (FIREBASE_DOMAINS.includes(hostname) && hostname !== PRIMARY_DOMAIN) {
+//     // Tạo timestamp mới để phá vỡ cache
+//     const timestamp = new Date().getTime();
     
-    // Lưu đường dẫn hiện tại và thêm tham số để phá vỡ cache
-    const currentPath = window.location.pathname;
-    const searchParams = new URLSearchParams(window.location.search);
+//     // Lưu đường dẫn hiện tại và thêm tham số để phá vỡ cache
+//     const currentPath = window.location.pathname;
+//     const searchParams = new URLSearchParams(window.location.search);
     
-    // Thêm tham số timestamp để phá vỡ cache
-    searchParams.set('_t', timestamp);
+//     // Thêm tham số timestamp để phá vỡ cache
+//     searchParams.set('_t', timestamp);
     
-    // Tạo URL mới với domain chính
-    const newUrl = `https://${PRIMARY_DOMAIN}${currentPath}?${searchParams.toString()}${window.location.hash}`;
+//     // Tạo URL mới với domain chính
+//     const newUrl = `https://${PRIMARY_DOMAIN}${currentPath}?${searchParams.toString()}${window.location.hash}`;
     
-    // Chuyển hướng và thay thế history entry
-    window.location.replace(newUrl);
-    return true;
-  }
+//     // Chuyển hướng và thay thế history entry
+//     window.location.replace(newUrl);
+//     return true;
+//   }
   
-  return false;
-};
+//   return false;
+// };
 
 /**
  * Xóa cache của trình duyệt

@@ -7,85 +7,6 @@
   },
   "hosting": [
     {
-      "target": "tailieu-89ca9",
-      "public": "dist",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ],
-      "headers": [
-        {
-          "source": "/",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            },
-            {
-              "key": "Pragma",
-              "value": "no-cache"
-            },
-            {
-              "key": "Expires",
-              "value": "0"
-            }
-          ]
-        },
-        {
-          "source": "index.html",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache, no-store, must-revalidate"
-            },
-            {
-              "key": "Pragma",
-              "value": "no-cache"
-            },
-            {
-              "key": "Expires",
-              "value": "0"
-            }
-          ]
-        },
-        {
-          "source": "**/*.@(js|jsx)",
-          "headers": [
-            {
-              "key": "Content-Type",
-              "value": "application/javascript; charset=utf-8"
-            },
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=3600, must-revalidate"
-            }
-          ]
-        },
-        {
-          "source": "**/*.css",
-          "headers": [
-            {
-              "key": "Content-Type",
-              "value": "text/css; charset=utf-8"
-            },
-            {
-              "key": "Cache-Control",
-              "value": "public, max-age=3600, must-revalidate"
-            }
-          ]
-        }
-      ],
-      "cleanUrls": true,
-      "trailingSlash": false
-    },
-    {
       "target": "tailieuehou",
       "public": "dist",
       "ignore": [
@@ -163,13 +84,6 @@
       ],
       "cleanUrls": true,
       "trailingSlash": false
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "https://tailieuehou.id.vn",
-      "type": 301
     }
   ]
 }

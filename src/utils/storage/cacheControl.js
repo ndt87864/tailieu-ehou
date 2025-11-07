@@ -89,7 +89,7 @@ export const handleUpdate = async () => {
  */
 export const redirectToPrimaryDomain = () => {
   const FIREBASE_DOMAINS = ['tailieu-89ca9.web.app', 'tailieuehou.web.app', 'tailieuehou.firebaseapp.com'];
-  const PRIMARY_DOMAIN = 'tailieuehou.id.vn';
+  // const PRIMARY_DOMAIN = 'tailieuehou.id.vn';
   const hostname = window.location.hostname;
   
   if (FIREBASE_DOMAINS.includes(hostname) && hostname !== PRIMARY_DOMAIN) {
