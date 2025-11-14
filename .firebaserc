@@ -5,8 +5,8 @@
   "targets": {
     "tailieu-ehou": {
       "hosting": {
-        "tailieuehou": [
-          "tailieuehou"
+        "tailieuehou-webapp": [
+          "tailieuehou-webapp"
         ]
       }
     }

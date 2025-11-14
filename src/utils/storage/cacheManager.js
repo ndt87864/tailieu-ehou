@@ -19,32 +19,21 @@ const CHECK_INTERVAL = 15 * 60 * 1000;
  * Chuyển hướng từ domain Firebase sang domain chính
  * @returns {boolean} Trả về true nếu đã chuyển hướng
  */
-// export const redirectToPrimaryDomain = () => {
-//   if (typeof window === 'undefined') return false;
-  
-//   const hostname = window.location.hostname;
-  
-//   if (FIREBASE_DOMAINS.includes(hostname) && hostname !== PRIMARY_DOMAIN) {
-//     // Tạo timestamp mới để phá vỡ cache
-//     const timestamp = new Date().getTime();
-    
-//     // Lưu đường dẫn hiện tại và thêm tham số để phá vỡ cache
-//     const currentPath = window.location.pathname;
-//     const searchParams = new URLSearchParams(window.location.search);
-    
-//     // Thêm tham số timestamp để phá vỡ cache
-//     searchParams.set('_t', timestamp);
-    
-//     // Tạo URL mới với domain chính
-//     const newUrl = `https://${PRIMARY_DOMAIN}${currentPath}?${searchParams.toString()}${window.location.hash}`;
-    
-//     // Chuyển hướng và thay thế history entry
-//     window.location.replace(newUrl);
-//     return true;
-//   }
-  
-//   return false;
-// };
+const PRIMARY_DOMAIN = 'tailieuehou.id.vn';
+export const redirectToPrimaryDomain = () => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  if (FIREBASE_DOMAINS.includes(hostname) && hostname !== PRIMARY_DOMAIN) {
+    const timestamp = new Date().getTime();
+    const currentPath = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set('_t', timestamp);
+    const newUrl = `https://${PRIMARY_DOMAIN}${currentPath}?${searchParams.toString()}${window.location.hash}`;
+    window.location.replace(newUrl);
+    return true;
+  }
+  return false;
+};
 
 /**
  * Xóa cache của trình duyệt
