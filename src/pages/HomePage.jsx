@@ -425,15 +425,82 @@ const HomePage = () => {
 
           {/* Content */}
           <div className="flex-1 p-6">
+            {/* Add Hero Section Styles */}
+            <style>{`
+              @keyframes gradientShift {
+                0%, 100% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+              }
+
+              @keyframes fadeInUp {
+                from {
+                  opacity: 0;
+                  transform: translateY(30px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+
+              @keyframes float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-15px); }
+              }
+
+              .hero-section {
+                position: relative;
+                padding: 4rem 1.5rem;
+                margin: -1.5rem -1.5rem 2rem -1.5rem;
+                background: ${isDarkMode 
+                  ? 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.9) 50%, rgba(17, 24, 39, 0.95) 100%)' 
+                  : 'linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.03) 0%, rgba(var(--accent-color-rgb), 0.08) 50%, rgba(var(--accent-color-rgb), 0.03) 100%)'};
+                border-bottom: 1px solid ${isDarkMode 
+                  ? 'rgba(255, 255, 255, 0.05)' 
+                  : 'rgba(var(--accent-color-rgb), 0.1)'};
+                box-shadow: ${isDarkMode
+                  ? '0 4px 20px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 20px rgba(var(--accent-color-rgb), 0.08)'};
+              }
+
+              .hero-content {
+                animation: fadeInUp 0.8s ease-out;
+                max-width: 56rem;
+                margin: 0 auto;
+              }
+
+              .hero-icon {
+                animation: float 3s ease-in-out infinite;
+                display: inline-block;
+                margin-bottom: 1.5rem;
+                filter: drop-shadow(0 4px 12px rgba(var(--accent-color-rgb), 0.3));
+              }
+
+              .gradient-title {
+                background: ${isDarkMode
+                  ? 'linear-gradient(135deg, var(--accent-color-light), var(--accent-color))'
+                  : 'linear-gradient(135deg, var(--accent-color), var(--accent-color-dark))'};
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                display: inline-block;
+                font-weight: 900;
+              }
+
+              .collapse-button {
+                animation: fadeInUp 0.6s ease-out;
+              }
+            `}</style>
+
             <div className="mb-8 flex justify-between items-center">
               {/* Collapse All Button - Only show when at least one category is expanded */}
               {hasExpandedCategory && (
                 <button
                   onClick={handleCollapseAll}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`collapse-button px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 ${
                     isDarkMode
-                      ? "bg-gray-700 hover:bg-gray-600 text-white"
-                      : "bg-green-50 hover:bg-green-100 text-green-700"
+                      ? "bg-gray-700 hover:bg-gray-600 text-white shadow-lg"
+                      : "bg-white hover:bg-gray-50 text-gray-700 shadow-md border border-gray-200"
                   }`}
                 >
                   <div className="flex items-center">
@@ -457,77 +524,167 @@ const HomePage = () => {
               )}
             </div>
 
-            <div className="container mx-auto px-4 py-8">
-              <div className="text-center">
+            {/* Hero Section */}
+            <div className="hero-section">
+              <div className="hero-content text-center">
+                {/* Floating Icon */}
+                <div className="hero-icon">
+                  <svg
+                    className="w-20 h-20 mx-auto"
+                    style={{ color: 'var(--accent-color)' }}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M4 11.5l8 4 8-4M4 15l8 4 8-4" />
+                  </svg>
+                </div>
+
+                {/* Title */}
                 <h1
-                  className={`text-3xl md:text-4xl font-bold mb-6 ${
-                    isDarkMode ? "text-white" : "text-gray-800"
+                  className={`text-4xl md:text-5xl font-extrabold mb-4 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Thư viện Tài liệu HOU
+                  Thư viện Tài liệu{" "}
+                  <span className="gradient-title">HOU</span>
                 </h1>
+
+                {/* Description */}
                 <p
-                  className={`text-lg mb-8 ${
+                  className={`text-lg md:text-xl mb-6 ${
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   }`}
+                  style={{ maxWidth: '42rem', margin: '0 auto 1.5rem' }}
                 >
                   Kho tài liệu học tập dành cho sinh viên Đại học Mở Hà Nội
                 </p>
               </div>
+            </div>
+
+            <div className="container mx-auto px-4 py-8">
 
               {/* Add search bar at the top */}
               <div className="max-w-3xl mx-auto mb-8">
-                <div
-                  className={`relative ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
+                <style>{`
+                  .search-container {
+                    animation: fadeInUp 0.9s ease-out 0.2s backwards;
+                  }
+
+                  .search-input-wrapper {
+                    background: ${isDarkMode 
+                      ? 'rgba(31, 41, 55, 0.8)' 
+                      : 'rgba(255, 255, 255, 0.9)'};
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    border: 2px solid ${isDarkMode 
+                      ? 'rgba(255, 255, 255, 0.1)' 
+                      : 'rgba(0, 0, 0, 0.05)'};
+                    box-shadow: ${isDarkMode
+                      ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
+                      : '0 8px 32px 0 rgba(31, 38, 135, 0.15)'};
+                    border-radius: 1rem;
+                    transition: all 0.3s ease;
+                  }
+
+                  .search-input-wrapper:focus-within {
+                    border-color: var(--accent-color);
+                    box-shadow: 0 0 0 3px ${isDarkMode 
+                      ? 'rgba(var(--accent-color-rgb), 0.2)' 
+                      : 'rgba(var(--accent-color-rgb), 0.1)'};
+                    transform: translateY(-2px);
+                  }
+
+                  .search-input {
+                    background: transparent;
+                    border: none;
+                    outline: none;
+                    width: 100%;
+                    padding: 1rem 1.25rem;
+                    padding-right: 3rem;
+                    font-size: 1rem;
+                    color: ${isDarkMode ? '#e5e7eb' : '#1f2937'};
+                  }
+
+                  .search-input::placeholder {
+                    color: ${isDarkMode ? '#9ca3af' : '#6b7280'};
+                  }
+
+                  .search-button {
+                    transition: all 0.2s ease;
+                  }
+
+                  .search-button:hover {
+                    color: var(--accent-color);
+                    transform: scale(1.1);
+                  }
+
+                  .tab-button {
+                    transition: all 0.3s ease;
+                    position: relative;
+                    overflow: hidden;
+                  }
+
+                  .tab-button::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                    transition: left 0.5s;
+                  }
+
+                  .tab-button:hover::before {
+                    left: 100%;
+                  }
+
+                  .tab-button.active {
+                    background: linear-gradient(135deg, var(--accent-color-light), var(--accent-color-dark));
+                    color: white;
+                    border-color: var(--accent-color);
+                  }
+                `}</style>
+
+                <div className="search-container">
                   <div className="flex gap-3 items-center">
-                    <div
-                      className={`flex-1 relative rounded-lg shadow-md overflow-hidden ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
-                    >
-                      <input
-                        type="text"
-                        value={searchInput}
-                        onChange={handleSearchChange}
-                        onKeyDown={handleSearchKeyDown}
-                        placeholder={
-                          searchType === "exam"
-                            ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
-                            : "Tìm kiếm tài liệu..."
-                        }
-                        className={`w-full px-4 py-3 pr-10 ${
-                          isDarkMode
-                            ? "bg-gray-800 text-white placeholder-gray-400 focus:bg-gray-700"
-                            : "bg-white text-gray-900 placeholder-gray-500"
-                        } focus:outline-none`}
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                        <button
-                          onClick={triggerSearch}
-                          aria-label="Tìm kiếm"
-                          className={`h-8 w-8 flex items-center justify-center rounded focus:outline-none ${
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        >
-                          <svg
-                            className={`h-5 w-5 ${
-                              isDarkMode ? "text-gray-400" : "text-gray-500"
-                            }`}
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            aria-hidden="true"
+                    <div className="flex-1 search-input-wrapper">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={searchInput}
+                          onChange={handleSearchChange}
+                          onKeyDown={handleSearchKeyDown}
+                          placeholder={
+                            searchType === "exam"
+                              ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
+                              : "Tìm kiếm tài liệu..."
+                          }
+                          className="search-input"
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                          <button
+                            onClick={triggerSearch}
+                            aria-label="Tìm kiếm"
+                            className="search-button h-8 w-8 flex items-center justify-center rounded focus:outline-none"
                           >
-                            <path
-                              fillRule="evenodd"
-                              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              className="h-5 w-5"
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -535,21 +692,19 @@ const HomePage = () => {
                     <div
                       role="tablist"
                       aria-label="Chọn loại tìm kiếm"
-                      className="inline-flex rounded-md shadow-sm"
+                      className="inline-flex rounded-lg shadow-md overflow-hidden"
                     >
                       <button
                         type="button"
                         role="tab"
                         aria-pressed={searchType === "exam"}
                         onClick={() => setSearchType("exam")}
-                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-l-md ${
+                        className={`tab-button px-5 py-3 text-sm font-semibold focus:outline-none ${
                           searchType === "exam"
-                            ? isDarkMode
-                              ? "bg-green-600 text-white border border-green-600"
-                              : "bg-green-50 text-green-700 border border-green-200"
+                            ? "active"
                             : isDarkMode
-                            ? "bg-gray-800 text-gray-300 border border-gray-700"
-                            : "bg-white text-gray-900 border border-gray-200"
+                            ? "bg-gray-800 text-gray-300 border-2 border-gray-700"
+                            : "bg-white text-gray-900 border-2 border-gray-200"
                         }`}
                       >
                         Lịch thi
@@ -559,14 +714,12 @@ const HomePage = () => {
                         role="tab"
                         aria-pressed={searchType === "doc"}
                         onClick={() => setSearchType("doc")}
-                        className={`px-4 py-2 text-sm font-medium focus:outline-none transition-colors rounded-r-md ${
+                        className={`tab-button px-5 py-3 text-sm font-semibold focus:outline-none ${
                           searchType === "doc"
-                            ? isDarkMode
-                              ? "bg-green-600 text-white border border-green-600"
-                              : "bg-green-50 text-green-700 border border-green-200"
+                            ? "active"
                             : isDarkMode
-                            ? "bg-gray-800 text-gray-300 border border-gray-700"
-                            : "bg-white text-gray-900 border border-gray-200"
+                            ? "bg-gray-800 text-gray-300 border-2 border-gray-700"
+                            : "bg-white text-gray-900 border-2 border-gray-200"
                         }`}
                       >
                         Tài liệu
@@ -871,20 +1024,135 @@ const HomePage = () => {
 
               {/* Main Categories Section */}
               <div>
+                <style>{`
+                  @keyframes slideInStagger {
+                    from {
+                      opacity: 0;
+                      transform: translateY(20px);
+                    }
+                    to {
+                      opacity: 1;
+                      transform: translateY(0);
+                    }
+                  }
+
+                  .category-card {
+                    animation: slideInStagger 0.6s ease-out backwards;
+                    background: ${isDarkMode 
+                      ? 'rgba(31, 41, 55, 0.6)' 
+                      : 'rgba(255, 255, 255, 0.9)'};
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
+                    border: 1px solid ${isDarkMode 
+                      ? 'rgba(255, 255, 255, 0.1)' 
+                      : 'rgba(0, 0, 0, 0.05)'};
+                    border-radius: 1rem;
+                    overflow: hidden;
+                    transition: all 0.3s ease;
+                  }
+
+                  .category-card:hover {
+                    transform: translateY(-4px);
+                    box-shadow: ${isDarkMode
+                      ? '0 12px 40px 0 rgba(0, 0, 0, 0.6)'
+                      : '0 12px 40px 0 rgba(31, 38, 135, 0.2)'};
+                    border-color: var(--accent-color);
+                  }
+
+                  .category-card:nth-child(1) { animation-delay: 0.1s; }
+                  .category-card:nth-child(2) { animation-delay: 0.2s; }
+                  .category-card:nth-child(3) { animation-delay: 0.3s; }
+                  .category-card:nth-child(4) { animation-delay: 0.4s; }
+                  .category-card:nth-child(5) { animation-delay: 0.5s; }
+                  .category-card:nth-child(6) { animation-delay: 0.6s; }
+
+                  .category-header {
+                    background: ${isDarkMode
+                      ? 'linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.1), rgba(var(--accent-color-rgb), 0.05))'
+                      : 'linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.05), rgba(var(--accent-color-rgb), 0.02))'};
+                    border-bottom: 1px solid ${isDarkMode 
+                      ? 'rgba(255, 255, 255, 0.1)' 
+                      : 'rgba(0, 0, 0, 0.05)'};
+                    padding: 1.25rem 1.5rem;
+                    transition: all 0.3s ease;
+                  }
+
+                  .category-card:hover .category-header {
+                    background: ${isDarkMode
+                      ? 'linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.2), rgba(var(--accent-color-rgb), 0.1))'
+                      : 'linear-gradient(135deg, rgba(var(--accent-color-rgb), 0.1), rgba(var(--accent-color-rgb), 0.05))'};
+                  }
+
+                  .document-item {
+                    transition: all 0.2s ease;
+                    border-radius: 0.5rem;
+                    margin: 0.25rem;
+                  }
+
+                  .document-item:hover {
+                    background: ${isDarkMode 
+                      ? 'rgba(var(--accent-color-rgb), 0.15)' 
+                      : 'rgba(var(--accent-color-rgb), 0.08)'};
+                    transform: translateX(4px);
+                  }
+
+                  .load-more-button {
+                    background: linear-gradient(135deg, var(--accent-color-light), var(--accent-color-dark));
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 0.75rem;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    position: relative;
+                    overflow: hidden;
+                  }
+
+                  .load-more-button:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 20px rgba(var(--accent-color-rgb), 0.3);
+                  }
+
+                  .load-more-button::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                    transition: left 0.5s;
+                  }
+
+                  .load-more-button:hover:not(:disabled)::before {
+                    left: 100%;
+                  }
+
+                  .load-more-button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                  }
+
+                  .section-title {
+                    animation: fadeInUp 1s ease-out 0.3s backwards;
+                  }
+                `}</style>
+
                 <h2
-                  className={`text-2xl font-semibold mb-6 ${
-                    isDarkMode ? "text-white" : "text-gray-800"
+                  className={`section-title text-2xl md:text-3xl font-bold mb-8 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  Danh mục tài liệu
+                  Danh mục{" "}
+                  <span className="gradient-title">tài liệu</span>
                 </h2>
 
                 {loading ? (
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500"></div>
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
                   </div>
                 ) : error ? (
-                  <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
+                  <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-lg">
                     <p>{error}</p>
                   </div>
                 ) : (
@@ -892,22 +1160,12 @@ const HomePage = () => {
                     {categoriesWithDocs.map((category) => (
                       <div
                         key={category.id}
-                        className={`rounded-lg overflow-hidden shadow-md ${
-                          isDarkMode
-                            ? "bg-gray-800 border border-gray-700"
-                            : "bg-white"
-                        }`}
+                        className="category-card"
                       >
-                        <div
-                          className={`px-6 py-4 ${
-                            isDarkMode
-                              ? "border-b border-gray-700"
-                              : "border-b border-gray-200"
-                          }`}
-                        >
+                        <div className="category-header">
                           <h2
-                            className={`text-lg font-semibold ${
-                              isDarkMode ? "text-white" : "text-gray-800"
+                            className={`text-lg font-bold ${
+                              isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                           >
                             {category.title || "Danh mục không có tên"}
@@ -923,15 +1181,16 @@ const HomePage = () => {
                                     onClick={() =>
                                       handleDocumentClick(category, doc)
                                     }
-                                    className={`w-full text-left px-4 py-3 rounded-md ${
+                                    className={`document-item w-full text-left px-4 py-3 ${
                                       isDarkMode
-                                        ? "hover:bg-gray-700 text-gray-200"
-                                        : "hover:bg-gray-100 text-gray-700"
-                                    } transition-colors`}
+                                        ? "text-gray-200"
+                                        : "text-gray-700"
+                                    }`}
                                   >
                                     <div className="flex items-center">
                                       <svg
-                                        className="w-5 h-5 mr-2 text-green-500"
+                                        className="w-5 h-5 mr-2"
+                                        style={{ color: 'var(--accent-color)' }}
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"
@@ -968,11 +1227,7 @@ const HomePage = () => {
                               <button
                                 onClick={() => handleLoadMore(category.id)}
                                 disabled={loadingCategories[category.id]}
-                                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                                  isDarkMode
-                                    ? "bg-gray-700 hover:bg-gray-600 text-white"
-                                    : "bg-green-50 hover:bg-green-100 text-green-700"
-                                }`}
+                                className="load-more-button inline-flex items-center"
                               >
                                 {loadingCategories[category.id] ? (
                                   <>
