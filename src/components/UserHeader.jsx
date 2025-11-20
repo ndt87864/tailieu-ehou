@@ -7,6 +7,7 @@ import { auth } from "../firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import ThemeColorPicker from "./ThemeColorPicker";
 import { signOut } from "firebase/auth";
+import "../styles/layout.css";
 
 // Helper function to check and handle domain redirection
 const checkDomainAndRedirect = () => {
@@ -80,19 +81,9 @@ const UserHeader = ({ title }) => {
     };
   }, []);
   return (
-    <header
-      className={`${
-        isDarkMode
-          ? "bg-gray-900 border-gray-700 text-white"
-          : "bg-slate-50 border-gray-200 text-gray-900"
-      } px-6 py-3 flex items-center justify-between border-b sticky top-0 z-10 shadow-md border-l-0`}
-    >
+    <header className={`user-header ${isDarkMode ? "dark" : "light"}`}>
       <div className="flex items-center">
-        <h1
-          className={`text-xl font-bold ${
-            isDarkMode ? "text-white" : "text-gray-900"
-          }`}
-        >
+        <h1 className={`header-title ${isDarkMode ? "dark" : "light"}`}>
           {title || "Tài liệu HOU"}
         </h1>
       </div>
@@ -100,11 +91,8 @@ const UserHeader = ({ title }) => {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setIsThemePickerOpen(true)}
-          className={`p-2 rounded-full ${
-            isDarkMode
-              ? "hover:bg-gray-700 text-gray-300"
-              : "hover:bg-gray-100 text-gray-900"
-          } transition-colors`}
+          onClick={() => setIsThemePickerOpen(true)}
+          className={`header-btn-icon ${isDarkMode ? "dark" : "light"}`}
           aria-label="Tùy chỉnh giao diện"
         >
           <svg
@@ -127,23 +115,14 @@ const UserHeader = ({ title }) => {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
-                isDarkMode
-                  ? "hover:bg-gray-700 text-white"
-                  : "hover:bg-gray-100 text-gray-900"
-              }`}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`user-menu-btn ${isDarkMode ? "dark" : "light"}`}
             >
-              <div
-                className={`w-8 h-8 rounded-full ${
-                  isDarkMode
-                    ? "bg-gray-700 text-gray-300"
-                    : "bg-gray-200 text-gray-600"
-                } flex items-center justify-center`}
-              >
+              <div className={`user-avatar-container ${isDarkMode ? "dark" : "light"}`}>
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
-                    className="w-8 h-8 rounded-full"
+                    className="user-avatar-img"
                     alt={user.displayName || "Ảnh đại diện"}
                   />
                 ) : (
@@ -182,24 +161,11 @@ const UserHeader = ({ title }) => {
               </svg>
             </button>
             {isDropdownOpen && (
-              <div
-                className={`absolute right-0 mt-2 w-48 py-1 rounded-md shadow-lg z-10 border-2 ${
-                  isDarkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-300"
-                }`}
-                style={{
-                  backdropFilter: "blur(0px)",
-                  backgroundColor: isDarkMode ? "#1f2937" : "#ffffff",
-                }}
-              >
+              <div className={`dropdown-menu ${isDarkMode ? "dark" : "light"}`}>
                 <button
                   onClick={handleAccountClick}
-                  className={`block w-full text-left px-4 py-2 text-sm ${
-                    isDarkMode
-                      ? "text-gray-300 hover:bg-gray-700"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  onClick={handleAccountClick}
+                  className={`dropdown-item ${isDarkMode ? "dark" : "light"}`}
                 >
                   <svg
                     className="w-4 h-4 inline mr-2"
@@ -218,15 +184,12 @@ const UserHeader = ({ title }) => {
                   Tài khoản của tôi
                 </button>
 
-                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <div className={`dropdown-divider ${isDarkMode ? "dark" : "light"}`}></div>
 
                 <button
                   onClick={handleLogout}
-                  className={`block w-full text-left px-4 py-2 text-sm ${
-                    isDarkMode
-                      ? "text-gray-300 hover:bg-gray-700"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
+                  onClick={handleLogout}
+                  className={`dropdown-item ${isDarkMode ? "dark" : "light"}`}
                 >
                   <svg
                     className="w-4 h-4 inline mr-2"
@@ -250,11 +213,8 @@ const UserHeader = ({ title }) => {
         ) : (
           <button
             onClick={() => navigate("/login")}
-            className={`px-2 py-1 rounded-full transition-colors flex items-center gap-1 ${
-              isDarkMode
-                ? "hover:bg-gray-700 text-white"
-                : "hover:bg-gray-100 text-gray-900"
-            }`}
+            onClick={() => navigate("/login")}
+            className={`user-menu-btn ${isDarkMode ? "dark" : "light"}`}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

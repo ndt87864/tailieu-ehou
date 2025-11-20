@@ -5,6 +5,7 @@ import { useUserRole } from '../context/UserRoleContext';
 import { useSidebar } from '../context/SidebarContext';
 import { auth } from '../firebase/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import "../styles/layout.css";
 
 const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
   const { themeColor, changeThemeColor, toggleDarkMode, THEME_COLORS } = useTheme();
@@ -66,15 +67,14 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80">
+    <div className="modal-overlay">
       <div 
         ref={pickerRef}
-        className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} rounded-lg shadow-xl p-4 max-w-sm w-[90%] mx-auto border-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}
-        style={{ backdropFilter: 'blur(0px)', backgroundColor: isDarkMode ? '#1f2937' : '#ffffff' }}
+        className={`modal-content ${isDarkMode ? 'dark' : 'light'}`}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Tùy chỉnh giao diện</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+        <div className="modal-header">
+          <h3 className="modal-title">Tùy chỉnh giao diện</h3>
+          <button onClick={onClose} className="close-btn">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
@@ -83,7 +83,7 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
         
         {/* Save status indicator */}
         {saveStatus && (
-          <div className={`mb-4 p-2 text-sm rounded-md ${
+          <div className={`status-indicator ${
             saveStatus === 'saving' 
               ? isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'
               : saveStatus === 'saved'
@@ -101,10 +101,7 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
           <h4 className="text-sm font-medium mb-3">Chế độ sáng/tối</h4>
           <button 
             onClick={handleDarkModeToggle}
-            className={`w-full flex items-center justify-between p-3 rounded-md 
-              ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' 
-                : 'bg-gray-100 hover:bg-gray-200'
-            } transition-colors`}
+            className={`theme-toggle-btn ${isDarkMode ? 'dark' : 'light'}`}
           >
             <div className="flex items-center">
               {isDarkMode ? (
@@ -118,11 +115,7 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
               )}
               <span>{isDarkMode ? 'Chế độ tối' : 'Chế độ sáng'}</span>
             </div>
-            <span className={`px-2 py-1 rounded text-xs ${
-              isDarkMode 
-                ? 'bg-gray-600 text-gray-300' 
-                : 'bg-gray-200 text-gray-700'
-            }`}>
+            <span className={`theme-status-badge ${isDarkMode ? 'dark' : 'light'}`}>
               {isDarkMode ? 'Đang bật' : 'Đang bật'}
             </span>
           </button>
@@ -135,7 +128,7 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
             Chọn màu chủ đề cho ứng dụng
           </p>
           
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
+          <div className="color-options-grid">
             {/* Màu mặc định */}
             <div 
               className={`theme-color-option theme-color-default ${themeColor === THEME_COLORS.DEFAULT ? 'active' : ''}`}
@@ -194,7 +187,7 @@ const ThemeColorPicker = ({ isOpen, onClose, isDarkMode }) => {
           </div>
         </div>
         
-        <div className={`p-3 rounded-md text-sm ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+        <div className={`theme-note ${isDarkMode ? 'dark' : 'light'}`}>
           <p className="mb-2">
             <strong>Lưu ý:</strong> Thay đổi màu chủ đề sẽ chỉ có hiệu lực khi ở chế độ sáng.
           </p>
@@ -325,7 +318,7 @@ export const HomeMobileHeader = ({ title }) => {
   const headerTextColor = getHeaderTextColor(isDarkMode, themeColor);
 
   return (
-    <header className={`${headerBgColor} ${headerTextColor} px-4 py-3 flex items-center justify-between shadow-md`}>
+    <header className={`mobile-header ${headerBgColor} ${headerTextColor}`}>
       <div className="flex items-center gap-2">
         <div className="p-1">
           <svg className={`w-5 h-5 ${headerTextColor}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -365,12 +358,11 @@ export const HomeMobileHeader = ({ title }) => {
             
             {isDropdownOpen && (
               <div 
-                className={`absolute right-0 mt-2 w-48 py-1 rounded-md shadow-lg z-10 border-2 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}
-                style={{ backdropFilter: 'blur(0px)', backgroundColor: isDarkMode ? '#1f2937' : '#ffffff' }}
+                className={`dropdown-menu ${isDarkMode ? 'dark' : 'light'}`}
               >
                 <button
                   onClick={handleAccountClick}
-                  className={`block w-full text-left px-4 py-2 text-sm ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                  className={`dropdown-item ${isDarkMode ? 'dark' : 'light'}`}
                 >
                   <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -378,11 +370,11 @@ export const HomeMobileHeader = ({ title }) => {
                   Tài khoản của tôi
                 </button>
                 
-                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                <div className={`dropdown-divider ${isDarkMode ? 'dark' : 'light'}`}></div>
                 
                 <button
                   onClick={handleLogout}
-                  className={`block w-full text-left px-4 py-2 text-sm ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                  className={`dropdown-item ${isDarkMode ? 'dark' : 'light'}`}
                 >
                   <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -460,7 +452,7 @@ export const DocumentMobileHeader = ({
   const headerTextColor = getHeaderTextColor(isDarkMode, themeColor);
 
   return (
-    <header className={`${headerBgColor} ${headerTextColor} px-4 py-3 flex flex-col shadow-md sticky top-0 z-10`}>
+    <header className={`mobile-header sticky ${headerBgColor} ${headerTextColor}`}>
       <div className="flex items-center justify-between w-full">
         <Link to="/" className="flex items-center gap-2 overflow-hidden">
           <div className="p-1 flex-shrink-0">
@@ -505,14 +497,11 @@ export const DocumentMobileHeader = ({
               {/* User dropdown menu - improved positioning and styling */}
               {isDropdownOpen && (
                 <div 
-                  className={`absolute right-0 mt-2 w-48 py-1 rounded-md shadow-lg z-20 border ${
-                    isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'
-                  }`}
-                  style={{ backdropFilter: 'blur(8px)' }}
+                  className={`dropdown-menu ${isDarkMode ? 'dark' : 'light'}`}
                 >
                   <button
                     onClick={handleAccountClick}
-                    className={`block w-full text-left px-4 py-2 text-sm ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                    className={`dropdown-item ${isDarkMode ? 'dark' : 'light'}`}
                   >
                     <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -520,11 +509,11 @@ export const DocumentMobileHeader = ({
                     Tài khoản của tôi
                   </button>
                   
-                  <div className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} my-1`}></div>
+                  <div className={`dropdown-divider ${isDarkMode ? 'dark' : 'light'}`}></div>
                   
                   <button
                     onClick={handleLogout}
-                    className={`block w-full text-left px-4 py-2 text-sm ${isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}
+                    className={`dropdown-item ${isDarkMode ? 'dark' : 'light'}`}
                   >
                     <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -553,7 +542,7 @@ export const DocumentMobileHeader = ({
             aria-label="Mở menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
             </svg>
           </button>
         </div>

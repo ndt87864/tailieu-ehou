@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { getFooterContent } from "../firebase/firestoreService";
+import "../styles/layout.css";
 
 const Footer = () => {
   const { isDarkMode } = useTheme();
@@ -26,23 +27,19 @@ const Footer = () => {
   }, []);
 
   return (
-    <footer
-      className={`${
-        isDarkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"
-      } border-t`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className={`site-footer ${isDarkMode ? "dark" : "light"}`}>
+      <div className="footer-container">
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 ${
+          className={`footer-grid ${
             footerSections.length > 0
-              ? `lg:grid-cols-${Math.min(4, footerSections.length + 2)}`
-              : "lg:grid-cols-4"
-          } gap-8`}
+              ? `lg-cols-${Math.min(4, footerSections.length + 2)}`
+              : "lg-cols-4"
+          }`}
         >
           {/* Logo and Description */}
-          <div className="col-span-1 lg:col-span-2">
-            <div className="flex items-center mb-4">
-              <div className="bg-green-600 text-white p-2 rounded-lg mr-3">
+          <div className="footer-col-span-2">
+            <div className="footer-logo-container">
+              <div className="footer-logo-icon">
                 <svg
                   className="w-6 h-6"
                   fill="none"
@@ -57,31 +54,19 @@ const Footer = () => {
                   />
                 </svg>
               </div>
-              <h3
-                className={`text-xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
+              <h3 className={`footer-brand-name ${isDarkMode ? "dark" : "light"}`}>
                 Tài liệu HOU
               </h3>
             </div>
-            <p
-              className={`${
-                isDarkMode ? "text-gray-300" : "text-gray-600"
-              } mb-4 max-w-md`}
-            >
+            <p className={`footer-description ${isDarkMode ? "dark" : "light"}`}>
               Thư viện tài liệu học tập trực tuyến dành cho sinh viên Đại học Mở
               Hà Nội. Cung cấp nguồn tài liệu chất lượng, cập nhật và dễ tiếp
               cận.
             </p>
-            <div className="flex space-x-4">
+            <div className="social-links">
               <a
                 href="#"
-                className={`${
-                  isDarkMode
-                    ? "text-gray-400 hover:text-white"
-                    : "text-gray-400 hover:text-gray-500"
-                }`}
+                className={`social-link ${isDarkMode ? "dark" : "light"}`}
               >
                 <span className="sr-only">Facebook</span>
                 <svg
@@ -98,11 +83,7 @@ const Footer = () => {
               </a>
               <a
                 href="#"
-                className={`${
-                  isDarkMode
-                    ? "text-gray-400 hover:text-white"
-                    : "text-gray-400 hover:text-gray-500"
-                }`}
+                className={`social-link ${isDarkMode ? "dark" : "light"}`}
               >
                 <span className="sr-only">Instagram</span>
                 <svg
@@ -119,11 +100,7 @@ const Footer = () => {
               </a>
               <a
                 href="#"
-                className={`${
-                  isDarkMode
-                    ? "text-gray-400 hover:text-white"
-                    : "text-gray-400 hover:text-gray-500"
-                }`}
+                className={`social-link ${isDarkMode ? "dark" : "light"}`}
               >
                 <span className="sr-only">Twitter</span>
                 <svg
@@ -139,22 +116,14 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div>
-            <h4
-              className={`text-sm font-semibold ${
-                isDarkMode ? "text-gray-200" : "text-gray-900"
-              } tracking-wider uppercase mb-4`}
-            >
+            <h4 className={`footer-heading ${isDarkMode ? "dark" : "light"}`}>
               Liên kết nhanh
             </h4>
-            <ul className="space-y-3">
+            <ul className="footer-links-list">
               <li>
                 <Link
                   to="/"
-                  className={`${
-                    isDarkMode
-                      ? "text-gray-300 hover:text-white"
-                      : "text-gray-600 hover:text-gray-900"
-                  } transition-colors`}
+                  className={`footer-link ${isDarkMode ? "dark" : "light"}`}
                 >
                   Trang chủ
                 </Link>
@@ -162,11 +131,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/pricing"
-                  className={`${
-                    isDarkMode
-                      ? "text-gray-300 hover:text-white"
-                      : "text-gray-600 hover:text-gray-900"
-                  } transition-colors`}
+                  className={`footer-link ${isDarkMode ? "dark" : "light"}`}
                 >
                   Liên hệ
                 </Link>
@@ -174,11 +139,7 @@ const Footer = () => {
               <li>
                 <Link
                   to="/pricing"
-                  className={`${
-                    isDarkMode
-                      ? "text-gray-300 hover:text-white"
-                      : "text-gray-600 hover:text-gray-900"
-                  } transition-colors`}
+                  className={`footer-link ${isDarkMode ? "dark" : "light"}`}
                 >
                   Gói dịch vụ
                 </Link>
@@ -190,20 +151,14 @@ const Footer = () => {
           {!loading &&
             footerSections.map((section) => (
               <div key={section.id}>
-                <h4
-                  className={`text-sm font-semibold ${
-                    isDarkMode ? "text-gray-200" : "text-gray-900"
-                  } tracking-wider uppercase mb-4`}
-                >
+                <h4 className={`footer-heading ${isDarkMode ? "dark" : "light"}`}>
                   {section.title}
                 </h4>
-                <ul className="space-y-3">
+                <ul className="footer-links-list">
                   {section.content.map((item, index) => (
                     <li key={index}>
                       <span
-                        className={`${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        } text-sm leading-relaxed`}
+                        className={`footer-link ${isDarkMode ? "dark" : "light"}`}
                       >
                         {item}
                       </span>
@@ -246,24 +201,16 @@ const Footer = () => {
         </div>
 
         {/* Bottom Section */}
-        <div
-          className={`mt-8 pt-8 border-t ${
-            isDarkMode ? "border-gray-700" : "border-gray-200"
-          }`}
-        >
-          <div className="flex flex-col md:flex-row justify-between items-center">
+        <div className={`copyright-section ${isDarkMode ? "dark" : "light"}`}>
+          <div className="copyright-container">
             <div
-              className={`${
-                isDarkMode ? "text-gray-400" : "text-gray-500"
-              } text-sm`}
+              className={`copyright-text ${isDarkMode ? "dark" : "light"}`}
             >
               © 2025 Tài liệu HOU. Tất cả quyền được bảo lưu.
             </div>
             <div className="mt-4 md:mt-0">
               <p
-                className={`${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                } text-sm`}
+                className={`copyright-text ${isDarkMode ? "dark" : "light"}`}
               >
                 Được phát triển với ❤️ cho sinh viên HOU
               </p>
