@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
@@ -17,22 +17,23 @@ const Register = () => {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
 
-  // Define email regex as a proper RegExp object
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  // Mount animation
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Fix the isValidEmail function to ensure it uses RegExp.test() properly
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
+
   const isValidEmail = (email) => {
     if (!email) return false;
     return emailRegex.test(email);
   };
 
-  // Fix the phone regex definition - it might currently be a string instead of a RegExp object
-  const phoneRegex = /^(0[3|5|7|8|9])+([0-9]{8})$/;
-
-  // Fix the isValidPhone function
   const isValidPhone = (phone) => {
     if (!phone) return false;
     return phoneRegex.test(phone);
@@ -44,14 +45,12 @@ const Register = () => {
     setError('');
     setSuccess(false);
     
-    // Email validation
     if (!isValidEmail(email)) {
       setError('Email không hợp lệ. Vui lòng nhập đúng định dạng email.');
       setLoading(false);
       return;
     }
     
-    // Validate phone number before proceeding
     if (!isValidPhone(phone)) {
       setError('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10 chữ số, bắt đầu bằng 03, 05, 07, 08, hoặc 09)');
       setLoading(false);
@@ -89,7 +88,8 @@ const Register = () => {
 
       await saveUserToFirestore(userCredential.user.uid, {
         displayName: fullName,
-        email: email,        phoneNumber: phone,
+        email: email,
+        phoneNumber: phone,
         role: 'fuser', 
         emailVerified: userCredential.user.emailVerified
       });
@@ -117,64 +117,344 @@ const Register = () => {
     }
   };
 
-  const inputClasses = `appearance-none rounded-md relative block w-full px-3 py-2 border ${
-    isDarkMode 
-      ? 'border-gray-700 bg-gray-700 text-white placeholder-gray-400 focus:ring-green-500 focus:border-green-500' 
-      : 'border-gray-300 placeholder-gray-500 focus:ring-green-600 focus:border-green-600'
-  } focus:outline-none focus:ring-2 focus:z-10 sm:text-sm transition-colors`;
-
   return (
-    <div className={`min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-      <div className={`max-w-md w-full space-y-6 p-8 rounded-lg shadow-md ${isDarkMode ? 'bg-gray-800 shadow-gray-900/50' : 'bg-white shadow-gray-200/50'}`}>
-        <div>
-          <div className="flex justify-center">
-            <svg className={`w-12 h-12 ${isDarkMode ? 'text-green-500' : 'text-green-600'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <div className="auth-page-wrapper">
+      <style>{`
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+
+        @keyframes slideInStagger {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        .auth-page-wrapper {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem 1rem;
+          position: relative;
+          overflow: hidden;
+          background: ${isDarkMode 
+            ? 'linear-gradient(-45deg, #1a1a1a, #2d2d2d, #1a1a1a, #0a0a0a)' 
+            : 'linear-gradient(-45deg, rgba(var(--accent-color-rgb), 0.05), rgba(var(--accent-color-rgb), 0.15), rgba(var(--accent-color-rgb), 0.1), rgba(var(--accent-color-rgb), 0.05))'};
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+
+        .auth-card {
+          animation: ${mounted ? 'fadeInUp 0.6s ease-out' : 'none'};
+          max-width: 28rem;
+          width: 100%;
+          position: relative;
+          z-index: 10;
+        }
+
+        .glass-card {
+          background: ${isDarkMode 
+            ? 'rgba(31, 41, 55, 0.8)' 
+            : 'rgba(255, 255, 255, 0.9)'};
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-radius: 1.5rem;
+          border: 1px solid ${isDarkMode 
+            ? 'rgba(255, 255, 255, 0.1)' 
+            : 'rgba(0, 0, 0, 0.05)'};
+          box-shadow: ${isDarkMode
+            ? '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
+            : '0 8px 32px 0 rgba(31, 38, 135, 0.15)'};
+          padding: 2.5rem;
+        }
+
+        .logo-container {
+          animation: float 3s ease-in-out infinite;
+          margin-bottom: 1.5rem;
+        }
+
+        .gradient-text {
+          background: ${isDarkMode
+            ? 'linear-gradient(135deg, var(--accent-color-light), var(--accent-color))'
+            : 'linear-gradient(135deg, var(--accent-color), var(--accent-color-dark))'};
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .input-group {
+          position: relative;
+          margin-bottom: 1.25rem;
+          animation: ${mounted ? 'slideInStagger 0.5s ease-out backwards' : 'none'};
+        }
+
+        .input-group:nth-child(1) { animation-delay: 0.1s; }
+        .input-group:nth-child(2) { animation-delay: 0.2s; }
+        .input-group:nth-child(3) { animation-delay: 0.3s; }
+        .input-group:nth-child(4) { animation-delay: 0.4s; }
+        .input-group:nth-child(5) { animation-delay: 0.5s; }
+
+        .input-field {
+          width: 100%;
+          padding: 0.875rem 1rem;
+          border-radius: 0.75rem;
+          border: 2px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'};
+          background: ${isDarkMode ? 'rgba(55, 65, 81, 0.5)' : 'rgba(255, 255, 255, 0.8)'};
+          color: ${isDarkMode ? '#e5e7eb' : '#1f2937'};
+          font-size: 0.95rem;
+          transition: all 0.3s ease;
+          outline: none;
+        }
+
+        .input-field:focus {
+          border-color: var(--accent-color);
+          background: ${isDarkMode ? 'rgba(55, 65, 81, 0.8)' : 'rgba(255, 255, 255, 1)'};
+          box-shadow: 0 0 0 3px ${isDarkMode 
+            ? 'rgba(var(--accent-color-rgb), 0.2)' 
+            : 'rgba(var(--accent-color-rgb), 0.1)'};
+          transform: translateY(-2px);
+        }
+
+        .input-field::placeholder {
+          color: ${isDarkMode ? '#9ca3af' : '#6b7280'};
+        }
+
+        .primary-button {
+          width: 100%;
+          padding: 0.875rem 1.5rem;
+          border-radius: 0.75rem;
+          border: none;
+          background: linear-gradient(135deg, var(--accent-color-light), var(--accent-color-dark));
+          color: white;
+          font-weight: 600;
+          font-size: 1rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .primary-button:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px rgba(var(--accent-color-rgb), 0.3);
+        }
+
+        .primary-button:active:not(:disabled) {
+          transform: translateY(0);
+        }
+
+        .primary-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .primary-button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+          transition: left 0.5s;
+        }
+
+        .primary-button:hover:not(:disabled)::before {
+          left: 100%;
+        }
+
+        .google-button {
+          width: 100%;
+          padding: 0.875rem 1.5rem;
+          border-radius: 0.75rem;
+          border: 2px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'};
+          background: ${isDarkMode ? 'rgba(55, 65, 81, 0.5)' : 'rgba(255, 255, 255, 0.9)'};
+          color: ${isDarkMode ? '#e5e7eb' : '#1f2937'};
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+        }
+
+        .google-button:hover:not(:disabled) {
+          border-color: var(--accent-color);
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-message, .success-message {
+          padding: 0.875rem 1rem;
+          border-radius: 0.75rem;
+          margin-bottom: 1.5rem;
+          animation: fadeInUp 0.3s ease-out;
+        }
+
+        .error-message {
+          background: ${isDarkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(254, 226, 226, 0.9)'};
+          border: 1px solid ${isDarkMode ? 'rgba(239, 68, 68, 0.5)' : '#fca5a5'};
+          color: ${isDarkMode ? '#fca5a5' : '#dc2626'};
+        }
+
+        .success-message {
+          background: ${isDarkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(220, 252, 231, 0.9)'};
+          border: 1px solid ${isDarkMode ? 'rgba(34, 197, 94, 0.5)' : '#86efac'};
+          color: ${isDarkMode ? '#86efac' : '#16a34a'};
+        }
+
+        .divider {
+          display: flex;
+          align-items: center;
+          text-align: center;
+          margin: 1.5rem 0;
+          color: ${isDarkMode ? '#9ca3af' : '#6b7280'};
+        }
+
+        .divider::before,
+        .divider::after {
+          content: '';
+          flex: 1;
+          border-bottom: 1px solid ${isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'};
+        }
+
+        .divider span {
+          padding: 0 1rem;
+          font-size: 0.875rem;
+        }
+
+        .link-button {
+          background: none;
+          border: none;
+          color: var(--accent-color);
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s ease;
+          text-decoration: none;
+        }
+
+        .link-button:hover {
+          color: var(--accent-color-dark);
+          text-decoration: underline;
+        }
+
+        .password-toggle {
+          position: absolute;
+          right: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: ${isDarkMode ? '#9ca3af' : '#6b7280'};
+          cursor: pointer;
+          padding: 0.25rem;
+          transition: color 0.2s ease;
+        }
+
+        .password-toggle:hover {
+          color: var(--accent-color);
+        }
+
+        .spinner {
+          display: inline-block;
+          width: 1rem;
+          height: 1rem;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          border-top-color: white;
+          animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .text-muted {
+          color: ${isDarkMode ? '#9ca3af' : '#6b7280'};
+        }
+
+        .text-center {
+          text-align: center;
+        }
+
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-6 { margin-top: 1.5rem; }
+      `}</style>
+
+      <div className="auth-card">
+        <div className="glass-card">
+          {/* Logo */}
+          <div className="logo-container text-center">
+            <svg
+              className="w-16 h-16 mx-auto"
+              style={{ color: 'var(--accent-color)' }}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M4 11.5l8 4 8-4M4 15l8 4 8-4" />
             </svg>
           </div>
-          <h2 className={`mt-6 text-center text-3xl font-extrabold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
-            Tạo tài khoản mới
+
+          {/* Title */}
+          <h2 className="text-center mb-6" style={{ 
+            fontSize: '1.875rem', 
+            fontWeight: '800',
+            color: isDarkMode ? '#f9fafb' : '#111827'
+          }}>
+            Tạo <span className="gradient-text">tài khoản mới</span>
           </h2>
-          <p className={`mt-2 text-center text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Đã có tài khoản?{' '}
-            <button 
-              onClick={() => navigate('/login')}
-              className={`font-medium transition-colors ${isDarkMode ? 'text-green-500 hover:text-green-400' : 'text-green-600 hover:text-green-500'}`}
-            >
+
+          <p className="text-center text-muted" style={{ fontSize: '0.875rem', marginBottom: '2rem' }}>
+            Đã có tài khoản?{" "}
+            <button onClick={() => navigate('/login')} className="link-button">
               Đăng nhập
             </button>
           </p>
-        </div>
-        
-        
-        {/* Thông báo lỗi */}
-        {error && (
-          <div className={`px-4 py-3 rounded border ${
-            isDarkMode 
-              ? 'bg-red-900/30 border-red-800 text-red-300' 
-              : 'bg-red-100 border-red-400 text-red-700'
-          }`}>
-            <span>{error}</span>
-          </div>
-        )}
-        
-        {/* Thông báo thành công */}
-        {success && (
-          <div className={`px-4 py-3 rounded border ${
-            isDarkMode 
-              ? 'bg-green-900/30 border-green-800 text-green-300' 
-              : 'bg-green-100 border-green-400 text-green-700'
-          }`}>
-            <span>Đăng ký thành công! Đang chuyển hướng...</span>
-          </div>
-        )}
-        
-        <form className="mt-4 space-y-4" onSubmit={handleRegister}>
-          <div className="rounded-md space-y-4">
-            {/* Họ và tên field */}
-            <div>
-              <label htmlFor="full-name" className="sr-only">Họ và tên</label>
+
+          {/* Error Message */}
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {success && (
+            <div className="success-message">
+              Đăng ký thành công! Đang chuyển hướng...
+            </div>
+          )}
+
+          {/* Register Form */}
+          <form onSubmit={handleRegister}>
+            <div className="input-group">
               <input
                 id="full-name"
                 name="fullName"
@@ -182,45 +462,39 @@ const Register = () => {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className={inputClasses}
+                className="input-field"
                 placeholder="Họ và tên"
               />
             </div>
-            
-            {/* Email field */}
-            <div>
-              <label htmlFor="email-address" className="sr-only">E-mail</label>
+
+            <div className="input-group">
               <input
-                id="email-address"
+                id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={inputClasses}
-                placeholder="E-mail"
+                className="input-field"
+                placeholder="Địa chỉ email"
               />
             </div>
-            
-            {/* Số điện thoại field */}
-            <div>
-              <label htmlFor="phone-number" className="sr-only">Số điện thoại</label>
+
+            <div className="input-group">
               <input
-                id="phone-number"
+                id="phone"
                 name="phone"
                 type="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className={inputClasses}
+                className="input-field"
                 placeholder="Số điện thoại"
               />
             </div>
-            
-            {/* Password field */}
-            <div className="relative">
-              <label htmlFor="password" className="sr-only">Mật khẩu</label>
+
+            <div className="input-group">
               <input
                 id="password"
                 name="password"
@@ -229,31 +503,29 @@ const Register = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={inputClasses}
-                placeholder="Mật khẩu"
+                className="input-field"
+                placeholder="Mật khẩu (6-12 ký tự)"
               />
-              <button 
+              <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
                     <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
                   </svg>
                 )}
               </button>
             </div>
-            
-            {/* Confirm Password field */}
-            <div className="relative">
-              <label htmlFor="confirm-password" className="sr-only">Xác nhận mật khẩu</label>
+
+            <div className="input-group">
               <input
                 id="confirm-password"
                 name="confirmPassword"
@@ -261,70 +533,63 @@ const Register = () => {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className={inputClasses}
+                className="input-field"
                 placeholder="Xác nhận mật khẩu"
               />
-              <button 
+              <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                className="password-toggle"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 {showConfirmPassword ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
                   </svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
                     <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
                   </svg>
                 )}
               </button>
             </div>
-          </div>
 
-          <div className="pt-2">
             <button
               type="submit"
               disabled={loading}
-              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white transition-colors ${
-                isDarkMode 
-                  ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
-                  : 'bg-green-700 hover:bg-green-800 focus:ring-green-600'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-             >
-              {loading ? 'Đang xử lý...' : 'Đăng ký'}
+              className="primary-button"
+              style={{ marginTop: '1.5rem' }}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span className="spinner"></span>
+                  Đang xử lý...
+                </span>
+              ) : (
+                "Đăng ký"
+              )}
             </button>
-          </div>
-        </form>
-        
-        <div className="mt-4">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className={`w-full border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className={`px-2 ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-white text-gray-600'}`}>
-                Hoặc tiếp tục với
-              </span>
-            </div>
+          </form>
+
+          {/* Divider */}
+          <div className="divider">
+            <span>Hoặc tiếp tục với</span>
           </div>
 
-          <div className="mt-4">
-            <GoogleAuth isDarkMode={isDarkMode} />
+          {/* Google Auth */}
+          <GoogleAuth isDarkMode={isDarkMode} />
+
+          {/* Back to Home */}
+          <div className="text-center mt-6">
+            <button
+              onClick={() => navigate('/')}
+              className="link-button"
+              style={{ fontSize: '0.875rem' }}
+            >
+              ← Quay lại trang chủ
+            </button>
           </div>
-        </div>
-        
-        {/* Nút quay lại trang chủ */}
-        <div className="flex justify-center">
-          <button
-            onClick={() => navigate('/')}
-            className={`flex items-center text-sm transition-colors 
-                ${isDarkMode ? 'text-gray-400 hover:text-gray-300' 
-                : 'text-gray-600 hover:text-gray-800'}`}>
-                Quay lại trang chủ
-          </button>
         </div>
       </div>
     </div>
