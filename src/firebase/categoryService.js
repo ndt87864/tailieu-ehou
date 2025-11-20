@@ -32,7 +32,6 @@ const isBrowser = () => typeof window !== 'undefined' && typeof indexedDB !== 'u
  */
 export const getAllCategories = async () => {
   try {
-    const startTime = performance.now();
     
     // Kiểm tra cache
     if (isBrowser()) {
