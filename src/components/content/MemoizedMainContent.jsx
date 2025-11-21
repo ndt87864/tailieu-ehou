@@ -250,28 +250,21 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
 
       {/* Hiển thị dạng card trên mobile */}
       <div className="md:hidden">
-        <div
-          className="questions-wrapper space-y-4 px-4"
-          onCopy={handleCopy}
-          onCut={handleCopy}
-          onDragStart={handleCopy}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            userSelect: "none",
-            WebkitUserSelect: "none",
-            MozUserSelect: "none",
-            msUserSelect: "none",
-          }}
-        >
-          {filteredQuestions.map((question, index) => (
-            <div
-              key={question.id || index}
-              className={`question-card border rounded-lg overflow-hidden ml-4 ${
-                isDarkMode
-                  ? "bg-gray-800 border-gray-700"
-                  : "bg-white border-gray-200"
-              } shadow-sm`}
-            >
+        {filteredQuestions.map((question, index) => (
+          <div
+            key={question.id || index}
+            className="question-card"
+            onCopy={handleCopy}
+            onCut={handleCopy}
+            onDragStart={handleCopy}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              MozUserSelect: "none",
+              msUserSelect: "none",
+            }}
+          >
               <div
                 className={`question-card-header px-4 py-3 ${
                   isDarkMode ? "bg-gray-700/50" : "bg-gray-50"
@@ -377,7 +370,6 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
           >
             Hiển thị {filteredQuestions.length} câu hỏi
           </div>
-        </div>
       </div>
     </div>
   );
