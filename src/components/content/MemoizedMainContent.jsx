@@ -98,7 +98,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
       {/* Hiển thị dạng bảng trên desktop */}
       <div className="hidden md:block">
         <div
-          className={`overflow-hidden rounded-lg shadow ${
+          className={`questions-wrapper overflow-hidden rounded-lg shadow ${
             isDarkMode ? "bg-gray-800" : "bg-white"
           } mx-6`}
           onCopy={handleCopy}
@@ -114,7 +114,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
         >
           <div className="overflow-x-auto">
             <table
-              className={`min-w-full divide-y ${
+              className={`question-table min-w-full divide-y ${
                 isDarkMode ? "divide-gray-700" : "divide-gray-200"
               }`}
             >
@@ -251,7 +251,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
       {/* Hiển thị dạng card trên mobile */}
       <div className="md:hidden">
         <div
-          className="space-y-4 px-4"
+          className="questions-wrapper space-y-4 px-4"
           onCopy={handleCopy}
           onCut={handleCopy}
           onDragStart={handleCopy}
@@ -266,20 +266,20 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
           {filteredQuestions.map((question, index) => (
             <div
               key={question.id || index}
-              className={`border rounded-lg overflow-hidden ${
+              className={`question-card border rounded-lg overflow-hidden ml-4 ${
                 isDarkMode
                   ? "bg-gray-800 border-gray-700"
                   : "bg-white border-gray-200"
               } shadow-sm`}
             >
               <div
-                className={`px-4 py-3 ${
+                className={`question-card-header px-4 py-3 ${
                   isDarkMode ? "bg-gray-700/50" : "bg-gray-50"
                 }`}
               >
                 <div className="flex items-start">
                   <span
-                    className={`inline-flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full text-xs ${
+                    className={`question-index inline-flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full text-xs ${
                       isDarkMode
                         ? "bg-gray-600 text-gray-300"
                         : "bg-gray-200 text-gray-800"
@@ -328,7 +328,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
                 </div>
               </div>
               <div
-                className={`px-4 py-3 text-sm ${
+                className={`question-card-body px-4 py-3 text-sm ${
                   isDarkMode
                     ? "text-gray-300 border-t border-gray-700"
                     : "text-gray-700 border-t border-gray-200"

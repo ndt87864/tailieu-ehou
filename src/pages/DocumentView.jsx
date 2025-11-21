@@ -19,6 +19,8 @@ import { db } from "../firebase/firebase";
 import { checkExcelDownloadPermission } from "../utils/permission/downloadPermissions";
 import { checkVipDocumentAccess } from "../firebase/documentService";
 
+import "../styles/document-view.css";
+
 const noCopyStyles = {
   userSelect: "none",
   WebkitUserSelect: "none",
@@ -846,7 +848,11 @@ function DocumentView() {
           />
         )}
 
-        <div className="theme-content-container flex-1 shadow-sm flex flex-col">
+        <div
+          className={`theme-content-container document-view-container flex-1 shadow-sm flex flex-col ${
+            isDarkMode ? "dark" : "light"
+          }`}
+        >
           {windowWidth >= 770 && (
             <div className="w-full">
               <UserHeader
@@ -855,8 +861,10 @@ function DocumentView() {
                 setIsThemePickerOpen={setIsThemePickerOpen}
                 setIsSidebarOpen={setIsSidebarOpen}
                 title={
-                  selectedCategory?.title
-                    ? `${selectedCategory.title} - ${selectedDocument?.title}`
+                  selectedDocument?.title
+                    ? selectedCategory?.title
+                      ? `${selectedCategory.title} - ${selectedDocument.title}`
+                      : selectedDocument.title
                     : "Tài liệu NEU"
                 }
               />
@@ -881,7 +889,7 @@ function DocumentView() {
                     disabled={
                       loading || !excelButtonState.enabled || permissionLoading
                     }
-                    className={`flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${
+                    className={`action-btn flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${
                       !excelButtonState.enabled || permissionLoading
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-green-600 hover:bg-green-700"
@@ -923,7 +931,7 @@ function DocumentView() {
                     </span>
                   </button>
                 )}
-                <div className="relative">
+                <div className="search-container relative">
                   <input
                     type="text"
                     placeholder="Tìm kiếm câu hỏi"
