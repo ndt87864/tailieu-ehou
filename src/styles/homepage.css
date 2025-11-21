@@ -140,16 +140,20 @@
 }
 
 .search-input-wrapper:focus-within {
-    border-color: var(--accent-color);
-    transform: translateY(-2px);
+    /* Disable colored border and lift on focus — keep appearance stable */
+    border-color: transparent !important;
+    transform: none !important;
 }
 
-.search-input-wrapper.dark:focus-within {
-    box-shadow: 0 0 0 3px rgba(var(--accent-color-rgb), 0.2);
-}
-
+.search-input-wrapper.dark:focus-within,
 .search-input-wrapper.light:focus-within {
-    box-shadow: 0 0 0 3px rgba(var(--accent-color-rgb), 0.1);
+    /* remove focus ring/shadow so no colored outline appears when typing */
+    box-shadow: none !important;
+}
+
+.search-input:focus {
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .search-input {
