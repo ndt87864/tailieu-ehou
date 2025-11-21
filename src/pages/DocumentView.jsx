@@ -907,7 +907,7 @@ function DocumentView() {
                     ) : (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
+                        className="h-10 w-10"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -1167,12 +1167,10 @@ function DocumentView() {
               </div>
             )}
             {loading ? (
-              <div className="mx-auto max-w-4xl px-4 py-8 rounded-lg">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                 <div
-                  className={`border rounded-lg overflow-hidden shadow-sm p-6 ${
-                    isDarkMode
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-white border-gray-200"
+                  className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
+                    isDarkMode ? "bg-gray-800" : "bg-white"
                   }`}
                 >
                   <div className="flex flex-col items-center justify-center py-12">
@@ -1266,12 +1264,10 @@ function DocumentView() {
                     {!loading &&
                       filteredQuestions.length === 0 &&
                       !viewState.viewLimitExceeded && (
-                        <div className="mx-auto max-w-4xl px-4 py-8 rounded-lg">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                           <div
-                            className={`border rounded-lg overflow-hidden shadow-sm p-8 text-center ${
-                              isDarkMode
-                                ? "bg-gray-800 border-gray-700"
-                                : "bg-white border-gray-200"
+                            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
+                              isDarkMode ? "bg-gray-800" : "bg-white"
                             }`}
                           >
                             <svg
@@ -1334,9 +1330,9 @@ function DocumentView() {
                         </div>
                       )}
                     {viewState.viewLimitExceeded && !isPuser && !isAdmin ? (
-                      <div className="mx-auto max-w-4xl px-4 py-12 text-center rounded-lg">
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                         <div
-                          className={`p-8 rounded-lg shadow-md ${
+                          className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
                             isDarkMode ? "bg-gray-800" : "bg-white"
                           }`}
                         >
