@@ -1,5 +1,10 @@
 /* Sidebar Styles */
 
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
 .app-sidebar {
     position: fixed;
     top: 0;
@@ -13,6 +18,8 @@
     flex-direction: column;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
     overflow: hidden;
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
 }
 
 /* Width states */
@@ -28,7 +35,7 @@
 
 /* Dark mode styles */
 .app-sidebar.dark {
-    background-color: var(--theme-sidebar-bg, #1f2937);
+    background: linear-gradient(-45deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.9) 50%, rgba(17, 24, 39, 0.95) 100%);
     color: #f3f4f6;
 }
 
@@ -103,7 +110,7 @@
 
 /* Light mode styles */
 .app-sidebar.light {
-    background-color: var(--theme-sidebar-bg, #f3f4f6);
+    background: linear-gradient(-45deg, rgba(var(--accent-color-rgb), 0.1) 0%, rgba(var(--accent-color-rgb), 0.2) 50%, rgba(var(--accent-color-rgb), 0.1) 100%);
     color: #1f2937;
 }
 
@@ -433,17 +440,29 @@
 
 /* Theme specific overrides */
 .theme-blue .app-sidebar {
-    background-color: #1e40af;
+    background: linear-gradient(-45deg, #1d4ed8 0%, #2563eb 50%, #1d4ed8 100%);
 }
 
 .theme-red .app-sidebar {
-    background-color: #b91c1c;
+    background: linear-gradient(-45deg, #b91c1c 0%, #dc2626 50%, #b91c1c 100%);
 }
 
 .theme-purple .app-sidebar {
-    background-color: #6d28d9;
+    background: linear-gradient(-45deg, #6d28d9 0%, #9333ea 50%, #6d28d9 100%);
+}
+
+.theme-yellow .app-sidebar {
+    background: linear-gradient(-45deg, #a16207 0%, #ca8a04 50%, #a16207 100%);
+}
+
+.theme-brown .app-sidebar {
+    background: linear-gradient(-45deg, #78350f 0%, #a16207 50%, #78350f 100%);
 }
 
 .theme-black .app-sidebar {
-    background-color: #111827;
+    background: linear-gradient(-45deg, #111827 0%, #374151 50%, #111827 100%);
+}
+
+.theme-white .app-sidebar {
+    background: linear-gradient(-45deg, #374151 0%, #6b7280 50%, #374151 100%);
 }
