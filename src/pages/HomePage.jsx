@@ -426,8 +426,6 @@ const HomePage = () => {
 
           {/* Content */}
           <div className="flex-1 p-6">
-
-
             <div className="mb-8 flex justify-between items-center">
               {/* Collapse All Button - Only show when at least one category is expanded */}
               {hasExpandedCategory && (
@@ -461,13 +459,13 @@ const HomePage = () => {
             </div>
 
             {/* Hero Section */}
-            <div className={`hero-section ${isDarkMode ? 'dark' : 'light'}`}>
+            <div className={`hero-section ${isDarkMode ? "dark" : "light"}`}>
               <div className="hero-content text-center">
                 {/* Floating Icon */}
                 <div className="hero-icon">
                   <svg
                     className="w-20 h-20 mx-auto"
-                    style={{ color: 'var(--accent-color)' }}
+                    style={{ color: "var(--accent-color)" }}
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
                     fill="currentColor"
@@ -484,7 +482,13 @@ const HomePage = () => {
                   }`}
                 >
                   Thư viện Tài liệu{" "}
-                  <span className={`gradient-title ${isDarkMode ? 'dark' : 'light'}`}>HOU</span>
+                  <span
+                    className={`gradient-title ${
+                      isDarkMode ? "dark" : "light"
+                    }`}
+                  >
+                    HOU
+                  </span>
                 </h1>
 
                 {/* Description */}
@@ -492,7 +496,7 @@ const HomePage = () => {
                   className={`text-lg md:text-xl mb-6 ${
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   }`}
-                  style={{ maxWidth: '42rem', margin: '0 auto 1.5rem' }}
+                  style={{ maxWidth: "42rem", margin: "0 auto 1.5rem" }}
                 >
                   Kho tài liệu học tập dành cho sinh viên Đại học Mở Hà Nội
                 </p>
@@ -500,14 +504,15 @@ const HomePage = () => {
             </div>
 
             <div className="container mx-auto px-4 py-8">
-
               {/* Add search bar at the top */}
-              <div className="max-w-3xl mx-auto mb-8">
-
-
+              <div className="max-w-5xl mx-auto mb-10">
                 <div className="search-container">
                   <div className="flex gap-3 items-center">
-                    <div className={`flex-1 search-input-wrapper ${isDarkMode ? 'dark' : 'light'}`}>
+                    <div
+                      className={`flex-1 search-input-wrapper ${
+                        isDarkMode ? "dark" : "light"
+                      }`}
+                    >
                       <div className="relative">
                         <input
                           type="text"
@@ -519,7 +524,9 @@ const HomePage = () => {
                               ? "Tìm kiếm lịch thi theo Họ và tên, hoặc Tài khoản..."
                               : "Tìm kiếm tài liệu..."
                           }
-                          className={`search-input ${isDarkMode ? 'dark' : 'light'}`}
+                          className={`search-input ${
+                            isDarkMode ? "dark" : "light"
+                          }`}
                         />
                         <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                           <button
@@ -881,15 +888,19 @@ const HomePage = () => {
 
               {/* Main Categories Section */}
               <div>
-
-
                 <h2
                   className={`section-title text-2xl md:text-3xl font-bold mb-8 ${
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
                   Danh mục{" "}
-                  <span className={`gradient-title ${isDarkMode ? 'dark' : 'light'}`}>tài liệu</span>
+                  <span
+                    className={`gradient-title ${
+                      isDarkMode ? "dark" : "light"
+                    }`}
+                  >
+                    tài liệu
+                  </span>
                 </h2>
 
                 {loading ? (
@@ -905,9 +916,15 @@ const HomePage = () => {
                     {categoriesWithDocs.map((category) => (
                       <div
                         key={category.id}
-                        className={`category-card ${isDarkMode ? 'dark' : 'light'}`}
+                        className={`category-card ${
+                          isDarkMode ? "dark" : "light"
+                        }`}
                       >
-                        <div className={`category-header ${isDarkMode ? 'dark' : 'light'}`}>
+                        <div
+                          className={`category-header ${
+                            isDarkMode ? "dark" : "light"
+                          }`}
+                        >
                           <h2
                             className={`text-lg font-bold ${
                               isDarkMode ? "text-white" : "text-gray-900"
@@ -926,12 +943,16 @@ const HomePage = () => {
                                     onClick={() =>
                                       handleDocumentClick(category, doc)
                                     }
-                                    className={`document-item w-full text-left px-4 py-3 ${isDarkMode ? 'dark text-gray-200' : 'light text-gray-700'}`}
+                                    className={`document-item w-full text-left px-4 py-3 ${
+                                      isDarkMode
+                                        ? "dark text-gray-200"
+                                        : "light text-gray-700"
+                                    }`}
                                   >
                                     <div className="flex items-center">
                                       <svg
                                         className="w-5 h-5 mr-2"
-                                        style={{ color: 'var(--accent-color)' }}
+                                        style={{ color: "var(--accent-color)" }}
                                         fill="none"
                                         stroke="currentColor"
                                         viewBox="0 0 24 24"

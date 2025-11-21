@@ -965,22 +965,22 @@ const Profile = () => {
               )}
             </div>
 
-              <div className="mt-6 flex items-center justify-end lg:justify-between">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="primary-button"
-                >
-                  {isSubmitting ? (
-                    <span className="loading-container">
-                      <span className="spinner"></span>
-                      Đang xử lý...
-                    </span>
-                  ) : (
-                    "Lưu thay đổi"
-                  )}
-                </button>
-              </div>
+            <div className="mt-6 flex items-center justify-end lg:justify-between">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="primary-button"
+              >
+                {isSubmitting ? (
+                  <span className="loading-container">
+                    <span className="spinner"></span>
+                    Đang xử lý...
+                  </span>
+                ) : (
+                  "Lưu thay đổi"
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>
