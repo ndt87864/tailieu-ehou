@@ -1266,7 +1266,7 @@ function DocumentView() {
                       !viewState.viewLimitExceeded && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                           <div
-                            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
+                            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center pointer-events-auto ${
                               isDarkMode ? "bg-gray-800" : "bg-white"
                             }`}
                           >
@@ -1332,7 +1332,7 @@ function DocumentView() {
                     {viewState.viewLimitExceeded && !isPuser && !isAdmin ? (
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                         <div
-                          className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
+                          className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center pointer-events-auto ${
                             isDarkMode ? "bg-gray-800" : "bg-white"
                           }`}
                         >
