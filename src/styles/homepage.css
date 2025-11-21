@@ -126,17 +126,17 @@
 }
 
 .search-input-wrapper.dark {
-    /* translucent so it blends with dark hero gradient */
-    background: rgba(31, 41, 55, 0.25);
+    /* Make wrapper background transparent to hide colored fill */
+    background: transparent;
     border-color: transparent;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    box-shadow: none;
 }
 
 .search-input-wrapper.light {
-    /* subtle translucent tint to match hero light gradient */
-    background: rgba(var(--accent-color-rgb), 0.03);
+    /* Make wrapper background transparent to hide colored fill */
+    background: transparent;
     border-color: transparent;
-    box-shadow: 0 6px 18px rgba(31, 38, 135, 0.06);
+    box-shadow: none;
 }
 
 .search-input-wrapper:focus-within {
@@ -201,10 +201,10 @@
     }
     .search-container .search-input-wrapper {
         order: 2;
-        /* Center and limit width to match auth form card on mobile */
-        margin: 0.75rem auto 0;
-        width: calc(100% - 2rem); /* provide small side padding on very small screens */
-        max-width: 28rem; /* match `.auth-card` width for consistent visual length */
+        /* Align with card widths on mobile: same horizontal margins (1rem) */
+        margin: 0.75rem 1rem 0;
+        width: calc(100% - 2rem); /* match card width which uses 1rem side margins */
+        max-width: none; /* allow full width within margins so it matches cards */
     }
     .search-container .search-input-wrapper .relative { position: relative; }
     /* Ensure the right-side absolute container (search button) is vertically centered */
@@ -240,6 +240,13 @@
     background: linear-gradient(135deg, var(--accent-color-light), var(--accent-color-dark));
     color: white;
     border-color: var(--accent-color);
+}
+
+/* Remove background and shadow from the tablist container that wraps the search type buttons */
+.search-container [role="tablist"] {
+    background: transparent !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
 }
 
 /* Category Cards */
