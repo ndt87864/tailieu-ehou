@@ -91,7 +91,6 @@ const UserHeader = ({ title }) => {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setIsThemePickerOpen(true)}
-          onClick={() => setIsThemePickerOpen(true)}
           className={`header-btn-icon ${isDarkMode ? "dark" : "light"}`}
           aria-label="Tùy chỉnh giao diện"
         >
@@ -114,7 +113,6 @@ const UserHeader = ({ title }) => {
         {user ? (
           <div className="relative" ref={dropdownRef}>
             <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className={`user-menu-btn ${isDarkMode ? "dark" : "light"}`}
             >
@@ -164,7 +162,6 @@ const UserHeader = ({ title }) => {
               <div className={`dropdown-menu ${isDarkMode ? "dark" : "light"}`}>
                 <button
                   onClick={handleAccountClick}
-                  onClick={handleAccountClick}
                   className={`dropdown-item ${isDarkMode ? "dark" : "light"}`}
                 >
                   <svg
@@ -187,7 +184,6 @@ const UserHeader = ({ title }) => {
                 <div className={`dropdown-divider ${isDarkMode ? "dark" : "light"}`}></div>
 
                 <button
-                  onClick={handleLogout}
                   onClick={handleLogout}
                   className={`dropdown-item ${isDarkMode ? "dark" : "light"}`}
                 >
@@ -212,7 +208,6 @@ const UserHeader = ({ title }) => {
           </div>
         ) : (
           <button
-            onClick={() => navigate("/login")}
             onClick={() => navigate("/login")}
             className={`user-menu-btn ${isDarkMode ? "dark" : "light"}`}
           >
