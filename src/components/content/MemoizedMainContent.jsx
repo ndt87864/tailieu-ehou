@@ -131,7 +131,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
                   </th>
                   <th
                     scope="col"
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider sortable ${
                       isDarkMode ? "text-gray-300" : "text-gray-500"
                     }`}
                     style={{ width: "40%" }}
@@ -140,7 +140,7 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
                   </th>
                   <th
                     scope="col"
-                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider sortable ${
                       isDarkMode ? "text-gray-300" : "text-gray-500"
                     }`}
                   >
@@ -265,111 +265,111 @@ export const MemoizedMainContent = memo(({ filteredQuestions }) => {
               msUserSelect: "none",
             }}
           >
-              <div
-                className={`question-card-header px-4 py-3 ${
-                  isDarkMode ? "bg-gray-700/50" : "bg-gray-50"
-                }`}
-              >
-                <div className="flex items-start">
-                  <span
-                    className={`question-index inline-flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full text-xs ${
-                      isDarkMode
-                        ? "bg-gray-600 text-gray-300"
-                        : "bg-gray-200 text-gray-800"
-                    }`}
-                  >
-                    {index + 1}
-                  </span>
-                  <div>
-                    <span
-                      className={`text-xs font-medium ${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                      } mb-1 block`}
-                    >
-                      Câu hỏi:
-                    </span>
-                    <span
-                      className={`text-sm font-medium ${
-                        isDarkMode ? "text-white" : "text-gray-900"
-                      }`}
-                      data-nocopy="true"
-                    >
-                      {question.question}
-                    </span>
-                    {question.url_question && (
-                      <div className="mt-2 flex flex-col items-start gap-1">
-                        <img
-                          src={question.url_question}
-                          alt="Ảnh câu hỏi"
-                          className="max-w-xs h-auto rounded"
-                        />
-                        <button
-                          type="button"
-                          className="text-blue-600 underline text-xs mt-1"
-                          onClick={() =>
-                            setImageModal({
-                              open: true,
-                              url: question.url_question,
-                            })
-                          }
-                        >
-                          Xem ảnh
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div
-                className={`question-card-body px-4 py-3 text-sm ${
-                  isDarkMode
-                    ? "text-gray-300 border-t border-gray-700"
-                    : "text-gray-700 border-t border-gray-200"
-                }`}
-              >
+            <div
+              className={`question-card-header px-4 py-3 ${
+                isDarkMode ? "bg-gray-700/50" : "bg-gray-50"
+              }`}
+            >
+              <div className="flex items-start">
                 <span
-                  className={`text-xs font-medium ${
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  } mb-1 block`}
+                  className={`question-index inline-flex items-center justify-center flex-shrink-0 w-6 h-6 mr-2 rounded-full text-xs ${
+                    isDarkMode
+                      ? "bg-gray-600 text-gray-300"
+                      : "bg-gray-200 text-gray-800"
+                  }`}
                 >
-                  Trả lời:
+                  {index + 1}
                 </span>
-                <div className="whitespace-pre-line" data-nocopy="true">
-                  {question.answer}
+                <div>
+                  <span
+                    className={`text-xs font-medium ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    } mb-1 block`}
+                  >
+                    Câu hỏi:
+                  </span>
+                  <span
+                    className={`text-sm font-medium ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                    data-nocopy="true"
+                  >
+                    {question.question}
+                  </span>
+                  {question.url_question && (
+                    <div className="mt-2 flex flex-col items-start gap-1">
+                      <img
+                        src={question.url_question}
+                        alt="Ảnh câu hỏi"
+                        className="max-w-xs h-auto rounded"
+                      />
+                      <button
+                        type="button"
+                        className="text-blue-600 underline text-xs mt-1"
+                        onClick={() =>
+                          setImageModal({
+                            open: true,
+                            url: question.url_question,
+                          })
+                        }
+                      >
+                        Xem ảnh
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {question.url_answer && (
-                  <div className="mt-2 flex flex-col items-start gap-1">
-                    <img
-                      src={question.url_answer}
-                      alt="Ảnh trả lời"
-                      className="max-w-xs h-auto rounded"
-                    />
-                    <button
-                      type="button"
-                      className="text-blue-600 underline text-xs mt-1"
-                      onClick={() =>
-                        setImageModal({
-                          open: true,
-                          url: question.url_answer,
-                        })
-                      }
-                    >
-                      Xem ảnh
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
-          ))}
-          <div
-            className={`mt-4 p-3 rounded-lg text-sm text-center ${
-              isDarkMode
-                ? "text-gray-400 bg-gray-800"
-                : "text-gray-500 bg-gray-100"
-            }`}
-          >
-            Hiển thị {filteredQuestions.length} câu hỏi
+            <div
+              className={`question-card-body px-4 py-3 text-sm ${
+                isDarkMode
+                  ? "text-gray-300 border-t border-gray-700"
+                  : "text-gray-700 border-t border-gray-200"
+              }`}
+            >
+              <span
+                className={`text-xs font-medium ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                } mb-1 block`}
+              >
+                Trả lời:
+              </span>
+              <div className="whitespace-pre-line" data-nocopy="true">
+                {question.answer}
+              </div>
+              {question.url_answer && (
+                <div className="mt-2 flex flex-col items-start gap-1">
+                  <img
+                    src={question.url_answer}
+                    alt="Ảnh trả lời"
+                    className="max-w-xs h-auto rounded"
+                  />
+                  <button
+                    type="button"
+                    className="text-blue-600 underline text-xs mt-1"
+                    onClick={() =>
+                      setImageModal({
+                        open: true,
+                        url: question.url_answer,
+                      })
+                    }
+                  >
+                    Xem ảnh
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+        ))}
+        <div
+          className={`mt-4 p-3 rounded-lg text-sm text-center ${
+            isDarkMode
+              ? "text-gray-400 bg-gray-800"
+              : "text-gray-500 bg-gray-100"
+          }`}
+        >
+          Hiển thị {filteredQuestions.length} câu hỏi
+        </div>
       </div>
     </div>
   );

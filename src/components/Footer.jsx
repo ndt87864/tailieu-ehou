@@ -54,11 +54,15 @@ const Footer = () => {
                   />
                 </svg>
               </div>
-              <h3 className={`footer-brand-name ${isDarkMode ? "dark" : "light"}`}>
+              <h3
+                className={`footer-brand-name ${isDarkMode ? "dark" : "light"}`}
+              >
                 Tài liệu HOU
               </h3>
             </div>
-            <p className={`footer-description ${isDarkMode ? "dark" : "light"}`}>
+            <p
+              className={`footer-description ${isDarkMode ? "dark" : "light"}`}
+            >
               Thư viện tài liệu học tập trực tuyến dành cho sinh viên Đại học Mở
               Hà Nội. Cung cấp nguồn tài liệu chất lượng, cập nhật và dễ tiếp
               cận.
@@ -151,14 +155,18 @@ const Footer = () => {
           {!loading &&
             footerSections.map((section) => (
               <div key={section.id}>
-                <h4 className={`footer-heading ${isDarkMode ? "dark" : "light"}`}>
+                <h4
+                  className={`footer-heading ${isDarkMode ? "dark" : "light"}`}
+                >
                   {section.title}
                 </h4>
                 <ul className="footer-links-list">
                   {section.content.map((item, index) => (
                     <li key={index}>
                       <span
-                        className={`footer-link ${isDarkMode ? "dark" : "light"}`}
+                        className={`footer-link ${
+                          isDarkMode ? "dark" : "light"
+                        }`}
                       >
                         {item}
                       </span>
@@ -203,15 +211,11 @@ const Footer = () => {
         {/* Bottom Section */}
         <div className={`copyright-section ${isDarkMode ? "dark" : "light"}`}>
           <div className="copyright-container">
-            <div
-              className={`copyright-text ${isDarkMode ? "dark" : "light"}`}
-            >
+            <div className={`copyright-text ${isDarkMode ? "dark" : "light"}`}>
               © 2025 Tài liệu HOU. Tất cả quyền được bảo lưu.
             </div>
             <div className="mt-4 md:mt-0">
-              <p
-                className={`copyright-text ${isDarkMode ? "dark" : "light"}`}
-              >
+              <p className={`copyright-text ${isDarkMode ? "dark" : "light"}`}>
                 Được phát triển với ❤️ cho sinh viên HOU
               </p>
             </div>
