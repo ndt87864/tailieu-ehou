@@ -201,11 +201,18 @@
     }
     .search-container .search-input-wrapper {
         order: 2;
-        margin-top: 0.75rem;
-        width: 100%;
+        /* Center and limit width to match auth form card on mobile */
+        margin: 0.75rem auto 0;
+        width: calc(100% - 2rem); /* provide small side padding on very small screens */
+        max-width: 28rem; /* match `.auth-card` width for consistent visual length */
     }
     .search-container .search-input-wrapper .relative { position: relative; }
-    .search-container .search-input-wrapper .absolute { right: 0; }
+    /* Ensure the right-side absolute container (search button) is vertically centered */
+    .search-container .search-input-wrapper .absolute {
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+    }
 }
 
 .tab-button {
