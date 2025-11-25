@@ -152,16 +152,25 @@ const Pricing = () => {
 
   // Function to scroll the premium tiers container
   const scrollPremiumTiers = (direction) => {
-    if (scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const scrollAmount = container.clientWidth * 0.75; // Scroll about one card
+    const container = scrollContainerRef.current;
+    if (!container || container.children.length === 0) return;
 
-      if (direction === "left") {
-        container.scrollBy({ left: -scrollAmount, behavior: "smooth" });
-      } else {
-        container.scrollBy({ left: scrollAmount, behavior: "smooth" });
-      }
+    const cardWidth = container.children[0].offsetWidth;
+    const gap = 32; // 2rem in pixels, matching CSS
+    const scrollAmount = cardWidth + gap;
+
+    const currentScroll = container.scrollLeft;
+    const currentIndex = Math.round(currentScroll / scrollAmount);
+
+    let newIndex;
+    if (direction === "left") {
+      newIndex = Math.max(0, currentIndex - 1);
+    } else {
+      newIndex = Math.min(container.children.length - 1, currentIndex + 1);
     }
+
+    const newScroll = newIndex * scrollAmount;
+    container.scrollTo({ left: newScroll, behavior: "smooth" });
   };
 
   // Available icons for premium tiers - same as in PremiumUserManagement

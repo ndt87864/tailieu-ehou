@@ -195,7 +195,7 @@
 
 @media (max-width: 640px) {
     .pricing-card {
-        width: 85vw;
+        width: 65vw;
     }
 }
 
@@ -284,6 +284,7 @@
 .card-features {
     flex: 1;
     margin-bottom: 2rem;
+    width: 100%;
 }
 
 .feature-list {
