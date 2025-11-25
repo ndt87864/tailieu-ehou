@@ -14,6 +14,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import ZaloContact from "../components/content/ZaloContact";
 import Footer from "../components/Footer";
+import "../styles/pricing.css";
 
 const Pricing = () => {
   const { isDarkMode } = useTheme();
@@ -169,7 +170,7 @@ const Pricing = () => {
       name: "default",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -187,7 +188,7 @@ const Pricing = () => {
       name: "crown",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -211,7 +212,7 @@ const Pricing = () => {
       name: "star",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -229,7 +230,7 @@ const Pricing = () => {
       name: "diamond",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -277,7 +278,7 @@ const Pricing = () => {
       name: "shield",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -295,7 +296,7 @@ const Pricing = () => {
       name: "trophy",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -331,7 +332,7 @@ const Pricing = () => {
       name: "lightning",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -349,7 +350,7 @@ const Pricing = () => {
       name: "fire",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -359,7 +360,7 @@ const Pricing = () => {
             x="12"
             y="15"
             textAnchor="middle"
-            fontSize={windowWidth < 768 ? "6" : "8"}
+            fontSize="8"
             fontWeight="bold"
             fill="currentColor"
             stroke="none"
@@ -373,7 +374,7 @@ const Pricing = () => {
       name: "heart",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -391,7 +392,7 @@ const Pricing = () => {
       name: "rocket",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -416,7 +417,7 @@ const Pricing = () => {
       name: "gift",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -434,7 +435,7 @@ const Pricing = () => {
       name: "magic",
       component: (
         <svg
-          className={`${windowWidth < 768 ? "w-4 h-4" : "w-6 h-6"}`}
+          className="w-full h-full"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -458,14 +459,10 @@ const Pricing = () => {
 
   if (loading) {
     return (
-      <div
-        className={`min-h-screen ${
-          isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"
-        } flex items-center justify-center`}
-      >
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
-          <p className="mt-3">Đang tải dữ liệu...</p>
+      <div className={`pricing-page ${isDarkMode ? "dark" : "light"}`}>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Đang tải dữ liệu...</p>
         </div>
       </div>
     );
@@ -473,33 +470,26 @@ const Pricing = () => {
 
   if (error) {
     return (
-      <div
-        className={`min-h-screen ${
-          isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"
-        } flex items-center justify-center`}
-      >
-        <div className="text-center">
-          <div
-            className={`${
-              isDarkMode
-                ? "bg-red-900/30 border-red-700"
-                : "bg-red-100 border-red-400"
-            } border text-red-500 px-4 py-3 rounded relative`}
-            role="alert"
-          >
-            <strong className="font-bold">Lỗi!</strong>
-            <span className="block sm:inline"> {error}</span>
-          </div>
-          <div className="mt-4 flex flex-col md:flex-row gap-3 justify-center">
+      <div className={`pricing-page ${isDarkMode ? "dark" : "light"}`}>
+        <div className={`error-container ${isDarkMode ? "dark" : "light"}`}>
+          <h3 className="font-bold text-xl mb-2">Lỗi!</h3>
+          <p className="mb-4">{error}</p>
+          <div className="flex flex-col md:flex-row gap-3 justify-center">
             <button
               onClick={() => window.location.reload()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+              className="card-button"
+              style={{ maxWidth: "200px" }}
             >
               Tải lại trang
             </button>
             <Link
               to="/"
-              className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-md text-center"
+              className="card-button"
+              style={{
+                maxWidth: "200px",
+                background: isDarkMode ? "#374151" : "#e5e7eb",
+                color: isDarkMode ? "#fff" : "#1f2937",
+              }}
             >
               Quay về trang chủ
             </Link>
@@ -517,28 +507,25 @@ const Pricing = () => {
     if (item.links && item.links.length > 0) {
       item.links.forEach((link) => {
         if (link.linkText && link.linkUrl) {
-          const linkElement = `<a href="${link.linkUrl}" class="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">${link.linkText}</a>`;
+          const linkElement = `<a href="${link.linkUrl}" target="_blank" rel="noopener noreferrer">${link.linkText}</a>`;
           content = content.replace(link.linkText, linkElement);
         }
       });
     }
 
     return (
-      <li key={item.id} className="flex items-start">
-        <span className="flex items-center justify-center bg-green-600 text-white rounded-full h-6 w-6 mr-2 flex-shrink-0">
-          {item.number}
-        </span>
-        <div dangerouslySetInnerHTML={{ __html: content }} />
+      <li key={item.id} className="info-item">
+        <span className="info-number">{item.number}</span>
+        <div
+          className="info-content"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
       </li>
     );
   };
 
   return (
-    <div
-      className={`flex flex-col min-h-screen ${
-        isDarkMode ? "bg-gray-900" : "bg-slate-100"
-      }`}
-    >
+    <div className={`pricing-page ${isDarkMode ? "dark" : "light"}`}>
       {/* Mobile Header */}
       {windowWidth < 770 && (
         <DocumentMobileHeader
@@ -585,7 +572,7 @@ const Pricing = () => {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {/* Desktop Header - Fixed at top */}
           {windowWidth >= 770 && (
             <div className="sticky top-0 z-20 w-full">
@@ -599,657 +586,384 @@ const Pricing = () => {
             </div>
           )}
 
-          <div className="flex flex-col flex-1">
-            <main className="flex-1 overflow-y-auto p-4">
-              <div className="container mx-auto py-8">
-                {/* Premium Packages Section */}
-                {!tiersLoading && premiumTiers.length > 0 && (
-                  <div className="mb-12 px-4 sm:px-6 md:px-8">
+          <main className="pricing-main-content">
+            <div className="container mx-auto">
+              {/* Premium Packages Section */}
+              {!tiersLoading && premiumTiers.length > 0 && (
+                <div className="mb-12">
+                  <div className="pricing-hero">
                     <h1
-                      className={`text-xl font-bold mb-6 ${
-                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      className={`pricing-title ${
+                        isDarkMode ? "dark" : "light"
                       }`}
                     >
                       Gói người dùng cao cấp
                     </h1>
+                    <p className="pricing-subtitle">
+                      Nâng cấp tài khoản để trải nghiệm đầy đủ tính năng và ưu
+                      đãi đặc biệt
+                    </p>
+                  </div>
 
-                    <div className="relative mb-8 overflow-hidden">
-                      {/* Navigation buttons */}
-                      <button
-                        onClick={() => scrollPremiumTiers("left")}
-                        className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full ${
-                          isDarkMode
-                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                            : "bg-white text-gray-800 hover:bg-gray-100"
-                        } shadow-lg`}
-                        aria-label="Previous"
+                  <div className="pricing-carousel-container">
+                    {/* Navigation buttons */}
+                    <button
+                      onClick={() => scrollPremiumTiers("left")}
+                      className={`carousel-nav-btn prev ${
+                        isDarkMode ? "dark" : "light"
+                      }`}
+                      aria-label="Previous"
+                    >
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M15 19l-7-7 7-7"
-                          ></path>
-                        </svg>
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M15 19l-7-7 7-7"
+                        ></path>
+                      </svg>
+                    </button>
 
-                      <button
-                        onClick={() => scrollPremiumTiers("right")}
-                        className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full ${
-                          isDarkMode
-                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                            : "bg-white text-gray-800 hover:bg-gray-100"
-                        } shadow-lg`}
-                        aria-label="Next"
+                    <button
+                      onClick={() => scrollPremiumTiers("right")}
+                      className={`carousel-nav-btn next ${
+                        isDarkMode ? "dark" : "light"
+                      }`}
+                      aria-label="Next"
+                    >
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M9 5l7 7-7 7"
-                          ></path>
-                        </svg>
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M9 5l7 7-7 7"
+                        ></path>
+                      </svg>
+                    </button>
 
-                      {/* Right shadow indicator for scrollable content */}
-                      {premiumTiers.length > 3 && (
-                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-gray-900/20 to-transparent z-10 pointer-events-none"></div>
-                      )}
-
-                      <div
-                        ref={scrollContainerRef}
-                        className="overflow-x-auto pb-4"
-                        style={{
-                          scrollbarWidth: "none",
-                          msOverflowStyle: "none",
-                        }}
-                      >
+                    <div
+                      ref={scrollContainerRef}
+                      className="pricing-scroll-area"
+                    >
+                      {premiumTiers.map((tier) => (
                         <div
-                          className={`flex ${
-                            windowWidth < 768 ? "space-x-4" : "space-x-6"
-                          } px-0.5`}
-                          style={{
-                            width: "100%",
-                            WebkitScrollbar: {
-                              display: "none",
-                            },
-                          }}
+                          key={tier.id}
+                          className={`pricing-card ${
+                            isDarkMode ? "dark" : "light"
+                          }`}
                         >
-                          {premiumTiers.map((tier) => (
+                          <div className="card-header">
                             <div
-                              key={tier.id}
-                              className={`${
-                                isDarkMode
-                                  ? "bg-gray-800 border-gray-700"
-                                  : "bg-white border-gray-200"
-                              } rounded-lg shadow-lg border hover:shadow-xl transition-shadow duration-300 flex-none flex flex-col
-                              p-6 md:p-6 sm:p-4
-                              ${
-                                windowWidth < 768
-                                  ? "max-h-[280px] overflow-y-auto"
-                                  : ""
+                              className={`card-icon-wrapper ${
+                                isDarkMode ? "dark" : "light"
                               }`}
-                              style={{
-                                width:
-                                  windowWidth < 768
-                                    ? "calc(85% - 1rem)"
-                                    : "calc((100% - 3rem) / 3)",
-                              }}
                             >
-                              <div
-                                className={`text-center ${
-                                  windowWidth < 768 ? "mb-2" : "mb-6"
-                                }`}
-                              >
-                                <div
-                                  className={`inline-flex items-center justify-center ${
-                                    windowWidth < 768
-                                      ? "w-8 h-8 mb-2"
-                                      : "w-12 h-12 mb-4"
-                                  } rounded-full ${
-                                    isDarkMode
-                                      ? "bg-blue-900/40 text-blue-300"
-                                      : "bg-blue-100 text-blue-600"
-                                  }`}
-                                >
-                                  {getIconComponent(tier.icon || "default")}
-                                </div>
-                                <h3
-                                  className={`${
-                                    windowWidth < 768 ? "text-base" : "text-xl"
-                                  } font-bold ${
-                                    windowWidth < 768 ? "mb-1" : "mb-2"
-                                  } ${
-                                    isDarkMode ? "text-white" : "text-gray-900"
-                                  }`}
-                                >
-                                  {tier.name}
-                                </h3>
-                                <div
-                                  className={`${
-                                    windowWidth < 768 ? "text-xl" : "text-3xl"
-                                  } font-bold ${
-                                    isDarkMode
-                                      ? "text-green-400"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {formatPrice(tier.price)}
-                                </div>
-                              </div>
-
-                              <div
-                                className={`flex-1 ${
-                                  windowWidth < 768
-                                    ? "mb-2 max-h-[100px] overflow-y-auto"
-                                    : "mb-6"
-                                }`}
-                              >
-                                {windowWidth < 768 ? (
-                                  // Mobile view - compact permissions display
-                                  tier.permissions &&
-                                  tier.permissions.length > 0 ? (
-                                    <div>
-                                      <h4
-                                        className={`text-xs font-semibold mb-1 ${
-                                          isDarkMode
-                                            ? "text-gray-300"
-                                            : "text-gray-700"
-                                        }`}
-                                      >
-                                        Quyền hạn:
-                                      </h4>
-                                      <ul className="space-y-1">
-                                        {tier.permissions.map(
-                                          (permission, index) => (
-                                            <li
-                                              key={index}
-                                              className="flex items-start"
-                                            >
-                                              <svg
-                                                className="w-3 h-3 text-green-500 mt-0.5 mr-1 flex-shrink-0"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth="2"
-                                                  d="M5 13l4 4L19 7"
-                                                ></path>
-                                              </svg>
-                                              <span
-                                                className={`text-xs leading-tight ${
-                                                  isDarkMode
-                                                    ? "text-gray-300"
-                                                    : "text-gray-600"
-                                                }`}
-                                              >
-                                                {permission}
-                                              </span>
-                                            </li>
-                                          )
-                                        )}
-                                      </ul>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-start">
-                                      <svg
-                                        className="w-3 h-3 text-yellow-500 mt-0.5 mr-1 flex-shrink-0"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth="2"
-                                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        ></path>
-                                      </svg>
-                                      <span
-                                        className={`text-xs ${
-                                          isDarkMode
-                                            ? "text-gray-400"
-                                            : "text-gray-500"
-                                        }`}
-                                      >
-                                        Đang cập nhật
-                                      </span>
-                                    </div>
-                                  )
-                                ) : // Desktop view - full permissions display
-                                tier.permissions &&
-                                  tier.permissions.length > 0 ? (
-                                  <div>
-                                    <h4
-                                      className={`text-sm font-semibold mb-3 ${
-                                        isDarkMode
-                                          ? "text-gray-300"
-                                          : "text-gray-700"
-                                      }`}
-                                    >
-                                      Quyền hạn:
-                                    </h4>
-                                    <ul className="space-y-2">
-                                      {tier.permissions.map(
-                                        (permission, index) => (
-                                          <li
-                                            key={index}
-                                            className="flex items-start"
-                                          >
-                                            <svg
-                                              className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth="2"
-                                                d="M5 13l4 4L19 7"
-                                              ></path>
-                                            </svg>
-                                            <span
-                                              className={`text-sm ${
-                                                isDarkMode
-                                                  ? "text-gray-300"
-                                                  : "text-gray-600"
-                                              }`}
-                                            >
-                                              {permission}
-                                            </span>
-                                          </li>
-                                        )
-                                      )}
-                                    </ul>
-                                  </div>
-                                ) : (
-                                  <div>
-                                    <h4
-                                      className={`text-sm font-semibold mb-3 ${
-                                        isDarkMode
-                                          ? "text-gray-300"
-                                          : "text-gray-700"
-                                      }`}
-                                    >
-                                      Quyền hạn:
-                                    </h4>
-                                    <div className="flex items-start">
-                                      <svg
-                                        className="w-4 h-4 text-yellow-500 mt-0.5 mr-2 flex-shrink-0"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth="2"
-                                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                        ></path>
-                                      </svg>
-                                      <span
-                                        className={`text-sm ${
-                                          isDarkMode
-                                            ? "text-gray-400"
-                                            : "text-gray-500"
-                                        }`}
-                                      >
-                                        Đang cập nhật
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="text-center mt-auto">
-                                <a
-                                  href="https://zalo.me/0915918742"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`inline-flex items-center justify-center w-full ${
-                                    windowWidth < 768
-                                      ? "px-2 py-1 text-xs"
-                                      : "px-4 py-2 text-sm"
-                                  } font-medium rounded-md transition-colors ${
-                                    isDarkMode
-                                      ? "bg-blue-700 hover:bg-blue-600 text-white"
-                                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                                  }`}
-                                >
-                                  <svg
-                                    className={`${
-                                      windowWidth < 768
-                                        ? "w-3 h-3 mr-1"
-                                        : "w-4 h-4 mr-2"
-                                    }`}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="2"
-                                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                                    ></path>
-                                  </svg>
-                                  Liên hệ Zalo
-                                </a>
-                              </div>
+                              {getIconComponent(tier.icon || "default")}
                             </div>
-                          ))}
+                            <h3 className="card-title">{tier.name}</h3>
+                            <div className="card-price">
+                              {formatPrice(tier.price)}
+                            </div>
+                          </div>
+
+                          <div className="card-features">
+                            <h4
+                              className={`text-sm font-semibold mb-3 uppercase tracking-wider ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              Quyền lợi:
+                            </h4>
+                            <ul className="feature-list">
+                              {tier.permissions &&
+                                tier.permissions.map((permission, index) => (
+                                  <li key={index} className="feature-item">
+                                    <svg
+                                      className="feature-icon"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M5 13l4 4L19 7"
+                                      ></path>
+                                    </svg>
+                                    <span>{permission}</span>
+                                  </li>
+                                ))}
+                            </ul>
+                          </div>
+
+                          <button className="card-button">Đăng ký ngay</button>
                         </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-                <div className="px-4 sm:px-6 md:px-8">
-                  <h1
-                    className={`text-xl font-bold mb-6 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-800"
+              {/* Pricing Content Section */}
+              {!contentLoading && pricingContent.length > 0 && (
+                <div className="mt-16">
+                  <div className="pricing-hero">
+                    <h2
+                      className={`pricing-title ${
+                        isDarkMode ? "dark" : "light"
+                      }`}
+                      style={{ fontSize: "2rem" }}
+                    >
+                      Thông tin chuyển khoản
+                    </h2>
+                  </div>
+
+                  <div
+                    className={`pricing-info-section ${
+                      isDarkMode ? "dark" : "light"
                     }`}
                   >
-                    Hướng dẫn liên hệ
+                    <ul className="space-y-4">
+                      {pricingContent.map((item) => renderContentItem(item))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Support Section */}
+              <div className="mt-16">
+                <div className="pricing-hero">
+                  <h1
+                    className={`pricing-title ${
+                      isDarkMode ? "dark" : "light"
+                    }`}
+                  >
+                    Hỗ trợ
                   </h1>
+                  <p className="pricing-subtitle">
+                    Chúng tôi cung cấp hỗ trợ toàn diện cho học tập và công việc của bạn
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div
+                    className={`${
+                      isDarkMode ? "bg-gray-800" : "bg-white"
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                  >
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          ></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      Hỗ trợ full 9/10 tất cả các môn hệ thống
+                    </h3>
+                  </div>
 
                   <div
                     className={`${
                       isDarkMode ? "bg-gray-800" : "bg-white"
-                    } rounded-lg shadow-sm p-6 mb-8`}
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
                   >
-                    {contentLoading ? (
-                      <div className="text-center py-4">
-                        <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-green-500"></div>
-                        <p className="mt-2">Đang tải nội dung...</p>
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color-light)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                          ></path>
+                        </svg>
                       </div>
-                    ) : pricingContent.length > 0 ? (
-                      <ol className="space-y-4">
-                        {pricingContent.map(renderContentItem)}
-                      </ol>
-                    ) : (
-                      <ol className="space-y-4">
-                        <li className="flex items-start">
-                          <span className="flex items-center justify-center bg-green-600 text-white rounded-full h-6 w-6 mr-2 flex-shrink-0">
-                            1
-                          </span>
-                          <div>
-                            Liên hệ với quản trị viên để được hỗ trợ học tập và
-                            trao đổi thông tin tại{" "}
-                            <a
-                              href="https://zalo.me/0915918742"
-                              className="text-blue-600"
-                            >
-                              Zalo 0876236682
-                            </a>
-                            .
-                          </div>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="flex items-center justify-center bg-green-600 text-white rounded-full h-6 w-6 mr-2 flex-shrink-0">
-                            2
-                          </span>
-                          <div>
-                            Lập tài khoản người dùng tại{" "}
-                            <Link to="/register" className="text-blue-600">
-                              Đăng ký tài khoản
-                            </Link>{" "}
-                            hoặc nếu đã có tài khoản thì bạn nhấp{" "}
-                            <Link to="/login" className="text-blue-600">
-                              Đăng nhập
-                            </Link>
-                            .
-                          </div>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="flex items-center justify-center bg-green-600 text-white rounded-full h-6 w-6 mr-2 flex-shrink-0">
-                            3
-                          </span>
-                          <div>
-                            Ủng hộ tôi với ly cà phê hoặc yêu cầu hỗ trợ học
-                            tập.
-                          </div>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="flex items-center justify-center bg-green-600 text-white rounded-full h-6 w-6 mr-2 flex-shrink-0">
-                            4
-                          </span>
-                          <div>
-                            Trải nghiệm trang Web, mở khóa toàn bộ thông tin tài
-                            liệu.
-                          </div>
-                        </li>
-                      </ol>
-                    )}
+                    </div>
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      Hỗ trợ đề cương trong thời gian học
+                    </h3>
                   </div>
 
-                  <h2
-                    className={`text-lg font-bold mb-6 ${
-                      isDarkMode ? "text-gray-200" : "text-gray-800"
-                    }`}
+                  <div
+                    className={`${
+                      isDarkMode ? "bg-gray-800" : "bg-white"
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
                   >
-                    Hỗ trợ tài liệu học tập
-                  </h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
-                    >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            ></path>
-                          </svg>
-                        </div>
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color-light)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                          ></path>
+                        </svg>
                       </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Hỗ trợ full 9/10 tất cả các môn hệ thống
-                      </h3>
                     </div>
-
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
                     >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
-                            ></path>
-                          </svg>
-                        </div>
-                      </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Hỗ trợ đề cương trong thời gian học
-                      </h3>
-                    </div>
+                      Hỗ trợ thi kết thúc môn học full điểm các môn
+                    </h3>
+                  </div>
+                </div>
 
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
-                    >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                            ></path>
-                          </svg>
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div
+                    className={`${
+                      isDarkMode ? "bg-gray-800" : "bg-white"
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                  >
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color-light)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          ></path>
+                        </svg>
                       </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Hỗ trợ thi kết thúc môn học full điểm các môn
-                      </h3>
                     </div>
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      Hỗ trợ đồ án full 9/10
+                    </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
-                    >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            ></path>
-                          </svg>
-                        </div>
+                  <div
+                    className={`${
+                      isDarkMode ? "bg-gray-800" : "bg-white"
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                  >
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color-light)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          ></path>
+                        </svg>
                       </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Hỗ trợ đồ án full 9/10
-                      </h3>
                     </div>
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
+                    >
+                      Báo cáo thực tập, chuyên đề thực tập, luận văn thạc sĩ tất cả các chuyên ngành
+                    </h3>
+                  </div>
 
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
-                    >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            ></path>
-                          </svg>
-                        </div>
+                  <div
+                    className={`${
+                      isDarkMode ? "bg-gray-800" : "bg-white"
+                    } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                  >
+                    <div className="flex justify-center mb-4">
+                      <div className="w-12 h-12 flex items-center justify-center">
+                        <svg
+                          className="w-8 h-8"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ color: 'var(--accent-color-light)' }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                          ></path>
+                        </svg>
                       </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Báo cáo thực tập, chuyên đề thực tập, luận văn thạc sĩ
-                        tất cả các chuyên ngành
-                      </h3>
                     </div>
-
-                    <div
-                      className={`${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow p-6 hover:shadow-md transition-shadow`}
+                    <h3
+                      className={`text-center text-sm font-medium ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
                     >
-                      <div className="flex justify-center mb-4">
-                        <div className="w-12 h-12 flex items-center justify-center">
-                          <svg
-                            className="w-8 h-8 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                            ></path>
-                          </svg>
-                        </div>
-                      </div>
-                      <h3
-                        className={`text-center text-sm font-medium ${
-                          isDarkMode ? "text-gray-200" : "text-gray-800"
-                        }`}
-                      >
-                        Dịch vụ kế toán, tư vấn khi ra trường, tư vấn pháp lý
-                      </h3>
-                    </div>
+                      Dịch vụ kế toán, tư vấn khi ra trường, tư vấn pháp lý
+                    </h3>
                   </div>
                 </div>
               </div>
-            </main>
 
-            {/* Add Footer */}
-            <Footer />
-          </div>
+              {/* Zalo Contact */}
+              <div className="mt-12">
+                <ZaloContact />
+              </div>
+            </div>
+          </main>
+          <Footer />
         </div>
       </div>
 
-      {/* Add ZaloContact component */}
-      <ZaloContact />
-
+      {/* Theme Color Picker Modal */}
       <ThemeColorPicker
         isOpen={isThemePickerOpen}
         onClose={() => setIsThemePickerOpen(false)}
