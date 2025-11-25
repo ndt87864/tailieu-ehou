@@ -745,14 +745,13 @@ const Pricing = () => {
               <div className="mt-16">
                 <div className="pricing-hero">
                   <h1
-                    className={`pricing-title ${
-                      isDarkMode ? "dark" : "light"
-                    }`}
+                    className={`pricing-title ${isDarkMode ? "dark" : "light"}`}
                   >
                     Hỗ trợ
                   </h1>
                   <p className="pricing-subtitle">
-                    Chúng tôi cung cấp hỗ trợ toàn diện cho học tập và công việc của bạn
+                    Chúng tôi cung cấp hỗ trợ toàn diện cho học tập và công việc
+                    của bạn
                   </p>
                 </div>
 
@@ -769,7 +768,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color)' }}
+                          style={{ color: "var(--accent-color)" }}
                         >
                           <path
                             strokeLinecap="round"
@@ -801,7 +800,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color-light)' }}
+                          style={{ color: "var(--accent-color-light)" }}
                         >
                           <path
                             strokeLinecap="round"
@@ -833,7 +832,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color-light)' }}
+                          style={{ color: "var(--accent-color-light)" }}
                         >
                           <path
                             strokeLinecap="round"
@@ -867,7 +866,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color-light)' }}
+                          style={{ color: "var(--accent-color-light)" }}
                         >
                           <path
                             strokeLinecap="round"
@@ -899,7 +898,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color-light)' }}
+                          style={{ color: "var(--accent-color-light)" }}
                         >
                           <path
                             strokeLinecap="round"
@@ -915,7 +914,8 @@ const Pricing = () => {
                         isDarkMode ? "text-gray-200" : "text-gray-800"
                       }`}
                     >
-                      Báo cáo thực tập, chuyên đề thực tập, luận văn thạc sĩ tất cả các chuyên ngành
+                      Báo cáo thực tập, chuyên đề thực tập, luận văn thạc sĩ tất
+                      cả các chuyên ngành
                     </h3>
                   </div>
 
@@ -931,7 +931,7 @@ const Pricing = () => {
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
-                          style={{ color: 'var(--accent-color-light)' }}
+                          style={{ color: "var(--accent-color-light)" }}
                         >
                           <path
                             strokeLinecap="round"

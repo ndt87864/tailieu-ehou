@@ -15,6 +15,7 @@ import Footer from "../components/Footer";
 import ThemeColorPicker from "../components/ThemeColorPicker";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../firebase/firebase";
+import "../styles/document-view.css";
 
 // Hide studentId, dob, examType columns from user-facing table
 const columns = [
@@ -148,11 +149,7 @@ const StudentPage = () => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div
-      className={`flex flex-col min-h-screen ${
-        isDarkMode ? "bg-gray-900" : "bg-slate-100"
-      }`}
-    >
+    <div className="theme-consistent-wrapper">
       {/* Mobile Header */}
       {windowWidth < 770 && (
         <HomeMobileHeader
@@ -194,7 +191,11 @@ const StudentPage = () => {
           />
         )}
 
-        <div className="theme-content-container flex-1 min-w-0 shadow-sm flex flex-col">
+        <div
+          className={`theme-content-container document-view-container flex-1 shadow-sm flex flex-col ${
+            isDarkMode ? "dark" : "light"
+          }`}
+        >
           {windowWidth >= 770 && (
             <div className="w-full">
               <UserHeader
@@ -205,8 +206,8 @@ const StudentPage = () => {
             </div>
           )}
 
-          <div className="flex-1 p-6 min-w-0">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
+          <div className="flex-1 flex flex-col">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4 px-4 mt-6">
               <p
                 className={`text-sm ${
                   isDarkMode ? "text-gray-400" : "text-slate-500"
@@ -216,7 +217,78 @@ const StudentPage = () => {
                   ? ""
                   : `Hiển thị từ ${showingFrom} đến ${showingTo} trong tổng số ${filtered.length} thí sinh`}
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                {/* Mobile Excel button */}
+                {windowWidth < 770 && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const XLSX = await import("xlsx");
+                        // Export only visible fields (hide studentId, dob, examType)
+                        const data = filtered.map((r) => ({
+                          "Họ và tên": r.fullName || "",
+                          "Tài khoản": r.username || "",
+                          "Tên môn học": r.subject || "",
+                          "Ca thi": r.examSession || "",
+                          "Phòng thi": r.examRoom || "",
+                          Khóa: r.course || "",
+                          "Mã ngành": r.majorCode || "",
+                          "Link phòng": r.examLink || "",
+                        }));
+                        const wb = XLSX.utils.book_new();
+                        const ws = XLSX.utils.json_to_sheet(data);
+                        XLSX.utils.book_append_sheet(
+                          wb,
+                          ws,
+                          "Danh sách thí sinh"
+                        );
+                        const wbout = XLSX.write(wb, {
+                          bookType: "xlsx",
+                          type: "array",
+                        });
+                        const blob = new Blob([wbout], {
+                          type: "application/octet-stream",
+                        });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `students_${new Date()
+                          .toISOString()
+                          .slice(0, 19)
+                          .replace(/[:T]/g, "-")}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      } catch (e) {
+                        console.error("Export XLSX failed", e);
+                        alert("Lỗi xuất file excel: " + (e?.message || e));
+                      }
+                    }}
+                    className={`action-btn flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white transition-colors text-sm ${
+                      loading
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg"
+                    }`}
+                    disabled={loading}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    <span>Tải Excel</span>
+                  </button>
+                )}
                 {windowWidth >= 770 && (
                   <button
                     onClick={async () => {
@@ -263,11 +335,16 @@ const StudentPage = () => {
                         alert("Lỗi xuất file excel: " + (e?.message || e));
                       }
                     }}
-                    className="flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors bg-blue-600 hover:bg-blue-700 text-sm"
+                    className={`action-btn flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${
+                      loading
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
+                    }`}
+                    disabled={loading}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
+                      className="h-9 w-9"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -279,55 +356,117 @@ const StudentPage = () => {
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                       />
                     </svg>
-                    Xuất file excel
+                    <span>Excel</span>
                   </button>
                 )}
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Nhập họ và tên,tên tài khoản"
-                    value={pendingSearch}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setPendingSearch(v);
-                      if (v === "") {
-                        setSearch("");
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        setSearch(pendingSearch);
-                      }
-                    }}
-                    className={`pl-3 pr-10 py-2 border rounded-md w-full md:w-64 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-700 text-gray-200 placeholder-gray-500"
-                        : "bg-white border-gray-300 text-gray-800"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    aria-label="Tìm kiếm"
-                    onClick={() => setSearch(pendingSearch)}
-                    className="absolute right-2 top-2 p-1 text-gray-400 hover:text-blue-600"
-                    tabIndex={-1}
-                    style={{ background: "none", border: "none" }}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                <div className="search-container relative group w-full sm:w-auto">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Nhập họ và tên,tên tài khoản"
+                      value={pendingSearch}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPendingSearch(v);
+                        if (v === "") {
+                          setSearch("");
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setSearch(pendingSearch);
+                        }
+                      }}
+                      disabled={loading}
+                      className={`w-full md:w-80 pl-12 pr-4 py-3 text-sm rounded-xl border-0 outline-none transition-all duration-300 ease-in-out shadow-lg backdrop-blur-md ${
+                        isDarkMode
+                          ? "bg-gray-800/80 text-gray-100 placeholder-gray-400 border-gray-600/50 hover:bg-gray-700/90 hover:border-gray-500/70 focus:bg-gray-700/95 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400/70"
+                          : "bg-white/80 text-gray-900 placeholder-gray-500 border-gray-200/50 hover:bg-white/95 hover:border-gray-300/70 focus:bg-white focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400/70"
+                      } ${
+                        loading
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:shadow-xl focus:shadow-xl"
+                      }`}
+                    />
+                    <div
+                      className={`absolute top-1/2 left-0 pl-4 transform -translate-y-1/2 flex items-center pointer-events-none transition-colors duration-200 ${
+                        isDarkMode
+                          ? "text-gray-400 group-hover:text-gray-300"
+                          : "text-gray-500 group-hover:text-gray-600"
+                      }`}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 transition-colors duration-200"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
                         strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                      />
-                    </svg>
-                  </button>
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                    </div>
+                    {pendingSearch && (
+                      <button
+                        onClick={() => {
+                          setPendingSearch("");
+                          setSearch("");
+                        }}
+                        className={`absolute inset-y-0 right-0 pr-4 flex items-center transition-all duration-200 ${
+                          isDarkMode
+                            ? "text-gray-400 hover:text-gray-200 hover:bg-gray-600/50"
+                            : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/50"
+                        } rounded-r-xl`}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {pendingSearch && (
+                    <div
+                      className={`absolute top-full mt-2 left-0 right-0 md:right-auto md:w-80 p-3 rounded-lg shadow-lg backdrop-blur-md border transition-all duration-200 ${
+                        isDarkMode
+                          ? "bg-gray-800/95 border-gray-600/50 text-gray-200"
+                          : "bg-white/95 border-gray-200/50 text-gray-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-sm">
+                        <span>
+                          Tìm thấy <strong>{filtered.length}</strong> kết quả
+                        </span>
+                        <button
+                          onClick={() => {
+                            setPendingSearch("");
+                            setSearch("");
+                          }}
+                          className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                            isDarkMode
+                              ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                          }`}
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -339,81 +478,143 @@ const StudentPage = () => {
             <div className="mx-auto w-full md:w-[90%] max-w-full">
               {/* Mobile optimized view: stacked cards for small screens */}
               {windowWidth < 770 ? (
-                <div className="p-3 space-y-3">
+                <div className="p-3 space-y-4">
                   {filtered.length === 0 ? (
-                    <div className="p-4 text-center">Không có bản ghi nào</div>
+                    <div className="p-8 text-center rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      <h3
+                        className={`text-lg font-medium ${
+                          isDarkMode ? "text-gray-200" : "text-gray-700"
+                        }`}
+                      >
+                        Không có bản ghi nào
+                      </h3>
+                      <p
+                        className={`mt-2 ${
+                          isDarkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        Không tìm thấy thí sinh nào phù hợp với tiêu chí tìm
+                        kiếm.
+                      </p>
+                    </div>
                   ) : (
                     paged.map((r) => (
                       <div
                         key={r.id}
-                        className={`p-3 bg-transparent border rounded-lg  bg-white dark:bg-gray-800 rounded shadow shadow-sm ${
-                          isDarkMode ? "border-gray-800" : "border-gray-200"
-                        }`}
+                        className="p-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out"
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate mb-1">
                               {r.fullName || "-"}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">
+                            <div className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">
                               Tài khoản: {r.username || "-"}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
                               Ngày thi:{" "}
                               {formatDate(r.examDate) || (
-                                <span className="text-sm text-gray-500">
+                                <span className="text-gray-500">
                                   chưa cập nhật
                                 </span>
                               )}
                             </div>
                           </div>
-                          {/* DOB hidden on user-facing page */}
+                          <div className="ml-3 flex-shrink-0">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <svg
+                                className="w-5 h-5 text-white"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                              </svg>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-700 dark:text-gray-300">
-                          <div>
-                            <span className="font-medium">Môn:</span>{" "}
-                            {r.subject || "-"}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Môn học
+                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">
+                              {r.subject || "-"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="font-medium">Ca:</span>{" "}
-                            {r.examSession || "-"}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Ca thi
+                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">
+                              {r.examSession || "-"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="font-medium">Phòng:</span>{" "}
-                            {r.examRoom || "-"}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Phòng thi
+                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">
+                              {r.examRoom || "-"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="font-medium">Khóa:</span>{" "}
-                            {r.course || "-"}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Khóa
+                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">
+                              {r.course || "-"}
+                            </span>
                           </div>
-                          <div>
-                            <span className="font-medium">Mã ngành:</span>{" "}
-                            {r.majorCode || "-"}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Mã ngành
+                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">
+                              {r.majorCode || "-"}
+                            </span>
                           </div>
-                          {/* examType hidden on user-facing page */}
-
-                          <div className="col-span-2">
-                            <span className="font-medium">Link phòng:</span>{" "}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 col-span-2">
+                            <span className="font-medium text-gray-700 dark:text-gray-300 block mb-1">
+                              Link phòng
+                            </span>
                             {r.examLink ? (
                               <a
                                 href={r.examLink}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-blue-600 hover:underline break-all"
+                                className="text-blue-600 dark:text-blue-400 hover:underline break-all text-sm"
                               >
                                 {r.examLink}
                               </a>
                             ) : (
-                              "-"
+                              <span className="text-gray-500">-</span>
                             )}
                           </div>
                         </div>
                       </div>
                     ))
                   )}
-                  {/* Xuất file excel button for mobile mode - Ẩn trên mobile */}
-                  {/* Không hiển thị nút xuất file excel ở mobile mode */}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -437,7 +638,35 @@ const StudentPage = () => {
                             colSpan={columns.length}
                             className="p-4 text-center"
                           >
-                            Không có bản ghi nào
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                            <h3
+                              className={`text-lg font-medium ${
+                                isDarkMode ? "text-gray-200" : "text-gray-700"
+                              }`}
+                            >
+                              Không có bản ghi nào
+                            </h3>
+                            <p
+                              className={`mt-2 ${
+                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              Không tìm thấy thí sinh nào phù hợp với tiêu chí
+                              tìm kiếm.
+                            </p>
                           </td>
                         </tr>
                       )}
@@ -510,7 +739,11 @@ const StudentPage = () => {
                     setLimit(v);
                     setCurrentPage(1);
                   }}
-                  className="px-2 py-1 border rounded-md text-sm"
+                  className={`px-2 py-1 border rounded-md text-sm ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-600 text-gray-200"
+                      : "bg-white border-gray-300 text-gray-700"
+                  }`}
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -524,8 +757,12 @@ const StudentPage = () => {
                     disabled={currentPage <= 1}
                     className={`px-3 py-1 rounded-md ${
                       currentPage <= 1
-                        ? "bg-gray-200 text-gray-400"
-                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : `bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border ${
+                            isDarkMode
+                              ? "border-gray-600 hover:bg-gray-700"
+                              : "border-gray-300 hover:bg-gray-50"
+                          }`
                     }`}
                   >
                     &laquo; Trước
@@ -542,8 +779,12 @@ const StudentPage = () => {
                     disabled={currentPage >= totalPages}
                     className={`px-3 py-1 rounded-md ${
                       currentPage >= totalPages
-                        ? "bg-gray-200 text-gray-400"
-                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                        : `bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border ${
+                            isDarkMode
+                              ? "border-gray-600 hover:bg-gray-700"
+                              : "border-gray-300 hover:bg-gray-50"
+                          }`
                     }`}
                   >
                     Sau &raquo;
