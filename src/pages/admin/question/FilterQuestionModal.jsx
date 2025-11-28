@@ -13,18 +13,17 @@ const FilterQuestionModal = ({
   setShowFilterModal,
 }) => {
   const [categorySearch, setCategorySearch] = useState("");
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  // showCategoryDropdown removed
   const [filteredCategories, setFilteredCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedCategoryTitle, setSelectedCategoryTitle] = useState("");
   const categoryInputRef = useRef(null);
   const categoryDropdownRef = useRef(null);
 
   const [documentSearch, setDocumentSearch] = useState("");
-  const [showDocumentDropdown, setShowDocumentDropdown] = useState(false);
+  // showDocumentDropdown removed
   const [filteredDocuments, setFilteredDocuments] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
-  const [selectedDocumentTitle, setSelectedDocumentTitle] = useState("");
+  // selectedDocumentTitle removed
   const documentInputRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -68,20 +67,9 @@ const FilterQuestionModal = ({
     } else if (Array.isArray(filterCategory)) {
       setSelectedCategories(filterCategory);
     }
+  }, [filterCategory]);
 
-    // Update category display title
-    if (selectedCategories.length === 0) {
-      setSelectedCategoryTitle("");
-    } else if (selectedCategories.length === 1) {
-      const selectedCat = allCategories.find(
-        (cat) => cat.id === selectedCategories[0]
-      );
-      setSelectedCategoryTitle(selectedCat ? selectedCat.title : "");
-    } else {
-      setSelectedCategoryTitle(`${selectedCategories.length} danh mục đã chọn`);
-    }
-  }, [filterCategory, allCategories, selectedCategories.length]);
-
+  // Update selected document title when filterDocument changes
   // Update selected document title when filterDocument changes
   useEffect(() => {
     // Convert single filterDocument to array for backward compatibility
@@ -90,36 +78,10 @@ const FilterQuestionModal = ({
     } else if (Array.isArray(filterDocument)) {
       setSelectedDocuments(filterDocument);
     }
-
-    // Update display title
-    if (selectedDocuments.length === 0) {
-      setSelectedDocumentTitle("");
-    } else if (selectedDocuments.length === 1) {
-      // Find document in any selected category
-      let selectedDoc = null;
-      for (const categoryId of selectedCategories) {
-        if (categoryDocuments[categoryId]) {
-          selectedDoc = categoryDocuments[categoryId].find(
-            (doc) => doc.id === selectedDocuments[0]
-          );
-          if (selectedDoc) break;
-        }
-      }
-      setSelectedDocumentTitle(selectedDoc ? selectedDoc.title : "");
-    } else {
-      setSelectedDocumentTitle(`${selectedDocuments.length} tài liệu đã chọn`);
-    }
-  }, [
-    filterDocument,
-    selectedCategories,
-    categoryDocuments,
-    selectedDocuments.length,
-  ]);
+  }, [filterDocument]);
 
   // Handle category search input focus
   const handleCategorySearchFocus = () => {
-    setShowCategoryDropdown(true);
-    setCategorySearch(selectedCategoryTitle);
     // Select all text for easy replacement
     setTimeout(() => {
       if (categoryInputRef.current) {
@@ -131,14 +93,11 @@ const FilterQuestionModal = ({
   // Handle category search input change
   const handleCategorySearchChange = (e) => {
     setCategorySearch(e.target.value);
-    setShowCategoryDropdown(true);
   };
 
   // Handle document search input focus
   const handleDocumentSearchFocus = () => {
     if (selectedCategories.length > 0) {
-      setShowDocumentDropdown(true);
-      setDocumentSearch(selectedDocumentTitle);
       // Select all text for easy replacement
       setTimeout(() => {
         if (documentInputRef.current) {
@@ -151,7 +110,6 @@ const FilterQuestionModal = ({
   // Handle document search input change
   const handleDocumentSearchChange = (e) => {
     setDocumentSearch(e.target.value);
-    setShowDocumentDropdown(true);
   };
 
   // Handle checkbox change for category selection
@@ -171,21 +129,8 @@ const FilterQuestionModal = ({
     // Reset documents when categories change
     setSelectedDocuments([]);
     setFilterDocument([]);
-    setSelectedDocumentTitle("");
 
-    // Update display title
-    if (newSelectedCategories.length === 0) {
-      setSelectedCategoryTitle("");
-    } else if (newSelectedCategories.length === 1) {
-      const selectedCat = allCategories.find(
-        (cat) => cat.id === newSelectedCategories[0]
-      );
-      setSelectedCategoryTitle(selectedCat ? selectedCat.title : "");
-    } else {
-      setSelectedCategoryTitle(
-        `${newSelectedCategories.length} danh mục đã chọn`
-      );
-    }
+
   };
 
   // Handle select all / deselect all categories
@@ -212,7 +157,6 @@ const FilterQuestionModal = ({
     // Reset documents when categories change
     setSelectedDocuments([]);
     setFilterDocument([]);
-    setSelectedDocumentTitle("");
   };
 
   // Handle checkbox change for document selection
@@ -228,25 +172,6 @@ const FilterQuestionModal = ({
     setFilterDocument(newSelectedDocuments);
 
     // Update display title
-    if (newSelectedDocuments.length === 0) {
-      setSelectedDocumentTitle("");
-    } else if (newSelectedDocuments.length === 1) {
-      // Find document in any selected category
-      let selectedDoc = null;
-      for (const categoryId of selectedCategories) {
-        if (categoryDocuments[categoryId]) {
-          selectedDoc = categoryDocuments[categoryId].find(
-            (doc) => doc.id === newSelectedDocuments[0]
-          );
-          if (selectedDoc) break;
-        }
-      }
-      setSelectedDocumentTitle(selectedDoc ? selectedDoc.title : "");
-    } else {
-      setSelectedDocumentTitle(
-        `${newSelectedDocuments.length} tài liệu đã chọn`
-      );
-    }
   };
 
   // Handle select all / deselect all
@@ -277,28 +202,7 @@ const FilterQuestionModal = ({
   };
 
   // Handle click outside to close dropdowns
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        categoryDropdownRef.current &&
-        !categoryDropdownRef.current.contains(event.target)
-      ) {
-        setShowCategoryDropdown(false);
-        setCategorySearch("");
-      }
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDocumentDropdown(false);
-        setDocumentSearch("");
-      }
-    };
-
-    if (showCategoryDropdown || showDocumentDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [showCategoryDropdown, showDocumentDropdown]);
+  // Removed useEffect for handleClickOutside as dropdowns are always visible
 
   // Handle category selection from dropdown (keep for backward compatibility)
   const handleCategorySelect = (category) => {
@@ -313,9 +217,7 @@ const FilterQuestionModal = ({
     setSelectedCategories([e.target.value]);
     setFilterDocument([]);
     setSelectedDocuments([]);
-    setSelectedDocumentTitle("");
     setDocumentSearch("");
-    setShowDocumentDropdown(false);
   };
 
   if (!showFilterModal) return null;
@@ -329,29 +231,21 @@ const FilterQuestionModal = ({
           &zwnj;
         </span>
         <div
-          className={`inline-block align-bottom rounded-lg text-left sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full ${
+          className={`inline-flex flex-col align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full ${
             isDarkMode
               ? "bg-gray-700 border border-gray-600"
               : "bg-gray-50 border border-gray-200"
           }`}
           style={{
-            minHeight: showDocumentDropdown ? "600px" : "350px",
-            maxHeight: "90vh",
-            overflow: "hidden",
-            position: "relative",
+            maxHeight: "80vh",
           }}
         >
           <div
-            className={`px-6 pt-6 pb-6 ${
+            className={`flex flex-col flex-1 min-h-0 w-full ${
               isDarkMode ? "bg-gray-800" : "bg-white"
             }`}
-            style={{
-              minHeight: showDocumentDropdown ? "550px" : "300px",
-              position: "relative",
-              overflow: "visible",
-              height: "100%",
-            }}
           >
+            <div className="flex-1 overflow-y-auto min-h-0 px-6 pt-6">
             <h3 className="text-xl font-medium leading-6 mb-5">Lọc câu hỏi</h3>
             <div className="mb-5" ref={categoryDropdownRef}>
               <label
@@ -377,11 +271,7 @@ const FilterQuestionModal = ({
                       : "bg-gray-50 text-gray-900 border-gray-200"
                   } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="Tìm kiếm danh mục..."
-                  value={
-                    showCategoryDropdown
-                      ? categorySearch
-                      : selectedCategoryTitle
-                  }
+                  value={categorySearch}
                   onChange={handleCategorySearchChange}
                   onFocus={handleCategorySearchFocus}
                 />
@@ -394,42 +284,23 @@ const FilterQuestionModal = ({
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    {showCategoryDropdown ? (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 15l7-7 7 7"
-                      />
-                    ) : (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                 </div>
 
-                {/* Category Dropdown list */}
-                {showCategoryDropdown && (
-                  <div
-                    className={`absolute w-full mt-1 overflow-auto rounded-lg shadow-xl border-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 border-gray-500"
-                        : "bg-white border-gray-300"
-                    }`}
-                    style={{
-                      maxHeight: "200px",
-                      zIndex: 11,
-                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      position: "absolute",
-                    }}
-                  >
+                {/* Category List (Always Visible) */}
+                <div
+                  className={`w-full mt-2 rounded-lg border ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600"
+                      : "bg-white border-gray-300"
+                  }`}
+                >
                     {filteredCategories.length > 0 ? (
                       <>
                         {/* Select All / Deselect All Categories */}
@@ -517,7 +388,6 @@ const FilterQuestionModal = ({
                       </div>
                     )}
                   </div>
-                )}
               </div>
             </div>
             <div className="mb-20" ref={dropdownRef}>
@@ -548,11 +418,7 @@ const FilterQuestionModal = ({
                       ? "Tìm kiếm tài liệu..."
                       : "Chọn danh mục trước"
                   }
-                  value={
-                    showDocumentDropdown
-                      ? documentSearch
-                      : selectedDocumentTitle
-                  }
+                  value={documentSearch}
                   onChange={handleDocumentSearchChange}
                   onFocus={handleDocumentSearchFocus}
                   disabled={selectedCategories.length === 0}
@@ -566,41 +432,23 @@ const FilterQuestionModal = ({
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
-                    {showDocumentDropdown ? (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 15l7-7 7 7"
-                      />
-                    ) : (
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                 </div>
 
-                {/* Dropdown list */}
-                {showDocumentDropdown && selectedCategories.length > 0 && (
+                {/* Document List (Always Visible) */}
+                {selectedCategories.length > 0 && (
                   <div
-                    className={`absolute w-full mt-1 overflow-auto rounded-lg shadow-xl border-2 ${
+                    className={`w-full mt-2 rounded-lg border ${
                       isDarkMode
-                        ? "bg-gray-700 border-gray-500"
+                        ? "bg-gray-700 border-gray-600"
                         : "bg-white border-gray-300"
                     }`}
-                    style={{
-                      maxHeight: "300px",
-                      zIndex: 10,
-                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      position: "absolute",
-                    }}
                   >
                     {filteredDocuments.length > 0 ? (
                       <>
@@ -701,13 +549,11 @@ const FilterQuestionModal = ({
                 )}
               </div>
             </div>
+            </div>
             <div
-              className="flex justify-between items-center space-x-4"
-              style={{
-                position: "relative",
-                zIndex: 0,
-                marginTop: "auto",
-              }}
+              className={`px-6 py-4 border-t flex justify-between items-center space-x-4 flex-shrink-0 ${
+                isDarkMode ? "border-gray-700" : "border-gray-200"
+              }`}
             >
               <div className="flex space-x-4">
                 <button
