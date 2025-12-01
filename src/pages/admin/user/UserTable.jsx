@@ -1,5 +1,6 @@
 import React from "react";
 import UserTableRow from "./UserTableRow";
+import UserMobileCard from "./UserMobileCard";
 
 const UserTable = ({
   users,
@@ -125,57 +126,11 @@ const UserTable = ({
     );
   }
   return (
-    <table
-      className={`min-w-full divide-y ${
-        isDarkMode ? "divide-gray-700" : "divide-gray-200"
-      }`}
-    >
-      <thead>
-        <tr className={isDarkMode ? "bg-gray-700/30" : "bg-gray-50"}>
-          <th
-            className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-              isDarkMode ? "text-gray-300" : "text-gray-500"
-            }`}
-          >
-            Người dùng
-          </th>
-          <th
-            className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-              isDarkMode ? "text-gray-300" : "text-gray-500"
-            }`}
-          >
-            Email
-          </th>
-          <th
-            className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-              isDarkMode ? "text-gray-300" : "text-gray-500"
-            }`}
-          >
-            Vai trò
-          </th>
-          <th
-            className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-              isDarkMode ? "text-gray-300" : "text-gray-500"
-            }`}
-          >
-            Excel Controls
-          </th>
-          <th
-            className={`px-6 py-3 text-center text-xs font-medium uppercase tracking-wider ${
-              isDarkMode ? "text-gray-300" : "text-gray-500"
-            }`}
-          >
-            Xóa
-          </th>
-        </tr>
-      </thead>
-      <tbody
-        className={`divide-y ${
-          isDarkMode ? "divide-gray-700" : "divide-gray-200"
-        }`}
-      >
+    <>
+      {/* Mobile View: Cards */}
+      <div className="block md:hidden">
         {filteredUsers.map((userData) => (
-          <UserTableRow
+          <UserMobileCard
             key={userData.id}
             userData={userData}
             isDarkMode={isDarkMode}
@@ -193,8 +148,82 @@ const UserTable = ({
             getRoleName={getRoleName}
           />
         ))}
-      </tbody>
-    </table>
+      </div>
+
+      {/* Desktop View: Table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table
+          className={`min-w-full divide-y ${
+            isDarkMode ? "divide-gray-700" : "divide-gray-200"
+          }`}
+        >
+          <thead>
+            <tr className={isDarkMode ? "bg-gray-700/30" : "bg-gray-50"}>
+              <th
+                className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                  isDarkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                Người dùng
+              </th>
+              <th
+                className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                  isDarkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                Email
+              </th>
+              <th
+                className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                  isDarkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                Vai trò
+              </th>
+              <th
+                className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                  isDarkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                Excel Controls
+              </th>
+              <th
+                className={`px-6 py-3 text-center text-xs font-medium uppercase tracking-wider ${
+                  isDarkMode ? "text-gray-300" : "text-gray-500"
+                }`}
+              >
+                Xóa
+              </th>
+            </tr>
+          </thead>
+          <tbody
+            className={`divide-y ${
+              isDarkMode ? "divide-gray-700" : "divide-gray-200"
+            }`}
+          >
+            {filteredUsers.map((userData) => (
+              <UserTableRow
+                key={userData.id}
+                userData={userData}
+                isDarkMode={isDarkMode}
+                userOnlineStatus={userOnlineStatus}
+                toggleUserOnlineStatus={toggleUserOnlineStatus}
+                handleRoleChange={handleRoleChange}
+                handleSubscriptionTypeChange={handleSubscriptionTypeChange}
+                handleManageCategories={handleManageCategories}
+                shouldShowExcelControls={shouldShowExcelControls}
+                handleExcelPermissionToggle={handleExcelPermissionToggle}
+                handleExcelPercentageChange={handleExcelPercentageChange}
+                getDefaultExcelPercentage={getDefaultExcelPercentage}
+                handleDeleteClick={handleDeleteClick}
+                user={user}
+                getRoleName={getRoleName}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 };
 

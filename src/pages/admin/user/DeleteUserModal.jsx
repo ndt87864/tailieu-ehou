@@ -177,7 +177,7 @@ const DeleteUserModal = ({
 
           {/* Modal Footer */}
           <div
-            className={`px-6 py-4 flex sm:flex-row-reverse ${
+            className={`px-6 py-4 flex flex-col sm:flex-row-reverse ${
               isDarkMode
                 ? "bg-gray-700 border-t border-gray-600"
                 : "bg-gray-50 border-t border-gray-200"

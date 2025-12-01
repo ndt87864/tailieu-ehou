@@ -176,11 +176,12 @@ const CategoryManagementModal = ({
                   </svg>
                 </div>
               ) : (
-                <div className="flex">
+                <div className="flex flex-col md:flex-row">
                   <div
-                    className="w-1/2 overflow-y-auto max-h-[70vh] border-r"
+                    className="w-full md:w-1/2 overflow-y-auto max-h-[40vh] md:max-h-[60vh] border-b md:border-b-0 md:border-r mb-4 md:mb-0 pb-4 md:pb-0"
                     style={{ borderColor: isDarkMode ? "#6b7280" : "#d1d5db" }}
                   >
+                    <h4 className={`font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Danh mục</h4>
                     <input
                       type="text"
                       placeholder="Search categories..."
@@ -199,31 +200,35 @@ const CategoryManagementModal = ({
                     {filteredCategories.map((category) => (
                       <div
                         key={category.id}
-                        className={`p-4 cursor-pointer ${
+                        className={`p-3 cursor-pointer rounded-md mb-1 ${
                           activeCategoryId === category.id
                             ? isDarkMode
                               ? "bg-gray-800 text-white"
                               : "bg-gray-200 text-gray-900"
                             : isDarkMode
-                            ? "bg-gray-700 text-gray-300"
-                            : "bg-white text-gray-700"
+                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            : "bg-white text-gray-700 hover:bg-gray-100"
                         }`}
                         onClick={() => handleCategoryClick(category.id)}
                       >
-                        <input
-                          type="checkbox"
-                          id={`category-${category.id}`}
-                          checked={selectedCategories.includes(category.id)}
-                          onChange={() => handleCategoryChange(category.id)}
-                          className="mr-2"
-                        />
-                        <label htmlFor={`category-${category.id}`}>
-                          {category.title || "Danh mục không có tên"}
-                        </label>
+                        <div className="flex items-center">
+                            <input
+                            type="checkbox"
+                            id={`category-${category.id}`}
+                            checked={selectedCategories.includes(category.id)}
+                            onChange={() => handleCategoryChange(category.id)}
+                            className="mr-3 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                            onClick={(e) => e.stopPropagation()}
+                            />
+                            <label htmlFor={`category-${category.id}`} className="cursor-pointer flex-1">
+                            {category.title || "Danh mục không có tên"}
+                            </label>
+                        </div>
                       </div>
                     ))}
                   </div>
-                  <div className="w-1/2 overflow-y-auto max-h-[70vh] p-4">
+                  <div className="w-full md:w-1/2 overflow-y-auto max-h-[40vh] md:max-h-[60vh] md:pl-4">
+                    <h4 className={`font-medium mb-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>Tài liệu</h4>
                     <input
                       type="text"
                       placeholder="Search documents..."
@@ -239,22 +244,26 @@ const CategoryManagementModal = ({
                           : "focus:ring-green-500 focus:border-green-500"
                       }`}
                     />
-                    {filteredDocuments.map((doc) => (
-                      <div key={doc.id} className="flex items-center mb-2">
-                        <input
-                          type="checkbox"
-                          id={`document-${doc.id}`}
-                          checked={selectedDocuments.includes(doc.id)}
-                          onChange={() =>
-                            handleDocumentChange(doc.id, activeCategoryId)
-                          }
-                          className="mr-2"
-                        />
-                        <label htmlFor={`document-${doc.id}`}>
-                          {doc.title}
-                        </label>
-                      </div>
-                    ))}
+                    {filteredDocuments.length > 0 ? (
+                        filteredDocuments.map((doc) => (
+                        <div key={doc.id} className={`flex items-center mb-2 p-2 rounded-md ${isDarkMode ? "hover:bg-gray-600" : "hover:bg-gray-100"}`}>
+                            <input
+                            type="checkbox"
+                            id={`document-${doc.id}`}
+                            checked={selectedDocuments.includes(doc.id)}
+                            onChange={() =>
+                                handleDocumentChange(doc.id, activeCategoryId)
+                            }
+                            className="mr-3 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor={`document-${doc.id}`} className={`cursor-pointer flex-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                            {doc.title}
+                            </label>
+                        </div>
+                        ))
+                    ) : (
+                        <p className={`text-sm italic ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>Không có tài liệu nào trong danh mục này</p>
+                    )}
                   </div>
                 </div>
               )}
