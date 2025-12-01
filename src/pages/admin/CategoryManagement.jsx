@@ -17,6 +17,7 @@ import {
   protectAdminRoute,
   loadCategoriesOptimized,
 } from "../../utils/permission/adminHelper";
+import CategoryMobileCard from "./CategoryMobileCard";
 
 const CategoryManagement = () => {
   const [categories, setCategories] = useState([]);
@@ -950,216 +951,18 @@ const CategoryManagement = () => {
                   ) : (
                     <>
                       {/* Mobile view - Changed to match desktop table layout */}
-                      <div className="md:hidden">
-                        <table
-                          className={`min-w-full divide-y ${
-                            isDarkMode ? "divide-gray-700" : "divide-gray-200"
-                          }`}
-                        >
-                          <thead>
-                            <tr
-                              className={
-                                isDarkMode ? "bg-gray-700/30" : "bg-gray-50"
-                              }
-                            >
-                              <th
-                                scope="col"
-                                className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                                  isDarkMode ? "text-gray-300" : "text-gray-500"
-                                }`}
-                              >
-                                STT
-                              </th>
-                              <th
-                                scope="col"
-                                className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                                  isDarkMode ? "text-gray-300" : "text-gray-500"
-                                }`}
-                              >
-                                Danh mục
-                              </th>
-                              <th
-                                scope="col"
-                                className={`px-3 py-3 text-right text-xs font-medium uppercase tracking-wider ${
-                                  isDarkMode ? "text-gray-300" : "text-gray-500"
-                                }`}
-                              >
-                                <span className="sr-only">Thao tác</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody
-                            className={`divide-y ${
-                              isDarkMode ? "divide-gray-700" : "divide-gray-200"
-                            }`}
-                          >
-                            {filteredCategories.map((category, index) => (
-                              <tr
-                                key={category.id}
-                                className={
-                                  isDarkMode
-                                    ? "hover:bg-gray-700/30"
-                                    : "hover:bg-gray-50"
-                                }
-                              >
-                                <td className="px-3 py-3 whitespace-nowrap text-center">
-                                  <div
-                                    className={`text-sm ${
-                                      isDarkMode
-                                        ? "text-gray-300"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {index + 1}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-3">
-                                  <div className="flex items-center">
-                                    <div
-                                      className={`w-8 h-8 flex-shrink-0 mr-2 flex items-center justify-center rounded-md ${
-                                        isDarkMode
-                                          ? "bg-gray-600"
-                                          : "bg-blue-100"
-                                      }`}
-                                    >
-                                      <div
-                                        className={`h-5 w-5 ${
-                                          isDarkMode
-                                            ? "text-blue-300"
-                                            : "text-blue-600"
-                                        }`}
-                                      >
-                                        {renderCategoryIcon(category.logo)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <div
-                                        className={`text-sm font-medium ${
-                                          isDarkMode
-                                            ? "text-white"
-                                            : "text-gray-900"
-                                        }`}
-                                      >
-                                        {category.title}
-                                      </div>
-                                      <div
-                                        className={`text-xs ${
-                                          isDarkMode
-                                            ? "text-gray-400"
-                                            : "text-gray-500"
-                                        }`}
-                                      >
-                                        {category.documentCount || 0} tài liệu
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-3 whitespace-nowrap text-right text-sm">
-                                  <div className="flex justify-end space-x-2">
-                                    <button
-                                      onClick={() => handlePinClick(category)}
-                                      disabled={
-                                        isMovingToTop || category.stt === 1
-                                      }
-                                      className={`p-1.5 rounded-md ${
-                                        isMovingToTop
-                                          ? isDarkMode
-                                            ? "text-gray-600 cursor-not-allowed"
-                                            : "text-gray-400 cursor-not-allowed"
-                                          : category.stt === 1
-                                          ? isDarkMode
-                                            ? "text-gray-600 cursor-not-allowed"
-                                            : "text-gray-400 cursor-not-allowed"
-                                          : isDarkMode
-                                          ? "text-yellow-400 hover:bg-gray-700 hover:text-yellow-300"
-                                          : "text-yellow-600 hover:bg-gray-100 hover:text-yellow-700"
-                                      }`}
-                                      title={
-                                        category.stt === 1
-                                          ? "Danh mục đã ở vị trí đầu tiên"
-                                          : "Ghim danh mục lên đầu danh sách"
-                                      }
-                                    >
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-5 w-5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M5 11l7-7 7 7M5 19l7-7 7 7"
-                                        />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => handleEditClick(category)}
-                                      className={`p-1.5 rounded-md ${
-                                        isDarkMode
-                                          ? "text-blue-400 hover:bg-gray-700 hover:text-blue-300"
-                                          : "text-blue-600 hover:bg-gray-100 hover:text-blue-700"
-                                      }`}
-                                      title="Chỉnh sửa danh mục"
-                                    >
-                                      <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth="2"
-                                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                        ></path>
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteClick(category)
-                                      }
-                                      className={`p-1.5 rounded-md ${
-                                        category.documentCount > 0
-                                          ? isDarkMode
-                                            ? "text-gray-600 cursor-not-allowed"
-                                            : "text-gray-400 cursor-not-allowed"
-                                          : isDarkMode
-                                          ? "text-red-400 hover:bg-gray-700 hover:text-red-300"
-                                          : "text-red-600 hover:bg-gray-100 hover:text-red-700"
-                                      }`}
-                                      title={
-                                        category.documentCount > 0
-                                          ? "Không thể xóa danh mục có tài liệu"
-                                          : "Xóa danh mục"
-                                      }
-                                      disabled={category.documentCount > 0}
-                                    >
-                                      <svg
-                                        className="w-5 h-5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth="2"
-                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                        ></path>
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="md:hidden space-y-4">
+                        {filteredCategories.map((category) => (
+                          <CategoryMobileCard
+                            key={category.id}
+                            category={category}
+                            isDarkMode={isDarkMode}
+                            renderCategoryIcon={renderCategoryIcon}
+                            handleEditClick={handleEditClick}
+                            handleDeleteClick={handleDeleteClick}
+                            handlePinClick={handlePinClick}
+                          />
+                        ))}
                       </div>
 
                       {/* Desktop view */}
