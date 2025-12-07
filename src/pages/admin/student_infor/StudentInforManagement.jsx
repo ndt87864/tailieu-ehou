@@ -2042,6 +2042,7 @@ const StudentInforManagement = () => {
         handleSave={handleSave}
         isSaving={isSaving}
         error={error}
+        isDarkMode={isDarkMode}
       />
     </div>
   );
