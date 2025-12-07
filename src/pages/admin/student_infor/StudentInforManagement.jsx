@@ -19,6 +19,7 @@ import StudentFormModal from "./StudentFormModal";
 import Modal from "../../../components/Modal";
 import LoadingSpinner from "../../../components/content/LoadingSpinner";
 import StudentTable from "./StudentTable";
+import StudentMobileCard from "./StudentMobileCard";
 import {
   ensureXLSX,
   mapHeaderToKey,
@@ -442,6 +443,24 @@ const StudentInforManagement = () => {
     done: 0,
     total: 0,
   });
+
+  // Mobile selection state
+  const [mobileSelectedIds, setMobileSelectedIds] = useState(new Set());
+
+  const toggleMobileSelect = (id) => {
+    setMobileSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleMobileBulkDelete = () => {
+    if (mobileSelectedIds.size === 0) return;
+    handleBulkDelete(Array.from(mobileSelectedIds));
+    setMobileSelectedIds(new Set());
+  };
 
   const handleBulkDelete = (ids) => {
     if (!ids || ids.length === 0) return;
@@ -1484,56 +1503,77 @@ const StudentInforManagement = () => {
             }`}
           >
             <div className="max-w-7xl mx-auto">
-              <h2 className="text-2xl font-bold">
+              <h2 className={`text-xl md:text-2xl font-bold mb-4 ${windowWidth < 770 ? "text-center" : ""}`}>
                 Quản lý thông tin sinh viên dự thi
               </h2>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between items-start mb-6 gap-3">
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                  <div className="ml-2 flex items-center">
+              
+              {/* Search and Actions */}
+              <div className="space-y-3 mb-6">
+                {/* Search Row */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
                     <input
                       type="search"
-                      placeholder="Tìm theo Mã SV, Họ và tên, Tài khoản hoặc Tên môn học..."
+                      placeholder={windowWidth < 770 ? "Tìm kiếm..." : "Tìm theo Mã SV, Họ và tên, Tài khoản hoặc Tên môn học..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="px-3 py-2 border rounded-md w-64 text-sm"
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                      }`}
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery("")}
-                        className="ml-2 text-sm text-gray-600"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       >
-                        Xóa
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div className="flex-shrink-0">
+                {/* Action Buttons Row */}
+                <div className={`flex ${windowWidth < 770 ? "flex-wrap gap-2" : "gap-2"}`}>
                   <button
                     onClick={openAddModal}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+                    className={`flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors ${
+                      windowWidth < 770 ? "flex-1 px-3 py-2 text-sm" : "px-4 py-2"
+                    }`}
                   >
-                    Thêm mới
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>{windowWidth < 770 ? "Thêm" : "Thêm mới"}</span>
                   </button>
                   <button
-                    onClick={() =>
-                      document.getElementById("student-import-input")?.click()
-                    }
-                    className="ml-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+                    onClick={() => document.getElementById("student-import-input")?.click()}
+                    className={`flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors ${
+                      windowWidth < 770 ? "flex-1 px-3 py-2 text-sm" : "px-4 py-2"
+                    }`}
                   >
-                    Import Excel
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span>Import</span>
                   </button>
                   <button
                     onClick={handleExportExcel}
                     disabled={exportLoading}
-                    className={`ml-2 ${
+                    className={`flex items-center justify-center gap-2 text-white rounded-lg transition-colors ${
                       exportLoading
-                        ? "bg-gray-400"
+                        ? "bg-gray-400 cursor-not-allowed"
                         : "bg-yellow-600 hover:bg-yellow-700"
-                    } text-white px-4 py-2 rounded-md`}
+                    } ${windowWidth < 770 ? "flex-1 px-3 py-2 text-sm" : "px-4 py-2"}`}
                     title="Xuất Excel các bản ghi đang hiển thị"
                   >
-                    {exportLoading ? `Đang xuất...` : "Export Excel"}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>{exportLoading ? "Đang xuất..." : "Export"}</span>
                   </button>
                   <input
                     id="student-import-input"
@@ -1589,29 +1629,103 @@ const StudentInforManagement = () => {
                 </div>
               ) : (
                 <>
-                  <StudentTable
-                    columns={columns}
-                    rows={pagedStudentInfors}
-                    loading={loading}
-                    isDarkMode={isDarkMode}
-                    openEditModal={openEditModal}
-                    handleDelete={handleDelete}
-                    onBulkDelete={handleBulkDelete}
-                    // pass allRowIds so the table can support "select all" across the full
-                    // filtered result (or the whole DB if filteredStudentInfors === studentInfors)
-                    allRowIds={(filteredStudentInfors || []).map((r) => r.id)}
-                  />
+                  {/* Mobile View */}
+                  {windowWidth < 770 ? (
+                    <div className="space-y-4">
+                      {/* Mobile bulk actions header */}
+                      <div className={`flex items-center justify-between p-3 rounded-lg ${
+                        isDarkMode ? "bg-gray-800/50" : "bg-gray-50"
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={
+                              pagedStudentInfors.length > 0 &&
+                              pagedStudentInfors.every((s) => mobileSelectedIds.has(s.id))
+                            }
+                            onChange={() => {
+                              if (pagedStudentInfors.every((s) => mobileSelectedIds.has(s.id))) {
+                                setMobileSelectedIds(new Set());
+                              } else {
+                                setMobileSelectedIds(new Set(pagedStudentInfors.map((s) => s.id)));
+                              }
+                            }}
+                            className="w-5 h-5 rounded"
+                          />
+                          <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                            Đã chọn: <strong>{mobileSelectedIds.size}</strong>
+                          </span>
+                        </div>
+                        {mobileSelectedIds.size > 0 && (
+                          <button
+                            onClick={handleMobileBulkDelete}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Xóa ({mobileSelectedIds.size})
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Empty state */}
+                      {pagedStudentInfors.length === 0 ? (
+                        <div className={`p-8 text-center rounded-lg ${
+                          isDarkMode ? "bg-gray-800/80" : "bg-white/80"
+                        } backdrop-blur-md border ${
+                          isDarkMode ? "border-gray-700/50" : "border-gray-200/50"
+                        } shadow-lg`}>
+                          <svg className="h-16 w-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <h3 className={`text-lg font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
+                            Không có dữ liệu
+                          </h3>
+                          <p className={`mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            Không tìm thấy sinh viên nào phù hợp với tiêu chí tìm kiếm.
+                          </p>
+                        </div>
+                      ) : (
+                        pagedStudentInfors.map((student) => (
+                          <StudentMobileCard
+                            key={student.id}
+                            student={student}
+                            isDarkMode={isDarkMode}
+                            isSelected={mobileSelectedIds.has(student.id)}
+                            onToggleSelect={() => toggleMobileSelect(student.id)}
+                            onEdit={() => openEditModal(student)}
+                            onDelete={() => handleDelete(student.id)}
+                          />
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    /* Desktop View */
+                    <StudentTable
+                      columns={columns}
+                      rows={pagedStudentInfors}
+                      loading={loading}
+                      isDarkMode={isDarkMode}
+                      openEditModal={openEditModal}
+                      handleDelete={handleDelete}
+                      onBulkDelete={handleBulkDelete}
+                      // pass allRowIds so the table can support "select all" across the full
+                      // filtered result (or the whole DB if filteredStudentInfors === studentInfors)
+                      allRowIds={(filteredStudentInfors || []).map((r) => r.id)}
+                    />
+                  )}
 
                   {/* Pagination controls */}
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                  <div className={`mt-4 flex ${windowWidth < 770 ? "flex-col gap-3" : "items-center justify-between"}`}>
+                    <div className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"} ${windowWidth < 770 ? "text-center" : ""}`}>
                       Hiển thị <strong>{showingFrom}</strong> -{" "}
                       <strong>{showingTo}</strong> của{" "}
                       <strong>{filteredStudentInfors.length}</strong> bản ghi
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className={`flex items-center ${windowWidth < 770 ? "justify-center" : ""} gap-3`}>
+                      <label className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
                         Hiển thị
                       </label>
                       <select
@@ -1621,7 +1735,11 @@ const StudentInforManagement = () => {
                           setLimit(v);
                           setCurrentPage(1);
                         }}
-                        className="px-2 py-1 border rounded-md text-sm"
+                        className={`px-2 py-1 border rounded-md text-sm ${
+                          isDarkMode
+                            ? "bg-gray-800 border-gray-700 text-white"
+                            : "bg-white border-gray-300 text-gray-900"
+                        }`}
                       >
                         <option value={10}>10</option>
                         <option value={25}>25</option>
@@ -1637,14 +1755,16 @@ const StudentInforManagement = () => {
                           disabled={currentPage <= 1}
                           className={`px-3 py-1 rounded-md ${
                             currentPage <= 1
-                              ? "bg-gray-200 text-gray-400"
-                              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              : isDarkMode
+                              ? "bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700"
+                              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                           }`}
                         >
-                          &laquo; Prev
+                          &laquo;
                         </button>
 
-                        <div className="text-sm text-gray-700 dark:text-gray-200 px-2">
+                        <div className={`text-sm px-2 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}>
                           {currentPage} / {totalPages}
                         </div>
 
@@ -1655,11 +1775,13 @@ const StudentInforManagement = () => {
                           disabled={currentPage >= totalPages}
                           className={`px-3 py-1 rounded-md ${
                             currentPage >= totalPages
-                              ? "bg-gray-200 text-gray-400"
-                              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border"
+                              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              : isDarkMode
+                              ? "bg-gray-800 text-gray-200 border border-gray-700 hover:bg-gray-700"
+                              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                           }`}
                         >
-                          Next &raquo;
+                          &raquo;
                         </button>
                       </div>
                     </div>
