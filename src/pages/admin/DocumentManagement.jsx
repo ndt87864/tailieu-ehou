@@ -15,6 +15,7 @@ import Sidebar from "../../components/Sidebar";
 import { DocumentMobileHeader } from "../../components/MobileHeader";
 import UserHeader from "../../components/UserHeader";
 import ThemeColorPicker from "../../components/ThemeColorPicker";
+import DocumentMobileCard from "./DocumentMobileCard";
 
 const DocumentManagement = () => {
   const [categories, setCategories] = useState([]);
@@ -612,147 +613,16 @@ const DocumentManagement = () => {
                       {/* Mobile view */}
                       <div className="md:hidden">
                         {filteredDocuments.map((doc, index) => (
-                          <div
+                          <DocumentMobileCard
                             key={doc.id}
-                            className={`px-4 py-3 border-b ${
-                              isDarkMode ? "border-gray-700" : "border-gray-200"
-                            } ${
-                              isDarkMode
-                                ? "hover:bg-gray-700/30"
-                                : "hover:bg-gray-50"
-                            }`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <div className="flex space-x-3 items-center">
-                                {/* STT and Icon */}
-                                <div className="flex flex-col items-center space-y-1">
-                                  <span
-                                    className={`text-xs font-medium ${
-                                      isDarkMode
-                                        ? "text-gray-400"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {(currentPage - 1) * limit + index + 1}
-                                  </span>
-                                  <div
-                                    className={`w-8 h-8 flex items-center justify-center rounded-md ${
-                                      isDarkMode ? "bg-gray-600" : "bg-blue-100"
-                                    }`}
-                                  >
-                                    <svg
-                                      className={`h-5 w-5 ${
-                                        isDarkMode
-                                          ? "text-blue-300"
-                                          : "text-blue-600"
-                                      }`}
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                      />
-                                    </svg>
-                                  </div>
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1">
-                                  <h4
-                                    className={`text-sm font-medium ${
-                                      isDarkMode
-                                        ? "text-white"
-                                        : "text-gray-900"
-                                    }`}
-                                  >
-                                    {doc.title}
-                                  </h4>
-                                  <div className="mt-1 flex flex-col space-y-1">
-                                    <span
-                                      className={`flex items-center text-xs ${
-                                        isDarkMode
-                                          ? "text-gray-400"
-                                          : "text-gray-500"
-                                      }`}
-                                    >
-                                      <svg
-                                        className="w-3 h-3 mr-1"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                                        />
-                                      </svg>
-                                      {doc.categoryTitle || "Không có danh mục"}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Actions */}
-                              <div className="flex space-x-1">
-                                <button
-                                  onClick={() => handleEditClick(doc)}
-                                  className={`p-1.5 rounded-md ${
-                                    isDarkMode
-                                      ? "text-blue-400 hover:bg-gray-700 hover:text-blue-300"
-                                      : "text-blue-600 hover:bg-gray-100 hover:text-blue-700"
-                                  }`}
-                                  title="Chỉnh sửa tài liệu"
-                                >
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="2"
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    ></path>
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClick(doc)}
-                                  className={`p-1.5 rounded-md ${
-                                    isDarkMode
-                                      ? "text-red-400 hover:bg-gray-700 hover:text-red-300"
-                                      : "text-red-600 hover:bg-gray-100 hover:text-red-700"
-                                  }`}
-                                  title="Xóa tài liệu"
-                                >
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="2"
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    ></path>
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                            doc={doc}
+                            isDarkMode={isDarkMode}
+                            index={index}
+                            currentPage={currentPage}
+                            limit={limit}
+                            handleEditClick={handleEditClick}
+                            handleDeleteClick={handleDeleteClick}
+                          />
                         ))}
                         <div className="flex flex-col md:flex-row justify-center items-center gap-2 mt-4 pb-4">
                           <div className="flex flex-row items-center gap-2 w-full justify-center">
