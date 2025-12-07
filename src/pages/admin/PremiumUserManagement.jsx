@@ -19,6 +19,7 @@ import UserHeader from "../../components/UserHeader";
 import { DocumentMobileHeader } from "../../components/MobileHeader";
 import Sidebar from "../../components/Sidebar";
 import ThemeColorPicker from "../../components/ThemeColorPicker";
+import PremiumUserMobileCard from "./PremiumUserMobileCard";
 
 const PremiumUserManagement = () => {
   const { isDarkMode } = useTheme();
@@ -860,6 +861,21 @@ const PremiumUserManagement = () => {
                           ? "Thử tìm kiếm với từ khóa khác"
                           : 'Nhấn nút "Thêm gói người dùng" để tạo gói mới'}
                       </p>
+                    </div>
+                  ) : windowWidth < 770 ? (
+                    <div className="space-y-3 p-4">
+                      {filteredTiers.map((tier) => (
+                        <PremiumUserMobileCard
+                          key={tier.id}
+                          tier={tier}
+                          isDarkMode={isDarkMode}
+                          onEdit={openEditTierModal}
+                          onDelete={openDeleteModal}
+                          onToggleStatus={handleToggleStatus}
+                          formatPrice={formatPrice}
+                          getIconComponent={getIconComponent}
+                        />
+                      ))}
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
