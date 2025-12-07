@@ -22,6 +22,7 @@ import { UserRoleProvider } from "./context/UserRoleContext";
 import { SidebarProvider } from "./context/SidebarContext";
 import { FirebaseConnectionProvider } from "./context/FirebaseConnectionContext";
 import FirebaseConnectionGuard from "./components/FirebaseConnectionGuard";
+import { AppSettingsProvider, useAppSettings } from "./context/AppSettingsContext";
 import AdminUserManagement from "./pages/admin/user/AdminUserManagement";
 import CategoryManagement from "./pages/admin/CategoryManagement";
 import DocumentManagement from "./pages/admin/DocumentManagement";
@@ -97,6 +98,26 @@ const ProtectedAdminRoute = ({ children }) => {
   }
 
   return user && isAdmin ? children : null;
+};
+
+// Component bảo vệ route StudentPage khi bị tắt
+const ProtectedStudentRoute = () => {
+  const { studentPageEnabled, loading } = useAppSettings();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  // Nếu StudentPage bị tắt, redirect về trang chủ
+  if (!studentPageEnabled) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <StudentPage />;
 };
 
 // Xử lý trang chủ cho admin với cải tiến lưu đường dẫn
@@ -427,6 +448,7 @@ function App() {
     <ThemeProvider>
       <FirebaseConnectionProvider>
         <UserRoleProvider>
+          <AppSettingsProvider>
           <SidebarProvider>
             <FirebaseConnectionGuard>
               <AdSenseComponent />
@@ -439,7 +461,7 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/profile" element={<Profile />} />
-                <Route path="/students" element={<StudentPage />} />
+                <Route path="/students" element={<ProtectedStudentRoute />} />
 
                 {/* Sử dụng các component bảo vệ riêng lẻ */}
                 <Route
@@ -570,6 +592,7 @@ function App() {
           </div>
         </FirebaseConnectionGuard>
         </SidebarProvider>
+          </AppSettingsProvider>
       </UserRoleProvider>
     </FirebaseConnectionProvider>
     </ThemeProvider>

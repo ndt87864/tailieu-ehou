@@ -12,6 +12,7 @@ import Footer from "../components/Footer";
 import { auth, db } from "../firebase/firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { useAppSettings } from "../context/AppSettingsContext";
 import "../styles/homepage.css";
 
 const toSlug = (str) => {
@@ -23,14 +24,24 @@ const toSlug = (str) => {
 };
 
 const HomePage = () => {
+  // App settings for studentPage visibility
+  const { studentPageEnabled } = useAppSettings();
+
   // Add search state
   // `searchInput` is the immediate controlled input value.
   // `searchQuery` is the actual query used for searching and will only
   // be updated when the user presses Enter or clicks the magnifier.
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  // search type: 'doc' = tài liệu, 'exam' = lịch thi (default)
-  const [searchType, setSearchType] = useState("exam");
+  // search type: 'doc' = tài liệu, 'exam' = lịch thi (default when enabled)
+  const [searchType, setSearchType] = useState(studentPageEnabled ? "exam" : "doc");
+
+  // Auto-switch to 'doc' when studentPage is disabled
+  useEffect(() => {
+    if (!studentPageEnabled && searchType === "exam") {
+      setSearchType("doc");
+    }
+  }, [studentPageEnabled, searchType]);
 
   // student schedule data used when searching lịch thi
   const [studentInfors, setStudentInfors] = useState(null);
@@ -552,7 +563,8 @@ const HomePage = () => {
                       </div>
                     </div>
 
-                    {/* Search type segmented selector */}
+                    {/* Search type segmented selector - Only show when studentPage is enabled */}
+                    {studentPageEnabled && (
                     <div
                       role="tablist"
                       aria-label="Chọn loại tìm kiếm"
@@ -589,6 +601,7 @@ const HomePage = () => {
                         Tài liệu
                       </button>
                     </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -630,6 +643,8 @@ const HomePage = () => {
                       <h2 className="text-xl font-semibold mb-2">
                         Kết quả tìm kiếm: {searchQuery}
                       </h2>
+                      {/* Only show link to students page if enabled */}
+                      {studentPageEnabled && (
                       <Link
                         to={`/students?query=${encodeURIComponent(
                           searchQuery
@@ -642,6 +657,7 @@ const HomePage = () => {
                       >
                         Xem chi tiết
                       </Link>
+                      )}
                     </div>
                     <div
                       className={`h-1 w-24 ${

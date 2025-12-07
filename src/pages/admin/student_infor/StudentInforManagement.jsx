@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useTheme } from "../../../context/ThemeContext";
 import { useUserRole } from "../../../context/UserRoleContext";
+import { useAppSettings } from "../../../context/AppSettingsContext";
 import { auth } from "../../../firebase/firebase";
 import {
   getAllStudentInfor,
@@ -68,6 +69,8 @@ const StudentInforManagement = () => {
   const [user] = useAuthState(auth);
   const { isDarkMode } = useTheme();
   const { isAdmin } = useUserRole();
+  const { studentPageEnabled, setStudentPageEnabled } = useAppSettings();
+  const [isTogglingStudentPage, setIsTogglingStudentPage] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -1503,9 +1506,54 @@ const StudentInforManagement = () => {
             }`}
           >
             <div className="max-w-7xl mx-auto">
-              <h2 className={`text-xl md:text-2xl font-bold mb-4 ${windowWidth < 770 ? "text-center" : ""}`}>
-                Quản lý thông tin sinh viên dự thi
-              </h2>
+              <div className={`flex ${windowWidth < 770 ? "flex-col gap-3" : "items-center justify-between"} mb-4`}>
+                <h2 className={`text-xl md:text-2xl font-bold ${windowWidth < 770 ? "text-center" : ""}`}>
+                  Quản lý thông tin sinh viên dự thi
+                </h2>
+                
+                {/* Toggle switch for StudentPage visibility */}
+                <div className={`flex items-center gap-3 ${windowWidth < 770 ? "justify-center" : ""}`}>
+                  <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                    Hiển thị trang sinh viên:
+                  </span>
+                  <button
+                    onClick={async () => {
+                      setIsTogglingStudentPage(true);
+                      try {
+                        await setStudentPageEnabled(!studentPageEnabled);
+                      } catch (err) {
+                        console.error("Failed to toggle studentPage:", err);
+                        setError("Lỗi khi thay đổi cài đặt");
+                      } finally {
+                        setIsTogglingStudentPage(false);
+                      }
+                    }}
+                    disabled={isTogglingStudentPage}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      studentPageEnabled
+                        ? "bg-green-600 focus:ring-green-500"
+                        : isDarkMode
+                        ? "bg-gray-600 focus:ring-gray-500"
+                        : "bg-gray-300 focus:ring-gray-400"
+                    } ${isTogglingStudentPage ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    aria-pressed={studentPageEnabled}
+                    title={studentPageEnabled ? "Đang bật - Nhấn để tắt" : "Đang tắt - Nhấn để bật"}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        studentPageEnabled ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                    studentPageEnabled
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                  }`}>
+                    {studentPageEnabled ? "Bật" : "Tắt"}
+                  </span>
+                </div>
+              </div>
               
               {/* Search and Actions */}
               <div className="space-y-3 mb-6">

@@ -8,6 +8,7 @@ import ThemeColorPicker from "./ThemeColorPicker";
 import { useSafeAdminCheck } from "../utils/permission/adminHelper"; // Sử dụng helper function
 import { optimizedGetDocumentsByCategory } from "../utils/storage/queryOptimizer";
 import { clearQuestionManagementCache } from "../utils/questionCacheUtils";
+import { useAppSettings } from "../context/AppSettingsContext";
 
 // Helper function to convert string to slug
 const toSlug = (str) => {
@@ -658,6 +659,7 @@ function Sidebar({
   const { isDarkMode, toggleDarkMode, setIsThemePickerOpen } = useTheme();
   const [user] = useAuthState(auth);
   const { isAdmin } = useSafeAdminCheck();
+  const { studentPageEnabled } = useAppSettings();
   const [isThemePickerVisible, setIsThemePickerVisible] = useState(false);
 
   // Theo dõi kích thước màn hình with improved handling
@@ -1457,8 +1459,8 @@ function Sidebar({
           </ul>
         </nav>
 
-        {/* User-facing Students page link (hide in admin sidebar) */}
-        {!isAdmin && (
+        {/* User-facing Students page link (hide in admin sidebar or when disabled) */}
+        {!isAdmin && studentPageEnabled && (
           <div className="mt-4 px-2">
             <ul className="space-y-1">
               <li className="rounded-md overflow-hidden">
