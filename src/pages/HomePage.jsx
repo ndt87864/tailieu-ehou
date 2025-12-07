@@ -34,14 +34,18 @@ const HomePage = () => {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   // search type: 'doc' = tài liệu, 'exam' = lịch thi (default when enabled)
-  const [searchType, setSearchType] = useState(studentPageEnabled ? "exam" : "doc");
+  const [searchType, setSearchType] = useState("exam");
 
-  // Auto-switch to 'doc' when studentPage is disabled
+  // Auto-switch searchType based on studentPageEnabled
+  // When enabled: default to 'exam' (tìm thí sinh)
+  // When disabled: switch to 'doc' (tìm tài liệu)
   useEffect(() => {
-    if (!studentPageEnabled && searchType === "exam") {
+    if (studentPageEnabled) {
+      setSearchType("exam");
+    } else {
       setSearchType("doc");
     }
-  }, [studentPageEnabled, searchType]);
+  }, [studentPageEnabled]);
 
   // student schedule data used when searching lịch thi
   const [studentInfors, setStudentInfors] = useState(null);
