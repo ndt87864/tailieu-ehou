@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import QuestionMobileCard from "./QuestionMobileCard";
 
 const QuestionTable = ({
   loading,
@@ -15,12 +16,30 @@ const QuestionTable = ({
 }) => {
   // Thêm state cho modal ảnh
   const [imageModal, setImageModal] = useState({ open: false, url: "" });
+  
+  // Thêm state cho window width để responsive
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1200
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const isMobile = windowWidth < 768;
 
   // Thêm modal popup ảnh
   const renderImageModal = () =>
     imageModal.open && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-        <div className="bg-white rounded-lg p-4 max-w-2xl w-full relative">
+        <div className="bg-white rounded-lg p-4 max-w-2xl w-full mx-4 relative">
           <button
             className="absolute -top-4 -right-4 bg-white shadow-lg rounded-full text-gray-600 hover:text-black text-2xl w-10 h-10 flex items-center justify-center border border-gray-300 hover:border-blue-500 transition-colors"
             onClick={() => setImageModal({ open: false, url: "" })}
@@ -48,6 +67,87 @@ const QuestionTable = ({
       </div>
     );
 
+  // Mobile View Header với bulk actions
+  const renderMobileHeader = () => (
+    <div
+      className={`p-4 border-b flex items-center justify-between ${
+        isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+      }`}
+    >
+      <div className="flex items-center space-x-3">
+        <input
+          type="checkbox"
+          checked={
+            selectedRows.length === filteredQuestions.length &&
+            filteredQuestions.length > 0
+          }
+          onChange={handleSelectAll}
+          className="form-checkbox h-5 w-5 text-blue-600 rounded"
+        />
+        <span
+          className={`text-sm font-medium ${
+            isDarkMode ? "text-gray-300" : "text-gray-600"
+          }`}
+        >
+          {selectedRows.length > 0
+            ? `Đã chọn ${selectedRows.length} câu hỏi`
+            : "Chọn tất cả"}
+        </span>
+      </div>
+      {selectedRows.length > 0 && (
+        <button
+          className={`px-3 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors flex items-center ${
+            isDeleting ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          onClick={handleDeleteSelected}
+          disabled={isDeleting}
+          title="Xóa các câu hỏi đã chọn"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4m-4 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+          Xóa ({selectedRows.length})
+        </button>
+      )}
+    </div>
+  );
+
+  // Mobile View
+  const renderMobileView = () => (
+    <div
+      className={`${
+        isDarkMode ? "bg-gray-800" : "bg-white"
+      } rounded-lg shadow-md`}
+    >
+      {renderMobileHeader()}
+      <div className="p-4 space-y-4">
+        {filteredQuestions.map((question, index) => (
+          <QuestionMobileCard
+            key={question.id}
+            question={question}
+            isDarkMode={isDarkMode}
+            index={index}
+            isSelected={selectedRows.includes(question.id)}
+            handleSelectRow={handleSelectRow}
+            openEditModal={openEditModal}
+            openDeleteModal={openDeleteModal}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="overflow-hidden bg-white dark:bg-gray-800 rounded-lg shadow-md">
       {renderImageModal()}
@@ -60,7 +160,11 @@ const QuestionTable = ({
         <div className="p-6 text-center">
           <p>Không tìm thấy câu hỏi nào.</p>
         </div>
+      ) : isMobile ? (
+        // Mobile View
+        renderMobileView()
       ) : (
+        // Desktop View
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className={isDarkMode ? "bg-gray-600" : "bg-gray-50"}>
