@@ -12,6 +12,9 @@ import {
 } from "../../../firebase/studentInforService";
 import Sidebar from "../../../components/Sidebar";
 import UserHeader from "../../../components/UserHeader";
+import { useTheme } from "../../../context/ThemeContext";
+import { DocumentMobileHeader } from "../../../components/MobileHeader";
+import ExamSessionMobileCard from "./ExamSessionMobileCard";
 
 const ExamSessionManagement = () => {
   const [sessions, setSessions] = useState([]);
@@ -23,6 +26,13 @@ const ExamSessionManagement = () => {
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
   const [syncingSessionInfo, setSyncingSessionInfo] = useState(null); // Lưu thông tin ca thi đang đồng bộ
 
+  // Layout states
+  const { isDarkMode } = useTheme();
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1024
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   // Dummy props for Sidebar (for admin pages)
   const sidebarData = [];
   const documents = {};
@@ -30,7 +40,12 @@ const ExamSessionManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [search, setSearch] = useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -171,7 +186,7 @@ const ExamSessionManagement = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className={`flex flex-col min-h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
       {/* Popup tiến trình đồng bộ */}
       {syncing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -212,115 +227,166 @@ const ExamSessionManagement = () => {
           </div>
         </div>
       )}
-      {/* Sidebar */}
-      <Sidebar
-        sidebarData={sidebarData}
-        documents={documents}
-        openMain={openMain}
-        setOpenMain={setOpenMain}
-        selectedCategory={selectedCategory}
-        selectedDocument={selectedDocument}
-        setSelectedDocument={setSelectedDocument}
-        setSearch={setSearch}
-        setDocuments={() => {}}
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-        hideDocumentTree={true}
-      />
-      {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        <UserHeader title="Quản lý ca thi" />
-        <div className="max-w-4xl mx-auto w-full p-4">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-              Quản lý ca thi
-            </h2>
-            <button
-              onClick={openAdd}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow"
-            >
-              + Thêm ca thi
-            </button>
-          </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            {loading ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-300">
-                Đang tải...
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full table-auto border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                      <th className="px-4 py-2 font-semibold">Tiêu đề</th>
-                      <th className="px-4 py-2 font-semibold">Bắt đầu</th>
-                      <th className="px-4 py-2 font-semibold">Kết thúc</th>
-                      {/* Hình thức column hidden */}
-                      <th className="px-4 py-2 font-semibold">Trạng thái</th>
-                      <th className="px-4 py-2 font-semibold">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="text-center py-6 text-gray-500 dark:text-gray-300"
-                        >
-                          Chưa có ca thi
-                        </td>
-                      </tr>
-                    )}
-                    {sessions.map((s) => (
-                      <tr
-                        key={s.id}
-                        className="border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                      >
-                        <td className="px-4 py-2">{s.title}</td>
-                        <td className="px-4 py-2">{s.startTime || "-"}</td>
-                        <td className="px-4 py-2">{s.endTime || "-"}</td>
-                        {/* examType hidden in UI */}
-                        <td className="px-4 py-2">
-                          {s.isActive ? (
-                            <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                              Hoạt động
-                            </span>
-                          ) : (
-                            <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-200 text-gray-600 rounded">
-                              Đã tắt
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 space-x-2">
-                          <button
-                            onClick={() => openEdit(s)}
-                            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDelete(s.id)}
-                            className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
-                          >
-                            Xóa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-        <ExamSessionFormModal
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          onSave={handleSave}
-          initial={editing}
-          isSaving={isSaving}
+      {/* Mobile Header */}
+      {windowWidth < 770 && (
+        <DocumentMobileHeader
+          setIsSidebarOpen={setIsSidebarOpen}
+          isDarkMode={isDarkMode}
         />
+      )}
+
+      <div className="flex min-h-screen w-full">
+        {/* Sidebar */}
+        <div
+          className={`theme-sidebar ${
+            windowWidth < 770
+              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${
+                  isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                }`
+              : "relative w-64 flex-shrink-0"
+          }`}
+        >
+          <Sidebar
+            sidebarData={sidebarData}
+            documents={documents}
+            openMain={openMain}
+            setOpenMain={setOpenMain}
+            selectedCategory={selectedCategory}
+            selectedDocument={selectedDocument}
+            setSelectedDocument={setSelectedDocument}
+            setSearch={setSearch}
+            setDocuments={() => {}}
+            isOpen={isSidebarOpen}
+            setIsOpen={setIsSidebarOpen}
+            hideDocumentTree={true}
+          />
+        </div>
+
+        {/* Overlay for mobile sidebar */}
+        {windowWidth < 770 && isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-10"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col w-full">
+          {windowWidth >= 770 && <UserHeader title="Quản lý ca thi" />}
+          
+          <div className="max-w-4xl mx-auto w-full p-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white">
+                Quản lý ca thi
+              </h2>
+              <button
+                onClick={openAdd}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded shadow text-sm md:text-base"
+              >
+                + Thêm ca thi
+              </button>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+              {loading ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-300">
+                  Đang tải...
+                </div>
+              ) : windowWidth < 770 ? (
+                /* Mobile View - Cards */
+                <div className="space-y-3">
+                  {sessions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-300">
+                      Chưa có ca thi
+                    </div>
+                  ) : (
+                    sessions.map((s) => (
+                      <ExamSessionMobileCard
+                        key={s.id}
+                        session={s}
+                        onEdit={openEdit}
+                        onDelete={handleDelete}
+                        isDarkMode={isDarkMode}
+                      />
+                    ))
+                  )}
+                </div>
+              ) : (
+                /* Desktop View - Table */
+                <div className="overflow-x-auto">
+                  <table className="min-w-full table-auto border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                        <th className="px-4 py-2 font-semibold">Tiêu đề</th>
+                        <th className="px-4 py-2 font-semibold">Bắt đầu</th>
+                        <th className="px-4 py-2 font-semibold">Kết thúc</th>
+                        {/* Hình thức column hidden */}
+                        <th className="px-4 py-2 font-semibold">Trạng thái</th>
+                        <th className="px-4 py-2 font-semibold">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sessions.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="text-center py-6 text-gray-500 dark:text-gray-300"
+                          >
+                            Chưa có ca thi
+                          </td>
+                        </tr>
+                      )}
+                      {sessions.map((s) => (
+                        <tr
+                          key={s.id}
+                          className="border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                        >
+                          <td className="px-4 py-2 text-gray-900 dark:text-gray-200">{s.title}</td>
+                          <td className="px-4 py-2 text-gray-900 dark:text-gray-200">{s.startTime || "-"}</td>
+                          <td className="px-4 py-2 text-gray-900 dark:text-gray-200">{s.endTime || "-"}</td>
+                          {/* examType hidden in UI */}
+                          <td className="px-4 py-2">
+                            {s.isActive ? (
+                              <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                                Hoạt động
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-200 text-gray-600 rounded">
+                                Đã tắt
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 space-x-2">
+                            <button
+                              onClick={() => openEdit(s)}
+                              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDelete(s.id)}
+                              className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+          <ExamSessionFormModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onSave={handleSave}
+            initial={editing}
+            isSaving={isSaving}
+          />
+        </div>
       </div>
     </div>
   );
