@@ -20,7 +20,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useUserRole } from "../../../context/UserRoleContext";
 import Sidebar from "../../../components/Sidebar";
 import UserHeader from "../../../components/UserHeader";
-import { HomeMobileHeader } from "../../../components/MobileHeader";
+import { DocumentMobileHeader } from "../../../components/MobileHeader";
 import Footer from "../../../components/Footer";
 import ThemeColorPicker from "../../../components/ThemeColorPicker";
 import { getAllCategoriesWithDocuments } from "../../../firebase/firestoreService";
@@ -33,6 +33,7 @@ import {
 import { deleteRoomInfor } from "../../../firebase/roomInforService";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../firebase/firebase";
+import RoomMobileCard from "./RoomMobileCard";
 
 const emptyRoom = {
   examDate: "",
@@ -95,10 +96,10 @@ const RoomInforManagement = () => {
   const computeRoomsFromStudents = (students = []) => {
     const map = new Map();
     for (const s of students) {
-      // build a composite key from the fields we care about (bao gồm majorCode để phân biệt các ngành khác nhau)
+      // build a composite key from the fields we care about (BỎ examTime khỏi key, NHƯNG LUÔN LƯU examTime vào object)
       const key = `${s.examDate || ""}||${s.subject || ""}||${
         s.examSession || ""
-      }||${s.examRoom || ""}||${s.examType || ""}||${s.majorCode || ""}`;
+      }||${s.examRoom || ""}||${s.examType || ""}`;
       if (!map.has(key)) {
         map.set(key, {
           id: key, // deterministic id for display only
@@ -108,7 +109,6 @@ const RoomInforManagement = () => {
           examTime: s.examTime || "", // LUÔN LƯU examTime
           examRoom: s.examRoom || "",
           examType: s.examType || "",
-          majorCode: s.majorCode || "", // Thêm majorCode để phân biệt
           examLink: s.examLink || "",
         });
       } else {
@@ -288,11 +288,11 @@ const RoomInforManagement = () => {
     }
   };
 
-  // BỎ examTime khỏi key, thêm majorCode để phân biệt các ngành
+  // BỎ examTime khỏi key
   const makeKey = (r) =>
     `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
       r.examRoom || ""
-    }||${r.examType || ""}||${r.majorCode || ""}`;
+    }||${r.examType || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
@@ -482,9 +482,7 @@ const RoomInforManagement = () => {
       const existingKeys = new Set(
         (rooms || []).map(
           (r) =>
-            `${r.examDate}||${r.subject}||${r.examSession}||${r.examRoom}||${
-              r.examType
-            }||${r.majorCode || ""}`
+            `${r.examDate}||${r.subject}||${r.examSession}||${r.examTime}||${r.examRoom}||${r.examType}`
         )
       );
 
@@ -493,7 +491,7 @@ const RoomInforManagement = () => {
       for (const s of students) {
         const key = `${s.examDate || ""}||${s.subject || ""}||${
           s.examSession || ""
-        }||${s.examRoom || ""}||${s.examType || ""}||${s.majorCode || ""}`;
+        }||${s.examTime || ""}||${s.examRoom || ""}||${s.examType || ""}`;
         if (!key) continue;
         // skip empty key
         if (!candidatesMap.has(key)) {
@@ -501,9 +499,9 @@ const RoomInforManagement = () => {
             examDate: s.examDate || "",
             subject: s.subject || "",
             examSession: s.examSession || "",
+            examTime: s.examTime || "",
             examRoom: s.examRoom || "",
             examType: s.examType || "",
-            majorCode: s.majorCode || "",
             examLink: s.examLink || "",
           });
         }
@@ -592,16 +590,7 @@ const RoomInforManagement = () => {
         if (mapped) headerMap[h] = mapped;
       });
       // Debug: log header map so admins can verify Excel headers map to expected fields
-      console.info("📋 handleExcelImport: headerMap", headerMap);
-      console.info("📋 handleExcelImport: firstRow raw data", firstRow);
-      
-      // Debug: log first row after mapping
-      const debugMappedFirstRow = {};
-      Object.entries(firstRow).forEach(([k, v]) => {
-        const key = headerMap[k];
-        if (key) debugMappedFirstRow[key] = v;
-      });
-      console.info("📋 handleExcelImport: firstRow mapped data", debugMappedFirstRow);
+      console.info("handleExcelImport: headerMap", headerMap);
 
       // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
       let updatedCount = 0;
@@ -673,179 +662,6 @@ const RoomInforManagement = () => {
           return !hasKey && link;
         });
 
-      // NEW LOGIC: Detect file with majorCode, examRoom, examLink columns (or with examDate, subject, examSession)
-      const hasThreeColumnFormat = rowsMapped.length > 0 && rowsMapped.some((m) => {
-        const hasMajorCode = m.mapped.majorCode && String(m.mapped.majorCode).trim() !== "";
-        const hasExamRoom = m.mapped.examRoom && String(m.mapped.examRoom).trim() !== "";
-        const hasExamLink = (m.mapped.examLink && String(m.mapped.examLink).trim() !== "") ||
-          Boolean(findUrlInAnyCell(m.raw));
-        // Also detect if file has examDate, subject, examSession columns (even without majorCode)
-        const hasExamDate = m.mapped.examDate && String(m.mapped.examDate).trim() !== "";
-        const hasSubject = m.mapped.subject && String(m.mapped.subject).trim() !== "";
-        const hasExamSession = m.mapped.examSession && String(m.mapped.examSession).trim() !== "";
-        
-        // Accept if: (majorCode + examRoom + link) OR (examDate + subject + examSession + examRoom + link)
-        return (hasMajorCode && hasExamRoom && hasExamLink) || 
-               (hasExamDate && hasSubject && hasExamSession && hasExamRoom && hasExamLink);
-      });
-
-      if (hasThreeColumnFormat) {
-        // Process file with multiple formats: 
-        // Format 1: majorCode + examRoom + examLink (+ optional subject, examDate, examSession)
-        // Format 2: examDate + subject + examSession + examRoom + examLink (without majorCode)
-        let applied = 0;
-        let studentsSynced = 0;
-        let notFoundCount = 0;
-
-        for (const m of rowsMapped) {
-          const majorCode = String(m.mapped.majorCode || "").trim();
-          const examRoom = String(m.mapped.examRoom || "").trim();
-          const examLink = String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim();
-          // Extract optional/required examDate, examSession, and subject from the row
-          const examDate = m.mapped.examDate ? parseExcelDateToYMD(m.mapped.examDate, { date1904 }) : "";
-          const examSession = String(m.mapped.examSession || "").trim();
-          const subject = String(m.mapped.subject || "").trim();
-
-          // Validation: must have examRoom and examLink at minimum
-          if (!examRoom || !examLink) continue;
-          
-          // Flexible validation based on available data:
-          // - If has majorCode: can work with just majorCode + examRoom
-          // - If no majorCode but has examDate + subject: can work
-          // - Allow matching even without examSession (many files don't have it)
-          if (!majorCode && !examDate && !subject) {
-            console.warn(`Bỏ qua dòng thiếu dữ liệu: cần ít nhất (majorCode + examRoom) HOẶC (examDate + subject + examRoom)`);
-            continue;
-          }
-
-          // Debug log for this row
-          console.log(`[Import] Processing row:`, { majorCode, examRoom, subject, examDate, examSession, examLink });
-
-          try {
-            // IMPORTANT: Room list is computed from student_infor, not room_infor collection!
-            // So we need to search in student_infor and update there directly
-            const allStudents = await getAllStudentInfor();
-            console.log(`[Import] Total students in DB: ${allStudents.length}`);
-            
-            // Find matching students based on criteria
-            const matchingStudents = allStudents.filter((s) => {
-              const dbExamRoom = normalizeForSearch(String(s.examRoom || "")).trim();
-              const inputExamRoom = normalizeForSearch(examRoom).trim();
-              
-              // Basic match: examRoom must match
-              let isMatch = dbExamRoom === inputExamRoom;
-              
-              // If majorCode is provided, match by majorCode
-              if (isMatch && majorCode) {
-                const dbMajorCode = String(s.majorCode || "").trim();
-                const majorMatch = dbMajorCode === majorCode;
-                isMatch = isMatch && majorMatch;
-                if (!majorMatch && dbExamRoom === inputExamRoom) {
-                  // Only log once per unique combination
-                }
-              }
-              
-              // If subject is provided, match by subject
-              if (isMatch && subject) {
-                const dbSubject = normalizeForSearch(String(s.subject || "")).trim();
-                const inputSubject = normalizeForSearch(subject).trim();
-                const subjectMatch = dbSubject === inputSubject;
-                isMatch = isMatch && subjectMatch;
-              }
-              
-              // If examDate is provided, match by examDate
-              if (isMatch && examDate) {
-                const dbExamDate = parseDateToYMD(s.examDate || "");
-                const dateMatch = dbExamDate === examDate;
-                isMatch = isMatch && dateMatch;
-              }
-              
-              // If examSession is provided, match by examSession (OPTIONAL)
-              if (isMatch && examSession) {
-                const dbExamSession = normalizeForSearch(String(s.examSession || "")).trim();
-                const inputExamSession = normalizeForSearch(examSession).trim();
-                const sessionMatch = dbExamSession === inputExamSession;
-                isMatch = isMatch && sessionMatch;
-              }
-              
-              return isMatch;
-            });
-            
-            console.log(`[Import] Found ${matchingStudents.length} matching students for examRoom="${examRoom}"`);
-            
-            if (matchingStudents.length === 0) {
-              notFoundCount++;
-              const criteria = [];
-              if (majorCode) criteria.push(`majorCode: ${majorCode}`);
-              if (examRoom) criteria.push(`examRoom: ${examRoom}`);
-              if (subject) criteria.push(`subject: ${subject}`);
-              if (examDate) criteria.push(`examDate: ${examDate}`);
-              if (examSession) criteria.push(`examSession: ${examSession}`);
-              console.warn(`❌ Không tìm thấy sinh viên khớp cho: ${criteria.join(', ')}`);
-              
-              // Show sample of students with same examRoom to help debug
-              const sameRoomSamples = allStudents.filter(s => 
-                normalizeForSearch(String(s.examRoom || "")).trim() === normalizeForSearch(examRoom).trim()
-              ).slice(0, 3);
-              if (sameRoomSamples.length > 0) {
-                console.warn(`   Tìm thấy ${sameRoomSamples.length} sinh viên có cùng số phòng "${examRoom}" nhưng không khớp điều kiện khác:`, 
-                  sameRoomSamples.map(s => ({
-                    examRoom: s.examRoom,
-                    majorCode: s.majorCode,
-                    subject: s.subject,
-                    examDate: parseDateToYMD(s.examDate),
-                    examSession: s.examSession
-                  }))
-                );
-              } else {
-                console.warn(`   Không có sinh viên nào có số phòng "${examRoom}" trong database`);
-              }
-              continue;
-            }
-            
-            console.log(`✅ Tìm thấy ${matchingStudents.length} sinh viên khớp, sẽ cập nhật link`);
-            
-            // Update examLink for all matching students using updateStudentsByMatch
-            const updateCriteria = {
-              examRoom: examRoom,
-            };
-            if (majorCode) updateCriteria.majorCode = majorCode;
-            if (subject) updateCriteria.subject = subject;
-            if (examDate) updateCriteria.examDate = examDate;
-            if (examSession) updateCriteria.examSession = examSession;
-            
-            const res = await updateStudentsByMatch(
-              updateCriteria,
-              { examLink },
-              { allowBulk: true }
-            );
-            
-            if (res && typeof res.updated === "number" && res.updated > 0) {
-              applied++;
-              studentsSynced += res.updated;
-              console.log(`✅ Đã cập nhật ${res.updated} sinh viên với link: ${examLink}`);
-            }
-          } catch (e) {
-            console.error("Error processing row with majorCode/examRoom/examLink:", e);
-          }
-        }
-
-        setImportModal((m) => ({
-          ...m,
-          open: true,
-          title: "Hoàn tất nhập Excel",
-          message: `Đã xử lý file. Cập nhật ${applied} nhóm phòng, đồng bộ ${studentsSynced} bản ghi thí sinh. ${notFoundCount > 0 ? `Không tìm thấy: ${notFoundCount} phòng.` : ''}`,
-          processed: json.length,
-          total: json.length,
-          updatedCount: applied,
-          studentUpdatedCount: studentsSynced,
-          done: true,
-        }));
-
-        setIsSaving(false);
-        return; // finish three-column format flow
-      }
-
       if (allRowsHaveNoKeyAndHaveLink) {
         // Build ordered list of links from the file
         const links = rowsMapped
@@ -908,6 +724,7 @@ const RoomInforManagement = () => {
                 examDate: example.examDate,
                 subject: example.subject,
                 examSession: example.examSession,
+                examTime: example.examTime,
                 examRoom: example.examRoom,
                 examType: example.examType,
               };
@@ -919,6 +736,7 @@ const RoomInforManagement = () => {
                   const studentCriteria = {
                     subject: example.subject,
                     examSession: example.examSession,
+                    examTime: example.examTime,
                     examRoom: example.examRoom,
                   };
                   if (example.examDate)
@@ -959,6 +777,7 @@ const RoomInforManagement = () => {
                     const studentCriteria = {
                       subject: doc.subject,
                       examSession: doc.examSession,
+                      examTime: doc.examTime,
                       examRoom: doc.examRoom,
                     };
                     if (doc.examDate) studentCriteria.examDate = doc.examDate;
@@ -1010,10 +829,11 @@ const RoomInforManagement = () => {
           if (key) mapped[key] = v;
         });
 
-        // build match key from subject/session/room
+        // build match key from subject/session/time/room
         const keyObj = {
           subject: (mapped.subject || "").toString().trim(),
           examSession: (mapped.examSession || "").toString().trim(),
+          examTime: (mapped.examTime || "").toString().trim(),
           examRoom: (mapped.examRoom || "").toString().trim(),
           examType: (mapped.examType || "").toString().trim(),
         };
@@ -1044,7 +864,12 @@ const RoomInforManagement = () => {
           }
         }
 
-        if (!keyObj.subject && !keyObj.examSession && !keyObj.examRoom) {
+        if (
+          !keyObj.subject &&
+          !keyObj.examSession &&
+          !keyObj.examTime &&
+          !keyObj.examRoom
+        ) {
           rowsSkippedNoKey++;
           // Log the skipped row for debugging: show mapped keys so we can see which headers were missing
           console.warn(
@@ -1070,6 +895,7 @@ const RoomInforManagement = () => {
         const normKeyObj = {
           subject: normalizeForSearch(keyObj.subject || "").trim(),
           examSession: normalizeForSearch(keyObj.examSession || "").trim(),
+          examTime: normalizeForSearch(keyObj.examTime || "").trim(),
           examRoom: normalizeForSearch(keyObj.examRoom || "").trim(),
           examType: normalizeForSearch(keyObj.examType || "").trim(),
         };
@@ -1179,6 +1005,7 @@ const RoomInforManagement = () => {
               const criteria = {
                 subject: keyObj.subject,
                 examSession: keyObj.examSession,
+                examTime: keyObj.examTime,
                 examRoom: keyObj.examRoom,
               };
               // include examType if provided in the imported row
@@ -1248,6 +1075,7 @@ const RoomInforManagement = () => {
               const criteria = {
                 subject: doc.subject,
                 examSession: doc.examSession,
+                examTime: doc.examTime,
                 examRoom: doc.examRoom,
               };
               // include examType if available on the room doc
@@ -1339,10 +1167,12 @@ const RoomInforManagement = () => {
     setIsSaving(true);
     try {
       if (editing) {
+        // update all room_infor docs that match the original composite key
         const matches = await getMatchingRoomDocs({
           examDate: editing.examDate,
           subject: editing.subject,
           examSession: editing.examSession,
+          examTime: editing.examTime,
           examRoom: editing.examRoom,
           examType: editing.examType,
         });
@@ -1375,9 +1205,11 @@ const RoomInforManagement = () => {
         // 2) Update students that match the saved/updated room documents (affectedDocs) so missing fields
         //    like examDate/examLink are propagated.
         try {
+          // PASS 1: update students that matched the original editing key
           const origCriteria = {
             subject: editing.subject,
             examSession: editing.examSession,
+            examTime: editing.examTime,
             examRoom: editing.examRoom,
           };
           if (editing.examType) origCriteria.examType = editing.examType;
@@ -1523,7 +1355,7 @@ const RoomInforManagement = () => {
       }`}
     >
       {windowWidth < 770 && (
-        <HomeMobileHeader
+        <DocumentMobileHeader
           setIsSidebarOpen={setIsSidebarOpen}
           isDarkMode={isDarkMode}
         />
@@ -1718,6 +1550,78 @@ const RoomInforManagement = () => {
               <div className="py-8 flex justify-center">
                 <LoadingSpinner />
               </div>
+            ) : windowWidth < 770 ? (
+              /* Mobile View - Card Layout */
+              <div className="space-y-3">
+                {/* Mobile Header with selection controls */}
+                <div className={`p-3 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-white"} shadow-sm border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm">
+                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+                        Tổng: <strong>{rooms.length}</strong> — Hiển thị: <strong>{visibleRooms.length}</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          if (selectedIds.length === visibleRooms.length) {
+                            clearSelection();
+                          } else {
+                            selectAllVisible();
+                          }
+                        }}
+                        className={`px-2 py-1 text-xs rounded ${
+                          isDarkMode
+                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {selectedIds.length === visibleRooms.length && visibleRooms.length > 0 ? "Bỏ chọn" : "Chọn tất cả"}
+                      </button>
+                      {selectedIds.length > 0 && (
+                        <span className={`text-xs ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                          ({selectedIds.length})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Cards */}
+                {visibleRooms.length === 0 ? (
+                  <div className={`p-8 text-center rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+                    <svg
+                      className={`mx-auto h-12 w-12 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                      Không có dữ liệu phòng thi
+                    </p>
+                  </div>
+                ) : (
+                  visibleRooms.map((room, idx) => (
+                    <RoomMobileCard
+                      key={room.id}
+                      room={room}
+                      index={idx + 1}
+                      isDarkMode={isDarkMode}
+                      isSelected={selectedIds.includes(room.id)}
+                      onToggleSelect={toggleSelect}
+                      onEdit={openEdit}
+                      onDelete={handleDeleteRoom}
+                    />
+                  ))
+                )}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 md:overflow-hidden">
@@ -1754,9 +1658,6 @@ const RoomInforManagement = () => {
                           Tên môn học
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Mã ngành
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                           Ca thi
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
@@ -1777,7 +1678,7 @@ const RoomInforManagement = () => {
                       {visibleRooms.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={10}
+                            colSpan={9}
                             className="p-6 text-center text-sm text-gray-500"
                           >
                             Không có dữ liệu
@@ -1806,7 +1707,7 @@ const RoomInforManagement = () => {
                                 className="bg-gray-100 dark:bg-gray-700"
                               >
                                 <td
-                                  colSpan={10}
+                                  colSpan={9}
                                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200"
                                 >
                                   Link:{" "}
@@ -1860,9 +1761,6 @@ const RoomInforManagement = () => {
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                                     {r.subject || "-"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.majorCode || "-"}
                                   </td>
                                   <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                                     {r.examSession || "-"}
@@ -1946,9 +1844,6 @@ const RoomInforManagement = () => {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.subject || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.majorCode || "-"}
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
                               {r.examSession || "-"}
