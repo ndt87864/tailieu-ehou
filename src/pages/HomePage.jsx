@@ -174,15 +174,25 @@ const HomePage = () => {
   }, []);
 
   // Khi categories thay đổi, reset categoriesWithDocs (chỉ chứa documents khi expand)
+  // Lọc bỏ các danh mục có adminOnly = true (danh mục đề thi chỉ admin xem)
   useEffect(() => {
     if (!categories || categories.length === 0) {
       setCategoriesWithDocs([]);
       return;
     }
+    
+    // Filter out adminOnly categories for regular users
+    const publicCategories = categories.filter((cat) => !cat.adminOnly);
+    
+    if (publicCategories.length === 0) {
+      setCategoriesWithDocs([]);
+      return;
+    }
+    
     // Khi load trang: chỉ lấy 5 tài liệu đầu tiên cho mỗi danh mục, không load allDocuments
     const fetchInitialDocs = async () => {
       const results = await Promise.all(
-        categories.map(async (cat) => {
+        publicCategories.map(async (cat) => {
           try {
             const docs = await getDocumentsByCategory(cat.id);
             const sortedDocs = (docs || []).sort(
