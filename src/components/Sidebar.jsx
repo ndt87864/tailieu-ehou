@@ -762,8 +762,7 @@ function Sidebar({
       }
     } else {
       console.log(
-        `Đã có sẵn ${documents[category.id].length} tài liệu cho danh mục: ${
-          category.title
+        `Đã có sẵn ${documents[category.id].length} tài liệu cho danh mục: ${category.title
         }`
       );
     }
@@ -811,16 +810,14 @@ function Sidebar({
 
   // Improved sidebar classes with better responsive behavior
   const sidebarClasses = `
-    h-screen overflow-y-auto border-r ${
-      isDarkMode ? "border-gray-700" : "border-green-800"
+    h-screen overflow-y-auto border-r ${isDarkMode ? "border-gray-700" : "border-green-800"
     } transition-all duration-300 scrollbar-hide
     ${isCollapsed && windowWidth >= 770 && windowWidth < 1280 ? "w-16" : "w-72"}
-    ${
-      windowWidth < 770
-        ? isOpen
-          ? "fixed left-0 top-0 z-50 shadow-lg w-72"
-          : "fixed -left-80 top-0 z-50"
-        : "relative h-screen flex-shrink-0"
+    ${windowWidth < 770
+      ? isOpen
+        ? "fixed left-0 top-0 z-50 shadow-lg w-72"
+        : "fixed -left-80 top-0 z-50"
+      : "relative h-screen flex-shrink-0"
     }
     theme-sidebar text-white
   `;
@@ -876,9 +873,8 @@ function Sidebar({
         {/* Optimized sidebar header with better responsive layout */}
         <div className={`sticky top-0 theme-sidebar z-10`}>
           <div
-            className={`p-4 flex items-center justify-between border-b ${
-              isDarkMode ? "border-gray-700" : "border-green-600"
-            }`}
+            className={`p-4 flex items-center justify-between border-b ${isDarkMode ? "border-gray-700" : "border-green-600"
+              }`}
           >
             <Link to="/" className="flex items-center overflow-hidden">
               <div className="p-1 mr-2 flex-shrink-0">
@@ -907,9 +903,8 @@ function Sidebar({
                 title={isCollapsed ? "Mở rộng" : "Thu gọn"}
               >
                 <svg
-                  className={`w-5 h-5 transform transition-transform ${
-                    isCollapsed ? "rotate-0" : "rotate-180"
-                  }`}
+                  className={`w-5 h-5 transform transition-transform ${isCollapsed ? "rotate-0" : "rotate-180"
+                    }`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -930,16 +925,14 @@ function Sidebar({
           {/* Admin Section - Only visible for admin users */}
           {isAdmin && (
             <div
-              className={`border-b ${
-                isDarkMode ? "border-gray-700" : "border-green-600"
-              }`}
+              className={`border-b ${isDarkMode ? "border-gray-700" : "border-green-600"
+                }`}
             >
               <Link
                 to="/admin/dashboard"
                 onClick={(e) => handleAdminRefresh(e, "/admin/dashboard")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -962,9 +955,8 @@ function Sidebar({
               <Link
                 to="/admin/users"
                 onClick={(e) => handleAdminRefresh(e, "/admin/users")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -990,9 +982,8 @@ function Sidebar({
               <Link
                 to="/admin/categories"
                 onClick={(e) => handleAdminRefresh(e, "/admin/categories")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1018,9 +1009,8 @@ function Sidebar({
               <Link
                 to="/admin/documents"
                 onClick={(e) => handleAdminRefresh(e, "/admin/documents")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1046,9 +1036,8 @@ function Sidebar({
               <Link
                 to="/admin/questions"
                 onClick={(e) => handleAdminRefresh(e, "/admin/questions")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1074,9 +1063,8 @@ function Sidebar({
               <Link
                 to="/admin/student-infor"
                 onClick={(e) => handleAdminRefresh(e, "/admin/student-infor")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1101,9 +1089,8 @@ function Sidebar({
               <Link
                 to="/admin/room-infor"
                 onClick={(e) => handleAdminRefresh(e, "/admin/room-infor")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1129,9 +1116,8 @@ function Sidebar({
               <Link
                 to="/admin/exam-sessions"
                 onClick={(e) => handleAdminRefresh(e, "/admin/exam-sessions")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1155,9 +1141,8 @@ function Sidebar({
               <Link
                 to="/admin/calendar-notes"
                 onClick={(e) => handleAdminRefresh(e, "/admin/calendar-notes")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   className="w-5 h-5 mr-3 text-white flex-shrink-0"
@@ -1181,9 +1166,8 @@ function Sidebar({
               <Link
                 to="/admin/premium-users"
                 onClick={(e) => handleAdminRefresh(e, "/admin/premium-users")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1209,9 +1193,8 @@ function Sidebar({
               <Link
                 to="/admin/footer"
                 onClick={(e) => handleAdminRefresh(e, "/admin/footer")}
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1264,9 +1247,8 @@ function Sidebar({
                 onClick={(e) =>
                   handleAdminRefresh(e, "/admin/pricing-content-management")
                 }
-                className={`flex items-center px-4 py-3 transition-colors ${
-                  isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
-                }`}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -1303,19 +1285,16 @@ function Sidebar({
                   className="rounded-md overflow-hidden"
                 >
                   <button
-                    className={`w-full flex items-center ${
-                      isCollapsed && windowWidth >= 770
-                        ? "justify-center"
-                        : "justify-between"
-                    } px-3 py-2.5 text-sm font-medium text-left transition-all duration-200 rounded-md ${
-                      openMain === idx
+                    className={`w-full flex items-center ${isCollapsed && windowWidth >= 770
+                      ? "justify-center"
+                      : "justify-between"
+                      } px-3 py-2.5 text-sm font-medium text-left transition-all duration-200 rounded-md ${openMain === idx
                         ? isDarkMode
                           ? "bg-slate-700 text-white"
                           : "theme-category-selected text-white"
-                        : `text-white hover:${
-                            isDarkMode ? "bg-slate-700" : "theme-button-hover"
-                          } hover:shadow-md`
-                    }`}
+                        : `text-white hover:${isDarkMode ? "bg-slate-700" : "theme-button-hover"
+                        } hover:shadow-md`
+                      }`}
                     style={
                       openMain === idx && isDarkMode
                         ? { backgroundColor: "#334155" }
@@ -1336,9 +1315,8 @@ function Sidebar({
 
                     {showFullContent && (
                       <svg
-                        className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${
-                          openMain === idx ? "transform rotate-180" : ""
-                        }`}
+                        className={`w-4 h-4 flex-shrink-0 transition-transform duration-200 ${openMain === idx ? "transform rotate-180" : ""
+                          }`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -1357,15 +1335,13 @@ function Sidebar({
                   {/* Hiển thị menu documents có điều kiện */}
                   {openMain === idx && documents && documents[category.id] && (
                     <ul
-                      className={`mt-1 ${
-                        showFullContent ? "pl-4" : ""
-                      } space-y-0.5 py-1 ${
-                        showFullContent
+                      className={`mt-1 ${showFullContent ? "pl-4" : ""
+                        } space-y-0.5 py-1 ${showFullContent
                           ? (isDarkMode
-                              ? "bg-slate-700/50"
-                              : "theme-category-container") + " rounded-md mx-1"
+                            ? "bg-slate-700/50"
+                            : "theme-category-container") + " rounded-md mx-1"
                           : ""
-                      }`}
+                        }`}
                       style={
                         showFullContent && isDarkMode
                           ? { backgroundColor: "rgba(51, 65, 85, 0.5)" }
@@ -1373,35 +1349,32 @@ function Sidebar({
                       }
                     >
                       {Array.isArray(documents[category.id]) &&
-                      documents[category.id].length > 0 ? (
+                        documents[category.id].length > 0 ? (
                         documents[category.id].map((doc) => (
                           <li key={doc.id}>
                             <button
-                              className={`group flex items-center w-full ${
-                                showFullContent ? "px-3" : "px-1"
-                              } py-2 text-sm rounded-md transition-all duration-200 ${
-                                selectedDocument &&
-                                selectedDocument.id === doc.id
+                              className={`group flex items-center w-full ${showFullContent ? "px-3" : "px-1"
+                                } py-2 text-sm rounded-md transition-all duration-200 ${selectedDocument &&
+                                  selectedDocument.id === doc.id
                                   ? showFullContent
                                     ? (isDarkMode
-                                        ? "bg-slate-600/50"
-                                        : "theme-document-selected") +
-                                      " text-white font-medium shadow-sm"
+                                      ? "bg-slate-600/50"
+                                      : "theme-document-selected") +
+                                    " text-white font-medium shadow-sm"
                                     : "text-white font-medium"
-                                  : `text-white hover:${
-                                      isDarkMode
-                                        ? "bg-slate-700"
-                                        : "theme-button-hover"
-                                    } hover:text-white hover:shadow-sm`
-                              }`}
+                                  : `text-white hover:${isDarkMode
+                                    ? "bg-slate-700"
+                                    : "theme-button-hover"
+                                  } hover:text-white hover:shadow-sm`
+                                }`}
                               style={
                                 selectedDocument &&
-                                selectedDocument.id === doc.id &&
-                                showFullContent &&
-                                isDarkMode
+                                  selectedDocument.id === doc.id &&
+                                  showFullContent &&
+                                  isDarkMode
                                   ? {
-                                      backgroundColor: "rgba(71, 85, 105, 0.5)",
-                                    }
+                                    backgroundColor: "rgba(71, 85, 105, 0.5)",
+                                  }
                                   : {}
                               }
                               onClick={() => handleDocumentClick(category, doc)}
@@ -1424,17 +1397,55 @@ function Sidebar({
                   )}
                 </li>
               ))}
+            {/* User-facing Students page link (hide in admin sidebar or when disabled) */}
+            {!isAdmin && studentPageEnabled && (
+              <div className="mt-4 px-2">
+                <ul className="space-y-1">
+                  <li className="rounded-md overflow-hidden">
+                    <Link
+                      to="/students"
+                      className={`${linkBaseClass} ${isCollapsed && windowWidth >= 770 ? "justify-center" : ""
+                        } ${location.pathname === "/students"
+                          ? activeClass
+                          : linkHoverClass
+                        }`}
+                      onClick={() => {
+                        if (windowWidth < 770) setIsOpen(false);
+                      }}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-5 h-5 text-gray-100"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5.121 17.804A13.937 13.937 0 0112 15c2.21 0 4.32.5 6.121 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zM21 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"
+                        />
+                      </svg>
+                      {showFullContent && (
+                        <span className="ml-3 flex-1 text-white">
+                          Danh sách thí sinh
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            )}
             {!isAdmin && (
               <li className="rounded-md overflow-hidden">
                 <Link
                   to="/pricing"
-                  className={`${linkBaseClass} ${
-                    isCollapsed && windowWidth >= 770 ? "justify-center" : ""
-                  } ${
-                    location.pathname === "/pricing"
+                  className={`${linkBaseClass} ${isCollapsed && windowWidth >= 770 ? "justify-center" : ""
+                    } ${location.pathname === "/pricing"
                       ? activeClass
                       : linkHoverClass
-                  }`}
+                    }`}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -1459,48 +1470,7 @@ function Sidebar({
           </ul>
         </nav>
 
-        {/* User-facing Students page link (hide in admin sidebar or when disabled) */}
-        {!isAdmin && studentPageEnabled && (
-          <div className="mt-4 px-2">
-            <ul className="space-y-1">
-              <li className="rounded-md overflow-hidden">
-                <Link
-                  to="/students"
-                  className={`${linkBaseClass} ${
-                    isCollapsed && windowWidth >= 770 ? "justify-center" : ""
-                  } ${
-                    location.pathname === "/students"
-                      ? activeClass
-                      : linkHoverClass
-                  }`}
-                  onClick={() => {
-                    if (windowWidth < 770) setIsOpen(false);
-                  }}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="w-5 h-5 text-gray-100"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5.121 17.804A13.937 13.937 0 0112 15c2.21 0 4.32.5 6.121 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zM21 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"
-                    />
-                  </svg>
-                  {showFullContent && (
-                    <span className="ml-3 flex-1 text-white">
-                      Danh sách thí sinh
-                    </span>
-                  )}
-                </Link>
-              </li>
-            </ul>
-          </div>
-        )}
+
 
         {/* Theme Color Picker Modal */}
         <ThemeColorPicker
