@@ -124,7 +124,7 @@ export const updateStudentInfor = async (id, data) => {
 export const deleteStudentInfor = async (id) => {
   await deleteDoc(doc(db, STUDENT_INFOR_COLLECTION, id));
 };
- 
+
 // Bulk delete: delete up to 10 student records at once
 export const bulkDeleteStudentInfor = async (ids = []) => {
   if (!Array.isArray(ids)) throw new Error("Input must be an array of IDs");
@@ -135,10 +135,10 @@ export const bulkDeleteStudentInfor = async (ids = []) => {
 };
 
 // Get student documents that match provided criteria.
-// criteria: { subject, examSession, examTime, examRoom, examDate? }
+// criteria: { subject, examSession, examTime, examRoom, examDate?, majorCode?, examType? }
 export const getStudentsByMatch = async (criteria = {}) => {
   try {
-    const { subject, examSession, examTime, examRoom, examDate } = criteria;
+    const { subject, examSession, examTime, examRoom, examDate, majorCode, examType } = criteria;
     // Build a simple query by filtering client-side since compound queries require indexes.
     // For now, fetch all and filter — acceptable for moderate dataset sizes.
     const qSnap = await getDocs(collection(db, STUDENT_INFOR_COLLECTION));
@@ -149,6 +149,8 @@ export const getStudentsByMatch = async (criteria = {}) => {
     const inputSession = examSession ? normalizeString(examSession) : '';
     const inputTime = examTime ? normalizeExamTime(examTime) : '';
     const inputRoom = examRoom ? normalizeString(examRoom) : '';
+    const inputMajorCode = majorCode ? String(majorCode).trim() : '';
+    const inputExamType = examType ? normalizeString(examType) : '';
     // Nếu examRoom là một link (bắt đầu bằng http), tách ra để so sánh cả số phòng và link phòng
     let inputRoomLink = '';
     let inputRoomNumber = '';
@@ -161,6 +163,18 @@ export const getStudentsByMatch = async (criteria = {}) => {
     const inputExamDate = examDate ? parseDateToYMD(examDate) : '';
 
     return docs.filter((d) => {
+      // majorCode: EXACT match (case-sensitive) - QUAN TRỌNG để phân biệt các ngành
+      if (inputMajorCode) {
+        const dbMajorCode = String(d.majorCode || '').trim();
+        if (dbMajorCode !== inputMajorCode) return false;
+      }
+
+      // examType: normalized match
+      if (inputExamType) {
+        const dbExamType = normalizeString(d.examType || '');
+        if (dbExamType !== inputExamType) return false;
+      }
+
       // examDate: compare normalized ISO Y-M-D
       if (inputExamDate) {
         const dbDate = parseDateToYMD(d.examDate || '');
