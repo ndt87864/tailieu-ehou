@@ -16,9 +16,12 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
+import NotFound from "./pages/NotFound";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import { UserRoleProvider } from "./context/UserRoleContext";
 import { SidebarProvider } from "./context/SidebarContext";
+import { FirebaseConnectionProvider } from "./context/FirebaseConnectionContext";
+import FirebaseConnectionGuard from "./components/FirebaseConnectionGuard";
 import AdminUserManagement from "./pages/admin/user/AdminUserManagement";
 import CategoryManagement from "./pages/admin/CategoryManagement";
 import DocumentManagement from "./pages/admin/DocumentManagement";
@@ -422,12 +425,14 @@ function App() {
 
   return (
     <ThemeProvider>
-      <UserRoleProvider>
-        <SidebarProvider>
-          <AdSenseComponent />
-          <div className={`App ${darkMode ? "dark" : ""}`}>
-            <ToastContainer position="top-right" autoClose={3000} />
-            <Suspense fallback={<LoadingSpinner />}>
+      <FirebaseConnectionProvider>
+        <UserRoleProvider>
+          <SidebarProvider>
+            <FirebaseConnectionGuard>
+              <AdSenseComponent />
+              <div className={`App ${darkMode ? "dark" : ""}`}>
+                <ToastContainer position="top-right" autoClose={3000} />
+                <Suspense fallback={<LoadingSpinner />}>
               <Routes>
                 <Route path="/" element={<ConditionalHomeRoute />} />
                 <Route path="/login" element={<Login />} />
@@ -557,14 +562,16 @@ function App() {
                   path="/:categorySlug/:documentSlug"
                   element={<DocumentView />}
                 />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
             <CalendarReminder />
             <ZaloContact />
           </div>
+        </FirebaseConnectionGuard>
         </SidebarProvider>
       </UserRoleProvider>
+    </FirebaseConnectionProvider>
     </ThemeProvider>
   );
 }

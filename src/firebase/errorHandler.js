@@ -16,6 +16,45 @@ const RETRYABLE_ERROR_CODES = [
   'unknown'
 ];
 
+// Offline error patterns - QUAN TRỌNG
+const OFFLINE_ERROR_PATTERNS = [
+  'client is offline',
+  'Failed to get document',
+  'network error',
+  'ERR_INTERNET_DISCONNECTED',
+  'net::ERR',
+  'offline',
+  'WebChannelConnection'
+];
+
+// Callback để báo cáo offline
+let reportOfflineCallback = null;
+
+export const setReportOfflineCallback = (callback) => {
+  reportOfflineCallback = callback;
+};
+
+/**
+ * Kiểm tra nếu lỗi là do offline
+ */
+export const isOfflineError = (error) => {
+  if (!error) return false;
+
+  const errorMessage = error.message || error.toString() || '';
+  const errorCode = error.code || '';
+
+  const isOffline = OFFLINE_ERROR_PATTERNS.some(pattern =>
+    errorMessage.toLowerCase().includes(pattern.toLowerCase()) ||
+    errorCode.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  if (errorCode === 'unavailable') {
+    return true;
+  }
+
+  return isOffline;
+};
+
 // Network status tracking
 let isNetworkEnabled = true;
 let connectionRetries = 0;
@@ -34,31 +73,40 @@ export const isRetryableError = (error) => {
  */
 export const handleFirestoreError = async (error) => {
   console.warn('Firestore error detected:', error);
-  
+
+  // QUAN TRỌNG: Kiểm tra nếu là lỗi offline và báo cáo ngay lập tức
+  if (isOfflineError(error)) {
+    console.error('OFFLINE ERROR DETECTED - Báo cáo đến FirebaseConnectionContext');
+    if (reportOfflineCallback) {
+      reportOfflineCallback(error);
+    }
+    return false;
+  }
+
   if (!error || !error.code) return false;
-  
+
   // Handle specific error cases
   switch (error.code) {
     case 'unavailable':
     case 'deadline-exceeded':
     case 'cancelled':
       return await reconnectFirestore();
-      
+
     case 'resource-exhausted':
       console.warn('Firestore quota exceeded, waiting before retry...');
       await new Promise(resolve => setTimeout(resolve, 5000));
       return true;
-      
+
     case 'permission-denied':
     case 'unauthenticated':
       console.error('Authentication/permission error:', error.message);
       return false;
-      
+
     case 'failed-precondition':
     case 'invalid-argument':
       console.error('Invalid operation:', error.message);
       return false;
-      
+
     default:
       if (isRetryableError(error)) {
         return await reconnectFirestore();
@@ -75,27 +123,27 @@ export const reconnectFirestore = async () => {
     console.error('Max connection retries reached');
     return false;
   }
-  
+
   connectionRetries++;
   console.log(`Attempting Firestore reconnection (${connectionRetries}/${MAX_CONNECTION_RETRIES})`);
-  
+
   try {
     if (isNetworkEnabled) {
       await disableNetwork(db);
       isNetworkEnabled = false;
     }
-    
+
     // Wait before reconnecting
     const delay = Math.min(1000 * Math.pow(2, connectionRetries - 1), 10000);
     await new Promise(resolve => setTimeout(resolve, delay));
-    
+
     await enableNetwork(db);
     isNetworkEnabled = true;
-    
+
     console.log('Firestore reconnection successful');
     connectionRetries = 0;
     return true;
-    
+
   } catch (reconnectError) {
     console.error('Firestore reconnection failed:', reconnectError);
     return false;
@@ -108,27 +156,27 @@ export const reconnectFirestore = async () => {
 export const clearFirestoreCache = async () => {
   try {
     console.log('Clearing Firestore cache...');
-    
+
     if (isNetworkEnabled) {
       await disableNetwork(db);
       isNetworkEnabled = false;
     }
-    
+
     await terminate(db);
-    
+
     try {
       await clearIndexedDbPersistence(db);
       console.log('IndexedDB persistence cleared');
     } catch (clearError) {
       console.warn('Could not clear IndexedDB:', clearError);
     }
-    
+
     await enableNetwork(db);
     isNetworkEnabled = true;
-    
+
     console.log('Firestore cache cleared and connection restored');
     return true;
-    
+
   } catch (error) {
     console.error('Failed to clear Firestore cache:', error);
     return false;
@@ -140,37 +188,37 @@ export const clearFirestoreCache = async () => {
  */
 export const retryFirestoreOperationWithErrorHandling = async (operation, maxRetries = 3) => {
   let lastError = null;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Firestore operation attempt ${attempt}/${maxRetries}`);
       return await operation();
-      
+
     } catch (error) {
       lastError = error;
       console.warn(`Attempt ${attempt} failed:`, error);
-      
+
       // Check if we should retry
       const shouldRetry = isRetryableError(error);
-      
+
       if (!shouldRetry || attempt === maxRetries) {
         console.error(`Operation failed after ${attempt} attempts:`, error);
         throw error;
       }
-      
+
       // Try to handle the error and reconnect
       const recovered = await handleFirestoreError(error);
-      
+
       if (!recovered && attempt < maxRetries) {
         console.log('Recovery failed, but will try again...');
       }
-      
+
       // Wait before next attempt with exponential backoff
       const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError;
 };
 
@@ -179,32 +227,32 @@ export const retryFirestoreOperationWithErrorHandling = async (operation, maxRet
  */
 export const monitorFirestoreConnection = () => {
   let connectionHealthy = true;
-  
+
   const checkConnection = async () => {
     try {
       // Simple health check - try to read from a lightweight collection
       const testQuery = doc(db, 'health-check', 'test');
       await getDoc(testQuery);
-      
+
       if (!connectionHealthy) {
         console.log('Firestore connection restored');
         connectionHealthy = true;
         connectionRetries = 0;
       }
-      
+
     } catch (error) {
       if (connectionHealthy) {
         console.warn('Firestore connection issues detected');
         connectionHealthy = false;
       }
-      
+
       await handleFirestoreError(error);
     }
   };
-  
+
   // Check connection every 30 seconds
   setInterval(checkConnection, 30000);
-  
+
   return checkConnection;
 };
 
