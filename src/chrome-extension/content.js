@@ -1552,18 +1552,20 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         element.style.color = 'green';
         element.classList.add('tailieu-highlighted-question');
         
-        // Get correct answer from database
-        const correctAnswer = extensionQuestion.answer;
-        console.log('[Tailieu Extension] Đáp án từ DB:', correctAnswer);
+        // IMPORTANT: Get ALL correct answers from database for this question (not just one)
+        const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
+        console.log('[Tailieu Extension] Tất cả đáp án từ DB cho câu hỏi này:', allCorrectAnswers);
+        console.log('[Tailieu Extension] Số lượng đáp án trong DB:', allCorrectAnswers.length);
         
-        if (!correctAnswer || !answerHighlightingEnabled) {
+        if (!allCorrectAnswers || allCorrectAnswers.length === 0 || !answerHighlightingEnabled) {
             console.log('[Tailieu Extension] Không có đáp án hoặc highlight bị tắt');
             return;
         }
         
-        // Normalize correct answer for comparison
-        const normalizedAnswer = normalizeTextForMatching(correctAnswer.toString());
-        console.log('[Tailieu Extension] Đáp án sau normalize:', normalizedAnswer);
+        // Use the array of all answers instead of just one
+        const correctAnswer = allCorrectAnswers; // This will be an array
+        const normalizedAnswer = normalizeTextForMatching(allCorrectAnswers[0].toString());
+        console.log('[Tailieu Extension] Đáp án đầu tiên sau normalize:', normalizedAnswer);
         
         // If we don't have an explicit answerContainer, try heuristic
         if (!answerContainer) {
@@ -1699,7 +1701,7 @@ function hideAnswerTooltip(questionElement) {
     all.forEach(t => t.remove());
 }
 
-// Helper function to highlight matching options - SIMPLE APPROACH
+// Helper function to highlight matching options - IMPROVED FOR MULTIPLE DB ANSWERS
 function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pageQuestion = null, extensionQuestion = null) {
     let highlighted = false;
     
@@ -1715,14 +1717,18 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
     const imageFingerprints = imageAnswers.map(src => fingerprintImagePath(src));
     if (imageAnswers.length > 0) console.log('[Tailieu Extension] Image answers detected:', imageAnswers, imageFingerprints);
     
+    console.log('[Tailieu Extension] Số đáp án trong DB:', normalizedAnswers.length);
+    console.log('[Tailieu Extension] Số options trên web:', options.length);
     console.log('[Tailieu Extension] Cần tìm các đáp án (normalized):', normalizedAnswers);
     console.log('[Tailieu Extension] Kiểm tra', options.length, 'options...');
     
+    // Extract all web options first
+    const webOptions = [];
     options.forEach((option, index) => {
         if (isExtensionElement(option)) return;
         
-        const optionText = option.textContent?.trim() || '';
-        const normalizedOption = normalizeTextForMatching(optionText);
+        let optionText = option.textContent?.trim() || '';
+        let normalizedOption = normalizeTextForMatching(optionText);
         
         // If option text is empty/short, try to extract useful text from images or nearby labels
         if (normalizedOption.length < 2) {
@@ -1742,82 +1748,159 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                 imgText = normalizeTextForMatching(imgText);
                 if (imgText && imgText.length > 1) {
                     console.log('[Tailieu Extension] Option', index, 'has image text:', imgText.substring(0,80));
-                    // Treat this as the option text for matching
                     normalizedOption = imgText;
+                    optionText = imgText;
                 }
             }
         }
         
-        if (normalizedOption.length < 2) return;
-        
-        // Log each option for debugging
-        console.log('[Tailieu Extension] Option', index, ':', normalizedOption.substring(0, 80));
-        
-        // Check each answer
-        for (const normalizedAns of normalizedAnswers) {
-            if (normalizedAns.length < 2) continue;
-            
-            // EXACT MATCH: Cả hai text giống nhau hoàn toàn
-            if (normalizedOption === normalizedAns) {
-                console.log('[Tailieu Extension] ✅ EXACT match:', optionText);
-                applyHighlightStyle(option);
-                // Log the highlighted QA pair
-                const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'EXACT' };
-                console.log('[Tailieu Extension] HIGHLIGHTED:', qaExact);
-                highlightedQA.push(qaExact);
-                highlighted = true;
-                continue;
-            }
-            
-            // CONTAINS MATCH: Option chứa toàn bộ đáp án (đáp án ngắn hơn)
-            if (normalizedOption.includes(normalizedAns) && normalizedAns.length > 10) {
-                console.log('[Tailieu Extension] ✅ CONTAINS match:', optionText);
-                applyHighlightStyle(option);
-                const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'CONTAINS' };
-                console.log('[Tailieu Extension] HIGHLIGHTED:', qaContains);
-                highlightedQA.push(qaContains);
-                highlighted = true;
-                continue;
-            }
-            
-            // REVERSE CONTAINS: Đáp án chứa toàn bộ option (option ngắn hơn)
-            if (normalizedAns.includes(normalizedOption) && normalizedOption.length > 10) {
-                console.log('[Tailieu Extension] ✅ REVERSE CONTAINS match:', optionText);
-                applyHighlightStyle(option);
-                const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'REVERSE_CONTAINS' };
-                console.log('[Tailieu Extension] HIGHLIGHTED:', qaReverse);
-                highlightedQA.push(qaReverse);
-                highlighted = true;
-                continue;
-            }
-            
-            // SIMILARITY CHECK: Tính độ giống nhau nếu không khớp exact
-            if (normalizedOption.length > 15 && normalizedAns.length > 15) {
-                const similarity = calculateSimilarity(normalizedOption, normalizedAns);
-                if (similarity > 0.90) { // tighten threshold to avoid false positives
-                    console.log('[Tailieu Extension] ✅ SIMILARITY match (' + (similarity * 100).toFixed(1) + '%):', optionText);
-                    applyHighlightStyle(option);
-                    const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'SIMILARITY', similarity: similarity };
-                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaSim);
-                    highlightedQA.push(qaSim);
-                    highlighted = true;
-                    continue;
-                } else if (similarity > 0.6) {
-                    console.log('[Tailieu Extension] ⚠️ Gần giống (' + (similarity * 100).toFixed(1) + '%):', 
-                        normalizedOption.substring(0, 50), 'vs', normalizedAns.substring(0, 50));
-                }
-            }
+        if (normalizedOption.length >= 2) {
+            webOptions.push({
+                element: option,
+                originalText: optionText,
+                normalizedText: normalizedOption,
+                index: index
+            });
         }
     });
+    
+    console.log('[Tailieu Extension] Extracted', webOptions.length, 'valid web options');
+    
+    // LOGIC: Xử lý theo số lượng đáp án trong DB
+    if (normalizedAnswers.length > 4) {
+        // Nếu số đáp án trong DB > 4: Lấy từng đáp án a,b,c,d từ web so sánh với DB
+        console.log('[Tailieu Extension] ⚙️ Strategy: DB answers > 4, comparing WEB options against DB answers');
+        
+        webOptions.forEach((webOpt) => {
+            // Nếu đã highlight rồi thì bỏ qua (chỉ highlight 1 đáp án duy nhất)
+            if (highlighted) return;
+            
+            console.log('[Tailieu Extension] Checking web option', webOpt.index, ':', webOpt.normalizedText.substring(0, 80));
+            
+            // So sánh option này với TẤT CẢ các đáp án trong DB
+            for (const normalizedAns of normalizedAnswers) {
+                if (normalizedAns.length < 2) continue;
+                
+                // EXACT MATCH
+                if (webOpt.normalizedText === normalizedAns) {
+                    console.log('[Tailieu Extension] ✅ EXACT match (WEB->DB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaExact);
+                    highlightedQA.push(qaExact);
+                    highlighted = true;
+                    return; // Dừng ngay khi tìm thấy match đầu tiên
+                }
+                
+                // CONTAINS MATCH
+                if (webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
+                    console.log('[Tailieu Extension] ✅ CONTAINS match (WEB->DB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'CONTAINS_WEB_TO_DB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaContains);
+                    highlightedQA.push(qaContains);
+                    highlighted = true;
+                    return;
+                }
+                
+                // REVERSE CONTAINS
+                if (normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
+                    console.log('[Tailieu Extension] ✅ REVERSE CONTAINS match (WEB->DB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'REVERSE_CONTAINS_WEB_TO_DB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaReverse);
+                    highlightedQA.push(qaReverse);
+                    highlighted = true;
+                    return;
+                }
+                
+                // SIMILARITY CHECK
+                if (webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
+                    const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
+                    if (similarity > 0.90) {
+                        console.log('[Tailieu Extension] ✅ SIMILARITY match (WEB->DB) (' + (similarity * 100).toFixed(1) + '%):', webOpt.originalText);
+                        applyHighlightStyle(webOpt.element);
+                        const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'SIMILARITY_WEB_TO_DB', similarity: similarity };
+                        console.log('[Tailieu Extension] HIGHLIGHTED:', qaSim);
+                        highlightedQA.push(qaSim);
+                        highlighted = true;
+                        return;
+                    }
+                }
+            }
+        });
+    } else {
+        // Nếu số đáp án trong DB <= 4: Lấy đáp án từ DB so sánh với từng option trên web
+        console.log('[Tailieu Extension] ⚙️ Strategy: DB answers <= 4, comparing DB answers against WEB options');
+        
+        normalizedAnswers.forEach((normalizedAns, ansIndex) => {
+            // Nếu đã highlight rồi thì bỏ qua (chỉ highlight 1 đáp án duy nhất)
+            if (highlighted) return;
+            
+            if (normalizedAns.length < 2) return;
+            
+            console.log('[Tailieu Extension] Checking DB answer', ansIndex, ':', normalizedAns.substring(0, 80));
+            
+            // So sánh đáp án này với TẤT CẢ các options trên web
+            for (const webOpt of webOptions) {
+                // EXACT MATCH
+                if (webOpt.normalizedText === normalizedAns) {
+                    console.log('[Tailieu Extension] ✅ EXACT match (DB->WEB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaExact);
+                    highlightedQA.push(qaExact);
+                    highlighted = true;
+                    return; // Dừng ngay khi tìm thấy match đầu tiên
+                }
+                
+                // CONTAINS MATCH
+                if (webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
+                    console.log('[Tailieu Extension] ✅ CONTAINS match (DB->WEB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'CONTAINS_DB_TO_WEB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaContains);
+                    highlightedQA.push(qaContains);
+                    highlighted = true;
+                    return;
+                }
+                
+                // REVERSE CONTAINS
+                if (normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
+                    console.log('[Tailieu Extension] ✅ REVERSE CONTAINS match (DB->WEB):', webOpt.originalText);
+                    applyHighlightStyle(webOpt.element);
+                    const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'REVERSE_CONTAINS_DB_TO_WEB' };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaReverse);
+                    highlightedQA.push(qaReverse);
+                    highlighted = true;
+                    return;
+                }
+                
+                // SIMILARITY CHECK
+                if (webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
+                    const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
+                    if (similarity > 0.90) {
+                        console.log('[Tailieu Extension] ✅ SIMILARITY match (DB->WEB) (' + (similarity * 100).toFixed(1) + '%):', webOpt.originalText);
+                        applyHighlightStyle(webOpt.element);
+                        const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'SIMILARITY_DB_TO_WEB', similarity: similarity };
+                        console.log('[Tailieu Extension] HIGHLIGHTED:', qaSim);
+                        highlightedQA.push(qaSim);
+                        highlighted = true;
+                        return;
+                    }
+                }
+            }
+        });
+    }
     
     if (!highlighted) {
         console.log('[Tailieu Extension] ⚠️ Không tìm thấy match cho các options');
         // Log all options for debugging
-        console.log('[Tailieu Extension] Tất cả options:');
-        options.forEach((opt, i) => {
-            console.log('  ', i, ':', normalizeTextForMatching(opt.textContent || '').substring(0, 100));
+        console.log('[Tailieu Extension] Tất cả web options:');
+        webOptions.forEach((opt, i) => {
+            console.log('  ', i, ':', opt.normalizedText.substring(0, 100));
         });
-        console.log('[Tailieu Extension] Cần tìm:');
+        console.log('[Tailieu Extension] Cần tìm (DB answers):');
         normalizedAnswers.forEach((ans, i) => {
             console.log('  ', i, ':', ans.substring(0, 100));
         });
