@@ -40,7 +40,7 @@ const ZaloContact = () => {
         } mb-2`}
       >
         <a
-          href="https://zalo.me/0915918742"
+          href="https://zalo.me/0876236682"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center"
