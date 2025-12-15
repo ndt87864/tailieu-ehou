@@ -18,14 +18,14 @@
     "default_popup": "popup.html",
     "default_title": "Tailieu Questions"
   },
-  "content_scripts": [
+    "content_scripts": [
     {
       "matches": [
         "https://learning.ehou.edu.vn/*",
         "https://tailieuehou.id.vn/editor"
       ],
-      "js": ["content.js", "question-scanner/scanner.js"],
-      "css": ["styles.css", "question-scanner/scanner.css"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
       "run_at": "document_idle"
     }
   ],
