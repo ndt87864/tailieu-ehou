@@ -13,6 +13,8 @@ if (window.tailieuExtensionLoaded) {
 // Store questions from extension for comparison
 let extensionQuestions = [];
 let answerHighlightingEnabled = true; // New setting
+// Track what QA pairs were highlighted in the current run
+let highlightedQA = [];
 
 // Cache key for questions
 const QUESTIONS_CACHE_KEY = 'tailieu_questions';
@@ -539,6 +541,75 @@ async function saveCachedQuestions() {
 function extractQuestionsFromPage() {
     const questions = [];
     
+    // ===== MOODLE STRUCTURE FIRST =====
+    // Look for .que (question) containers - standard Moodle structure
+    const moodleQuestions = document.querySelectorAll('.que');
+    if (moodleQuestions.length > 0) {
+        console.log('[Tailieu Extension] Phát hiện cấu trúc Moodle, tìm thấy', moodleQuestions.length, 'câu hỏi .que');
+        
+        moodleQuestions.forEach((queContainer, index) => {
+            if (isExtensionElement(queContainer)) return;
+            
+            // Find question text in .qtext
+            const qtextElement = queContainer.querySelector('.qtext');
+            if (!qtextElement) return;
+            
+            const questionText = qtextElement.textContent?.trim() || '';
+            if (questionText.length < 5) return;
+            
+            // Find answer container
+            const answerContainer = queContainer.querySelector('.answer');
+            
+            questions.push({
+                element: qtextElement,
+                container: queContainer,
+                answerContainer: answerContainer,
+                text: questionText,
+                originalText: questionText,
+                index: index,
+                reason: 'moodle .que structure'
+            });
+            // Attach hover listeners to show DB answers tooltip
+            try {
+                if (!qtextElement.dataset.tailieuHoverAttached) {
+                    qtextElement.dataset.tailieuHoverAttached = '1';
+                    qtextElement.addEventListener('mouseenter', () => {
+                        // small debounce to avoid frequent DB scans when moving mouse
+                        if (qtextElement._tailieuHoverTimer) clearTimeout(qtextElement._tailieuHoverTimer);
+                        qtextElement._tailieuHoverTimer = setTimeout(async () => {
+                            try {
+                                const answers = findAllCorrectAnswersForQuestion(questionText);
+                                if (answers && answers.length > 0) {
+                                    createAnswerTooltip(qtextElement, answers);
+                                }
+                            } catch (e) {
+                                // ignore
+                            }
+                        }, 120);
+                    });
+                    qtextElement.addEventListener('mouseleave', () => {
+                        if (qtextElement._tailieuHoverTimer) {
+                            clearTimeout(qtextElement._tailieuHoverTimer);
+                            qtextElement._tailieuHoverTimer = null;
+                        }
+                        hideAnswerTooltip(qtextElement);
+                    });
+                }
+            } catch (e) {
+                // ignore attach errors
+            }
+            
+            console.log('[Tailieu Extension] Moodle Q', index + 1, ':', questionText.substring(0, 50) + '...');
+        });
+        
+        // If we found Moodle questions, return them directly
+        if (questions.length > 0) {
+            console.log('[Tailieu Extension] Tổng cộng', questions.length, 'câu hỏi Moodle');
+            return questions;
+        }
+    }
+    
+    // ===== FALLBACK: Generic question patterns =====
     // Enhanced patterns for Vietnamese questions - focus on content, not labels
     const questionPatterns = [
         /Câu\s*\d+[:\.\)\s]/gi,
@@ -684,8 +755,14 @@ function extractQuestionsFromPage() {
         }
 
         if (isQuestion && cleanText.length > 5) {
+            // Attempt to find a nearby answer container for non-Moodle pages
+            const container = element.closest('.que, .question, .question-item, .question-block, .qtext, .question-content') || element.parentElement;
+            const answerContainer = findAnswerContainerForQuestion(element) || (container ? container.querySelector('.answer, .answers, .choices, .options, .answer-container') : null);
+
             questions.push({
                 element: element,
+                container: container,
+                answerContainer: answerContainer,
                 text: cleanText,  // Use clean text for matching
                 originalText: text,  // Keep full text for context
                 index: index,
@@ -715,17 +792,13 @@ function extractQuestionsFromPage() {
     return questions;
 }
 
-// Normalize text for EXACT matching (remove special chars, punctuation, extra spaces)
-// Used for both question and answer matching to ensure 100% accuracy
+// Normalize text for matching - Simple like Hỗ Trợ HT
 function normalizeTextForMatching(text) {
     if (!text) return '';
-    
     return text
-        .toLowerCase()
-        .trim()
-        // Remove all punctuation and special characters (keep only letters, numbers, Vietnamese chars)
-        .replace(/[\p{P}\p{S}]/gu, '') // Remove all punctuation and symbols
-        .replace(/\s+/g, ' ') // Normalize whitespace to single space
+        .replace(/\n/g, ' ')
+        .replace(/[\s\t]+/g, ' ')
+        .replace(/[\s\xa0]{2,}/g, ' ')
         .trim();
 }
 
@@ -783,6 +856,9 @@ async function compareAndHighlightQuestions(isManual = false) {
     isComparing = true;
     lastCompareTime = now;
     
+    // Reset highlighted QA log for this run
+    highlightedQA = [];
+    
     // Update compare button to show comparing state
     updateCompareButtonProgress();
     
@@ -809,6 +885,13 @@ async function compareAndHighlightQuestions(isManual = false) {
                 // ADDITIONAL VALIDATION: Double-check with stricter criteria
                 const finalValidation = performFinalValidation(pageQ.text, extQ.question);
                 if (!finalValidation.isValid) {
+                    // Log why validation failed for debugging
+                    console.log('[Tailieu Extension] Skipped candidate due to final validation failure:', {
+                        pageQuestion: pageQ.text,
+                        extQuestion: extQ.question,
+                        reason: finalValidation.reason,
+                        confidence: finalValidation.confidence
+                    });
                     continue; // Skip this match
                 }
                 
@@ -832,6 +915,24 @@ async function compareAndHighlightQuestions(isManual = false) {
                 // KHÔNG dừng vòng lặp, để có thể tìm và highlight tất cả câu trả lời giống nhau
             }
         }
+        // If no match found for this page question, log best candidates for debugging
+        if (!hasMatchedThisPageQuestion) {
+            try {
+                const scores = extensionQuestions.map(eq => ({
+                    question: eq.question,
+                    score: calculateEnhancedSimilarity(cleanPageQuestion, cleanQuestionText(eq.question))
+                }));
+                scores.sort((a, b) => b.score - a.score);
+                const top = scores.slice(0, 3).filter(s => s.score > 0.4);
+                if (top.length > 0) {
+                    console.log('[Tailieu Extension] No exact match for page question -- top candidates:', pageQ.text, top);
+                } else {
+                    console.log('[Tailieu Extension] No match candidates for page question:', pageQ.text);
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
         // Show progress for long lists
         if (totalComparisons > 100 && pageIndex % 10 === 0) {
             // ...existing code...
@@ -852,6 +953,7 @@ async function compareAndHighlightQuestions(isManual = false) {
         // Count total highlights before cleanup
         const highlightsBeforeCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
         console.log('[Tailieu Extension] Số highlight trước khi cleanup:', highlightsBeforeCleanup);
+        console.log('[Tailieu Extension] Summary of highlighted question-answer pairs for this run (' + highlightedQA.length + '):', highlightedQA);
         
         // Remove only duplicate highlights (same answer highlighted multiple times WITHIN same question)
         // TEMPORARILY DISABLED FOR DEBUGGING
@@ -949,8 +1051,23 @@ function resetCompareButton(matchedCount) {
 
 // Check if two questions are similar - Enhanced for 100% accuracy
 function isQuestionSimilar(q1, q2) {
-    // Use the same normalization function as answer matching for consistency
-    return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
+    // Use enhanced similarity instead of strict equality to be more tolerant
+    try {
+        const sim = calculateEnhancedSimilarity(q1 || '', q2 || '');
+        if (sim >= 0.72) return true;
+        // Helpful debug: if similarity is moderately high, log to help tuning
+        if (sim >= 0.5) {
+            console.log('[Tailieu Extension] Question similarity (below threshold):', {
+                q1: q1 && q1.substring(0,120),
+                q2: q2 && q2.substring(0,120),
+                similarity: sim
+            });
+        }
+        return false;
+    } catch (e) {
+        // Fallback to safer normalize-equality if anything goes wrong
+        return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
+    }
 }
 
 // Extract key words from question text
@@ -1424,140 +1541,325 @@ function findValidAnswersOnPage(questionText, questionElement) {
 }
 
 
-// Highlight matched question and try to find all possible answers
+// Highlight matched question and try to find all possible answers - SIMPLIFIED like Hỗ Trợ HT
 function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     const element = pageQuestion.element;
+    const container = pageQuestion.container || element.closest('.que');
+    const answerContainer = pageQuestion.answerContainer || container?.querySelector('.answer');
     
-    // Highlight only the text content, not the entire element
     if (!element.classList.contains('tailieu-highlighted-question')) {
-        // Create a wrapper span for highlighting text only
-        const questionText = pageQuestion.text.trim();
-        
-        // Store original HTML for restoration
-        if (!element.dataset.originalHTML) {
-            element.dataset.originalHTML = element.innerHTML;
-        }
-        
-        // Use a more sophisticated approach to highlight text content
-        highlightTextInElement(element, questionText);
-        
-        // Add a subtle border to the container for better visibility
-        element.style.cssText += `
-            border-left: 4px solid #ff6b35 !important;
-            padding-left: 8px !important;
-            margin: 5px 0 !important;
-            position: relative !important;
-        `;
+        // Mark question as highlighted
+        element.style.color = 'green';
         element.classList.add('tailieu-highlighted-question');
         
-        // Get ALL correct answers for this question from database
-        const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
-        const actuallyHighlightedAnswers = [];
+        // Get correct answer from database
+        const correctAnswer = extensionQuestion.answer;
+        console.log('[Tailieu Extension] Đáp án từ DB:', correctAnswer);
         
-
-        
-        // Try to highlight ALL correct answers from database
-        // IMPORTANT: Pass the specific question element and pageQuestion to limit search scope
-        if (answerHighlightingEnabled && allCorrectAnswers.length > 0) {
-            allCorrectAnswers.forEach((correctAnswer, index) => {
-                if (correctAnswer && correctAnswer.trim()) {
-                    // NEW: Try to highlight ALL instances of this answer on the page, not just the first one
-                    const highlightCount = highlightAllInstancesOfAnswer(correctAnswer, element, pageQuestion);
-                    if (highlightCount > 0) {
-                        actuallyHighlightedAnswers.push(correctAnswer);
-
-                    } else {
-
-                    }
-                }
-            });
+        if (!correctAnswer || !answerHighlightingEnabled) {
+            console.log('[Tailieu Extension] Không có đáp án hoặc highlight bị tắt');
+            return;
         }
         
-        // Determine what to show in tooltip based on what was actually highlighted
-        // Only show answers that were actually highlighted successfully
-        const answersToShow = actuallyHighlightedAnswers.length > 0 ? 
-            actuallyHighlightedAnswers : 
-            []; // No fallback - only show what was actually highlighted
+        // Normalize correct answer for comparison
+        const normalizedAnswer = normalizeTextForMatching(correctAnswer.toString());
+        console.log('[Tailieu Extension] Đáp án sau normalize:', normalizedAnswer);
         
+        // If we don't have an explicit answerContainer, try heuristic
+        if (!answerContainer) {
+            const found = findAnswerContainerForQuestion(element);
+            if (found) {
+                console.log('[Tailieu Extension] Heuristic found answerContainer for question');
+                answerContainer = found;
+            }
+        }
+
+        // Find answer options in the question container
+        if (answerContainer) {
+            // Method 1: Look for .flex-fill elements (NEU/Moodle structure)
+            const flexFillOptions = answerContainer.querySelectorAll('.flex-fill');
+            if (flexFillOptions.length > 0) {
+                console.log('[Tailieu Extension] Tìm thấy', flexFillOptions.length, 'options dạng .flex-fill');
+                highlightMatchingOptions(flexFillOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                return;
+            }
+            
+            // Method 2: Look for label elements
+            const labelOptions = answerContainer.querySelectorAll('label');
+            if (labelOptions.length > 0) {
+                console.log('[Tailieu Extension] Tìm thấy', labelOptions.length, 'options dạng label');
+                highlightMatchingOptions(labelOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                return;
+            }
+            
+            // Method 3: Look for any text elements within answer container
+            const allTextElements = answerContainer.querySelectorAll('div, span, p');
+            if (allTextElements.length > 0) {
+                console.log('[Tailieu Extension] Tìm thấy', allTextElements.length, 'text elements');
+                highlightMatchingOptions(allTextElements, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                return;
+            }
+
+            // METHOD 4: If options appear to be images-only (no text), pass the image elements directly
+            const imgOptions = answerContainer.querySelectorAll('img');
+            if (imgOptions.length > 0) {
+                console.log('[Tailieu Extension] Tìm thấy', imgOptions.length, 'image options');
+                // Wrap images into synthetic option wrappers for matching
+                const imgWrappers = Array.from(imgOptions).map(img => img.closest('label') || img.parentElement || img);
+                highlightMatchingOptions(imgWrappers, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                return;
+            }
+        }
         
-        // Add answer tooltip showing only successfully highlighted answers (only if we have answers to show)
-        if (answersToShow.length > 0) {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tailieu-answer-tooltip';
-        
-        // Create tooltip content with actually highlighted answers only
-        let tooltipContent = '<strong>Đáp án:</strong><br>';
-        if (answersToShow.length > 1) {
-            tooltipContent += answersToShow.map((answer, index) => 
-                `${index + 1}. ${answer}`
-            ).join('<br>');
-        } else if (answersToShow.length === 1) {
-            tooltipContent += answersToShow[0];
+        // Fallback: search in the entire question container
+        if (container) {
+            const allOptions = container.querySelectorAll('.flex-fill, label, .answer div, .answer span');
+            console.log('[Tailieu Extension] Fallback - Tìm trong container:', allOptions.length, 'options');
+            highlightMatchingOptions(allOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+        }
+
+        // Final fallback: try to find any instances on the page within question context (also consider images)
+        const fallbackCount = highlightAllInstancesOfAnswer(correctAnswer, element, pageQuestion);
+        if (fallbackCount > 0) {
+            console.log('[Tailieu Extension] Fallback highlightAllInstancesOfAnswer found', fallbackCount);
         } else {
-            tooltipContent += '<em>Đáp án được highlight trên trang</em>';
+            // If still nothing, mark question as highlighted (so user sees matched question) and log
+            console.log('[Tailieu Extension] Không tìm thấy đáp án trong tất cả các chiến lược - will at least mark the question');
+            element.style.backgroundColor = element.style.backgroundColor || '#f6fff6';
+            element.style.borderLeft = element.style.borderLeft || '4px solid #2E7D32';
+            const qaQuestionOnly = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: correctAnswer, matchType: 'QUESTION_ONLY' };
+            console.log('[Tailieu Extension] HIGHLIGHTED (question only):', qaQuestionOnly);
+            highlightedQA.push(qaQuestionOnly);
         }
-        
-        tooltip.innerHTML = `
-            <div style="
-                background: #2c3e50;
-                color: white;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 14px;
-                max-width: 300px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                z-index: 10001;
-                line-height: 1.4;
-            ">
-                ${tooltipContent}
-            </div>
-        `;
-        tooltip.style.cssText = `
-            position: absolute;
-            top: -10px;
-            right: -10px;
-            display: none;
-            z-index: 10001;
-        `;
-        
-        element.appendChild(tooltip);
-        
-        // Show/hide tooltip on hover
-        element.addEventListener('mouseenter', () => {
-            tooltip.style.display = 'block';
-        });
-        
-        element.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
-        });
-        } // End of if (answersToShow.length > 0)
-    } // End of if (!element.classList.contains('tailieu-highlighted-question'))
+    }
 }
 
-// Function to highlight ALL correct answers on the page
-function highlightAllCorrectAnswersOnPage(correctAnswers, questionElement, pageQuestion = null) {
-    if (!correctAnswers || correctAnswers.length === 0 || !answerHighlightingEnabled) {
-        return 0;
-    }
-    
-    let totalHighlighted = 0;
-    
-    // Try to highlight each correct answer with question context
-    correctAnswers.forEach((correctAnswer, index) => {
-        if (correctAnswer && correctAnswer.trim()) {
-            const found = highlightAnswerOnPage(correctAnswer, questionElement, pageQuestion);
-            if (found) {
-                totalHighlighted++;
+// Create and show an answer tooltip next to a question element
+function createAnswerTooltip(questionElement, answers) {
+    if (!questionElement || !answers || answers.length === 0) return;
+    hideAnswerTooltip(questionElement);
 
-            } else {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tailieu-answer-tooltip';
+    tooltip.dataset.tailieuTooltip = '1';
+    tooltip.style.cssText = `
+        position: absolute;
+        z-index: 10002;
+        background: rgba(44,62,80,0.98);
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        max-width: 360px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        font-size: 13px;
+        line-height: 1.3;
+    `;
 
+    let inner = '<div style="font-weight:600;margin-bottom:6px">Đáp án (DB)</div>';
+    inner += '<div style="display:flex;flex-direction:column;gap:6px">';
+    answers.forEach((ans, i) => {
+        if (isImageString(ans)) {
+            const src = extractImageSrcFromString(ans) || '';
+            inner += `<div style="display:block;max-width:320px;overflow:hidden"><img src="${src}" style="max-width:320px;max-height:160px;border-radius:4px;display:block"/></div>`;
+        } else {
+            // escape minimal HTML
+            const safe = String(ans).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            inner += `<div style="padding:6px 8px;background:rgba(255,255,255,0.06);border-radius:6px">` + `<strong style="margin-right:6px">${i+1}.</strong> ${safe}` + '</div>';
+        }
+    });
+    inner += '</div>';
+    tooltip.innerHTML = inner;
+
+    document.body.appendChild(tooltip);
+
+    // Position tooltip relative to questionElement
+    const rect = questionElement.getBoundingClientRect();
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    let top = window.scrollY + rect.top - th - 8;
+    if (top < window.scrollY + 8) top = window.scrollY + rect.bottom + 8;
+    let left = window.scrollX + rect.right - tw;
+    if (left < window.scrollX + 8) left = window.scrollX + rect.left;
+    tooltip.style.top = top + 'px';
+    tooltip.style.left = left + 'px';
+
+    // Remove tooltip on click outside
+    const outsideHandler = (e) => {
+        if (!tooltip.contains(e.target) && !questionElement.contains(e.target)) {
+            hideAnswerTooltip(questionElement);
+            document.removeEventListener('click', outsideHandler);
+        }
+    };
+    document.addEventListener('click', outsideHandler);
+}
+
+function hideAnswerTooltip(questionElement) {
+    // Remove any tooltip created for this extension
+    const all = document.querySelectorAll('.tailieu-answer-tooltip');
+    all.forEach(t => t.remove());
+}
+
+// Helper function to highlight matching options - SIMPLE APPROACH
+function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pageQuestion = null, extensionQuestion = null) {
+    let highlighted = false;
+    
+    // Handle array answers (multiple correct)
+    const answersToMatch = Array.isArray(originalAnswer) ? originalAnswer : [originalAnswer];
+    const normalizedAnswers = answersToMatch
+        .map(a => normalizeTextForMatching((a || '').toString()))
+        .filter(a => a && a.length > 0);
+    // Also check if any answers are images (URLs or <img> tags)
+    const imageAnswers = answersToMatch
+        .map(a => extractImageSrcFromString(a))
+        .filter(a => a && a.length > 0);
+    const imageFingerprints = imageAnswers.map(src => fingerprintImagePath(src));
+    if (imageAnswers.length > 0) console.log('[Tailieu Extension] Image answers detected:', imageAnswers, imageFingerprints);
+    
+    console.log('[Tailieu Extension] Cần tìm các đáp án (normalized):', normalizedAnswers);
+    console.log('[Tailieu Extension] Kiểm tra', options.length, 'options...');
+    
+    options.forEach((option, index) => {
+        if (isExtensionElement(option)) return;
+        
+        const optionText = option.textContent?.trim() || '';
+        const normalizedOption = normalizeTextForMatching(optionText);
+        
+        // If option text is empty/short, try to extract useful text from images or nearby labels
+        if (normalizedOption.length < 2) {
+            const img = option.querySelector && (option.querySelector('img') || option.querySelector('picture img'));
+            let imgText = '';
+            if (img) {
+                imgText = img.alt || img.title || img.getAttribute('aria-label') || '';
+                if (!imgText && img.src) {
+                    // Use filename as fallback
+                    try {
+                        const parts = img.src.split('/');
+                        imgText = parts[parts.length - 1].split('?')[0].replace(/[-_]+/g, ' ').replace(/\.[a-zA-Z0-9]+$/, '');
+                    } catch (e) {
+                        imgText = '';
+                    }
+                }
+                imgText = normalizeTextForMatching(imgText);
+                if (imgText && imgText.length > 1) {
+                    console.log('[Tailieu Extension] Option', index, 'has image text:', imgText.substring(0,80));
+                    // Treat this as the option text for matching
+                    normalizedOption = imgText;
+                }
+            }
+        }
+        
+        if (normalizedOption.length < 2) return;
+        
+        // Log each option for debugging
+        console.log('[Tailieu Extension] Option', index, ':', normalizedOption.substring(0, 80));
+        
+        // Check each answer
+        for (const normalizedAns of normalizedAnswers) {
+            if (normalizedAns.length < 2) continue;
+            
+            // EXACT MATCH: Cả hai text giống nhau hoàn toàn
+            if (normalizedOption === normalizedAns) {
+                console.log('[Tailieu Extension] ✅ EXACT match:', optionText);
+                applyHighlightStyle(option);
+                // Log the highlighted QA pair
+                const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'EXACT' };
+                console.log('[Tailieu Extension] HIGHLIGHTED:', qaExact);
+                highlightedQA.push(qaExact);
+                highlighted = true;
+                continue;
+            }
+            
+            // CONTAINS MATCH: Option chứa toàn bộ đáp án (đáp án ngắn hơn)
+            if (normalizedOption.includes(normalizedAns) && normalizedAns.length > 10) {
+                console.log('[Tailieu Extension] ✅ CONTAINS match:', optionText);
+                applyHighlightStyle(option);
+                const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'CONTAINS' };
+                console.log('[Tailieu Extension] HIGHLIGHTED:', qaContains);
+                highlightedQA.push(qaContains);
+                highlighted = true;
+                continue;
+            }
+            
+            // REVERSE CONTAINS: Đáp án chứa toàn bộ option (option ngắn hơn)
+            if (normalizedAns.includes(normalizedOption) && normalizedOption.length > 10) {
+                console.log('[Tailieu Extension] ✅ REVERSE CONTAINS match:', optionText);
+                applyHighlightStyle(option);
+                const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'REVERSE_CONTAINS' };
+                console.log('[Tailieu Extension] HIGHLIGHTED:', qaReverse);
+                highlightedQA.push(qaReverse);
+                highlighted = true;
+                continue;
+            }
+            
+            // SIMILARITY CHECK: Tính độ giống nhau nếu không khớp exact
+            if (normalizedOption.length > 15 && normalizedAns.length > 15) {
+                const similarity = calculateSimilarity(normalizedOption, normalizedAns);
+                if (similarity > 0.90) { // tighten threshold to avoid false positives
+                    console.log('[Tailieu Extension] ✅ SIMILARITY match (' + (similarity * 100).toFixed(1) + '%):', optionText);
+                    applyHighlightStyle(option);
+                    const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: optionText, matchType: 'SIMILARITY', similarity: similarity };
+                    console.log('[Tailieu Extension] HIGHLIGHTED:', qaSim);
+                    highlightedQA.push(qaSim);
+                    highlighted = true;
+                    continue;
+                } else if (similarity > 0.6) {
+                    console.log('[Tailieu Extension] ⚠️ Gần giống (' + (similarity * 100).toFixed(1) + '%):', 
+                        normalizedOption.substring(0, 50), 'vs', normalizedAns.substring(0, 50));
+                }
             }
         }
     });
     
-     return totalHighlighted;
+    if (!highlighted) {
+        console.log('[Tailieu Extension] ⚠️ Không tìm thấy match cho các options');
+        // Log all options for debugging
+        console.log('[Tailieu Extension] Tất cả options:');
+        options.forEach((opt, i) => {
+            console.log('  ', i, ':', normalizeTextForMatching(opt.textContent || '').substring(0, 100));
+        });
+        console.log('[Tailieu Extension] Cần tìm:');
+        normalizedAnswers.forEach((ans, i) => {
+            console.log('  ', i, ':', ans.substring(0, 100));
+        });
+    }
+    
+    return highlighted;
 }
 
+// Calculate text similarity (Levenshtein-based)
+function calculateSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+    if (str1 === str2) return 1;
+    
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1;
+    
+    // Simple overlap-based similarity (faster than Levenshtein)
+    const words1 = str1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = str2.split(/\s+/).filter(w => w.length > 2);
+    
+    if (words1.length === 0 || words2.length === 0) return 0;
+    
+    let matches = 0;
+    for (const word of words1) {
+        if (words2.some(w => w === word || w.includes(word) || word.includes(w))) {
+            matches++;
+        }
+    }
+    
+    return matches / Math.max(words1.length, words2.length);
+}
+
+// Apply highlight style to an element - SIMPLE GREEN BACKGROUND
+function applyHighlightStyle(element) {
+    if (element.classList.contains('tailieu-answer-highlight')) return;
+    
+    element.style.backgroundColor = '#00FF00';
+    element.classList.add('tailieu-answer-highlight');
+    element.title = 'Đây là đáp án đúng!';
+}
 
 
 // Helper function to extract question number from text
@@ -1702,6 +2004,99 @@ function belongsToCurrentQuestion(element, questionElement, pageQuestion) {
     return true;
 }
 
+// Heuristic to find answer container near a question element for non-Moodle pages
+function findAnswerContainerForQuestion(questionElement) {
+    if (!questionElement) return null;
+
+    // Common candidate selectors
+    const selectors = ['.answer', '.answers', '.choices', '.options', '.answer-container', '.qanswers', '.answers-list', 'ul.options', 'ol.options', '.form-check'];
+
+    // 1) Check immediate siblings and parent
+    const parent = questionElement.parentElement;
+    if (parent) {
+        for (const sel of selectors) {
+            const found = parent.querySelector(sel);
+            if (found && !isExtensionElement(found)) return found;
+        }
+        // Check next siblings (a few steps)
+        let sib = questionElement.nextElementSibling;
+        let steps = 0;
+        while (sib && steps < 6) {
+            // If sibling looks like an answer list (has inputs or letters A. B.)
+            if (!isExtensionElement(sib)) {
+                for (const sel of selectors) {
+                    if (sib.matches && sib.matches(sel)) return sib;
+                }
+                // Quick heuristic: contains radio/checkbox inputs or A./B./C. markers
+                if (sib.querySelector && (sib.querySelector('input[type="radio"], input[type="checkbox"]') || /(^|\s)[A-Da-d][\.|\)]\s/.test(sib.textContent))) {
+                    return sib;
+                }
+            }
+            sib = sib.nextElementSibling;
+            steps++;
+        }
+    }
+
+    // 2) Check ancestors for answer-like sections
+    let anc = questionElement.parentElement;
+    let depth = 0;
+    while (anc && depth < 5) {
+        for (const sel of selectors) {
+            const found = anc.querySelector(sel);
+            if (found && !isExtensionElement(found)) return found;
+        }
+        anc = anc.parentElement;
+        depth++;
+    }
+
+    // 3) As a last resort, search nearby in document (limited scope)
+    const nearby = questionElement.closest('section, article, form, .content, body') || document.body;
+    for (const sel of selectors) {
+        const found = nearby.querySelector(sel);
+        if (found && !isExtensionElement(found)) return found;
+    }
+
+    return null;
+}
+
+// Helpers to detect/normalize image answers (DB may store an <img> tag or image URL)
+function isImageString(str) {
+    if (!str) return false;
+    const s = ('' + str).toLowerCase();
+    return /<img\s/i.test(s) || /^data:image\//i.test(s) || /(https?:)?\/\/.*\.(png|jpe?g|gif|svg)(\?|$)/i.test(s) || /\.(png|jpe?g|gif|svg)$/i.test(s);
+}
+
+function extractImageSrcFromString(str) {
+    if (!str) return null;
+    try {
+        const s = ('' + str).trim();
+        // If contains <img ... src="...">
+        const imgMatch = s.match(/<img[^>]+src=["']?([^"'>\s]+)["']?/i);
+        if (imgMatch && imgMatch[1]) return imgMatch[1];
+        // If looks like a url
+        const urlMatch = s.match(/(https?:)?\/\/[^\s"']+/i);
+        if (urlMatch) return urlMatch[0];
+        // If plain filename
+        const fileMatch = s.match(/([^\s\/]+\.(png|jpe?g|gif|svg))(\?|$)/i);
+        if (fileMatch) return fileMatch[1];
+    } catch (e) {
+        return null;
+    }
+    return null;
+}
+
+function fingerprintImagePath(src) {
+    if (!src) return '';
+    try {
+        const parts = src.split('/');
+        let last = parts[parts.length - 1] || src;
+        last = last.split('?')[0].split('#')[0];
+        return last.toLowerCase().replace(/[-_]+/g, ' ').replace(/\.[a-z0-9]+$/, '').trim();
+    } catch (e) {
+        return src.toLowerCase();
+    }
+}
+
 // NEW: Function to highlight ALL instances of an answer on the page (not just the first one)
 function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion = null) {
     if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
@@ -1799,7 +2194,23 @@ function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion
     for (const candidateElement of elementsArray) {
         if (isExtensionElement(candidateElement)) continue;
         
-        const elementText = candidateElement.textContent?.toLowerCase().trim() || '';
+        let elementText = candidateElement.textContent?.toLowerCase().trim() || '';
+        // If element has no text but contains an image, try image alt/src as text
+        if ((!elementText || elementText.length < 2) && candidateElement.querySelector) {
+            const img = candidateElement.querySelector('img');
+            if (img) {
+                elementText = img.alt || img.title || img.getAttribute('aria-label') || '';
+                if (!elementText && img.src) {
+                    try {
+                        const parts = img.src.split('/');
+                        elementText = parts[parts.length - 1].split('?')[0].replace(/[-_]+/g, ' ').replace(/\.[a-zA-Z0-9]+$/, '');
+                    } catch (e) {
+                        elementText = '';
+                    }
+                }
+                elementText = elementText.toLowerCase().trim();
+            }
+        }
         if (elementText.length < 2) continue;
         if (candidateElement.classList.contains('tailieu-answer-highlight')) continue;
         
@@ -1863,6 +2274,9 @@ function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion
         const shouldSkip = hasNegativeIndicators || isAlreadyHighlighted || !belongsToQuestion;
         
         if (!shouldSkip) {
+            const qaGlobal = { question: pageQuestion?.text || 'unknown', dbAnswer: answerText, matchedElementText: (match.element.textContent || '').trim().slice(0, 200), pattern: match.pattern };
+            console.log('[Tailieu Extension] HIGHLIGHTED (global):', qaGlobal);
+            highlightedQA.push(qaGlobal);
             highlightAnswerTextInElement(match.element, match.pattern);
             highlightedCount++;
         }
@@ -2102,6 +2516,11 @@ function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null)
             }
 
             if (!alreadyHighlighted) {
+                // Log the highlight with context
+                const qaBest = { question: pageQuestion?.text || 'unknown', dbAnswer: answerText, matchedElementText: (bestMatch.element.textContent || '').trim().slice(0, 200), pattern: bestMatch.pattern };
+                console.log('[Tailieu Extension] HIGHLIGHTED (best match):', qaBest);
+                highlightedQA.push(qaBest);
+
                 // Highlight the answer
                 highlightAnswerTextInElement(bestMatch.element, bestMatch.pattern);
 
@@ -2201,6 +2620,9 @@ function tryHighlightPartialAnswer(pattern, elementsArray) {
         
         const elementText = element.textContent?.toLowerCase().trim() || '';
         if (elementText.includes(patternLower) && patternLower.length > 3) {
+            const qaPartial = { question: 'unknown', dbAnswer: pattern, matchedElementText: (element.textContent||'').trim().slice(0,200), matchType: 'PARTIAL' };
+            console.log('[Tailieu Extension] HIGHLIGHTED (partial):', qaPartial);
+            highlightedQA.push(qaPartial);
             highlightAnswerTextInElement(element, pattern);
 
             return true;
@@ -2493,6 +2915,39 @@ function highlightAnswerTextInElement(element, searchText) {
             
             // Replace the original text node
             parent.replaceChild(fragment, textNode);
+
+            // Capture context for this highlight (nearest question text) and record it
+            try {
+                let qAncestor = parent.closest('.tailieu-highlighted-question, .qtext, .question-text, .question-content, [class*="question"], .que');
+                let questionSnippet = 'unknown';
+                if (qAncestor) {
+                    questionSnippet = (qAncestor.textContent || '').trim().slice(0, 200);
+                } else {
+                    // Walk up a bit to find a likely question container
+                    let up = parent;
+                    let depth = 0;
+                    while (up && depth < 6) {
+                        if ((up.matches && up.matches('[class*="question"]')) || up.querySelector && up.querySelector('.qtext')) {
+                            questionSnippet = (up.textContent || '').trim().slice(0, 200);
+                            break;
+                        }
+                        up = up.parentElement;
+                        depth++;
+                    }
+                }
+
+                const qaTextNode = {
+                    question: questionSnippet,
+                    dbAnswer: searchText,
+                    matchedText: matchedText,
+                    matchType: 'TEXT_NODE',
+                    elementSnippet: (parent.textContent || '').trim().slice(0, 200)
+                };
+                console.log('[Tailieu Extension] HIGHLIGHTED (text node):', qaTextNode);
+                highlightedQA.push(qaTextNode);
+            } catch (e) {
+                // ignore errors while trying to log context
+            }
         }
     });
 }
