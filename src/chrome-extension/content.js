@@ -33,6 +33,33 @@ function debugLog(...args) {
     }
 }
 
+// Enforce strict exact-match for answers when true.
+// This makes the extension require answers to match 100% (ignoring punctuation)
+const STRICT_ANSWER_EXACT_MATCH = true;
+
+// Normalize text for strict exact comparison: lowercases, removes common punctuation, collapses whitespace
+function normalizeForExactMatch(text) {
+    if (!text) return '';
+    try {
+        let s = text.toString();
+        // Normalize unicode to composed form
+        if (s.normalize) s = s.normalize('NFC');
+        // Convert to lower case
+        s = s.toLowerCase();
+        // Replace various invisible / non-breaking spaces with normal space
+        s = s.replace(/[\u00A0\u2000-\u200B\uFEFF\u202F]/g, ' ');
+        // Remove common leading answer labels like "a.", "b)", "c -" etc.
+        s = s.replace(/^[a-dA-D]\s*[\.\)\-:\/]\s*/u, '');
+        // Remove any characters that are not letters, numbers or whitespace (keep diacritics via \p{L})
+        s = s.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+        // Collapse whitespace
+        s = s.replace(/\s+/g, ' ').trim();
+        return s;
+    } catch (e) {
+        return '';
+    }
+}
+
 // Load cached questions when page loads (immediately and asynchronously)
 (async () => {
     await loadCachedQuestions();
@@ -1763,6 +1790,32 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
             for (const normalizedAns of normalizedAnswers) {
                 if (normalizedAns.length < 2) continue;
                 
+                // Prepare strict-normalized forms for exact comparison (ignore punctuation)
+                const webExact = normalizeForExactMatch(webOpt.normalizedText || webOpt.originalText || '');
+                const dbExact = normalizeForExactMatch(normalizedAns || '');
+
+                // STRICT EXACT MATCH (configurable)
+                if (STRICT_ANSWER_EXACT_MATCH) {
+                    if (dbExact && webExact && webExact === dbExact) {
+                        applyHighlightStyle(webOpt.element);
+                        const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
+                        highlightedQA.push(qaExact);
+                        highlighted = true;
+                        return; // stop at first exact match
+                    }
+                    // Debug logging for strict mode mismatch (lightweight)
+                    if (debugMode) {
+                        console.log('[Tailieu Extension][STRICT_MATCH] No exact match for:', {
+                            pageQuestion: pageQuestion?.text || pageQuestion?.originalText || 'unknown',
+                            webExact,
+                            dbExact
+                        });
+                    }
+                    // If strict mode and not exact, do not fallback to fuzzy matches
+                    continue;
+                }
+
+                // NON-STRICT: preserve existing heuristics (contains/reverse/similarity)
                 // EXACT MATCH
                 if (webOpt.normalizedText === normalizedAns) {
                     applyHighlightStyle(webOpt.element);
@@ -1771,7 +1824,7 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                     highlighted = true;
                     return; // Dừng ngay khi tìm thấy match đầu tiên
                 }
-                
+
                 // CONTAINS MATCH
                 if (webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
                     applyHighlightStyle(webOpt.element);
@@ -1780,7 +1833,7 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                     highlighted = true;
                     return;
                 }
-                
+
                 // REVERSE CONTAINS
                 if (normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
                     applyHighlightStyle(webOpt.element);
@@ -1789,7 +1842,7 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                     highlighted = true;
                     return;
                 }
-                
+
                 // SIMILARITY CHECK
                 if (webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
                     const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
@@ -1812,6 +1865,24 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
             if (normalizedAns.length < 2) return;
             // So sánh đáp án này với TẤT CẢ các options trên web
             for (const webOpt of webOptions) {
+                // Prepare strict-normalized forms for exact comparison (ignore punctuation)
+                const webExact = normalizeForExactMatch(webOpt.normalizedText || webOpt.originalText || '');
+                const dbExact = normalizeForExactMatch(normalizedAns || '');
+
+                // STRICT EXACT MATCH (configurable)
+                if (STRICT_ANSWER_EXACT_MATCH) {
+                    if (dbExact && webExact && webExact === dbExact) {
+                        applyHighlightStyle(webOpt.element);
+                        const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
+                        highlightedQA.push(qaExact);
+                        highlighted = true;
+                        return; // stop at first exact match
+                    }
+                    // If strict mode and not exact, do not fallback to fuzzy matches
+                    continue;
+                }
+
+                // NON-STRICT: preserve existing heuristics (contains/reverse/similarity)
                 // EXACT MATCH
                 if (webOpt.normalizedText === normalizedAns) {
                     applyHighlightStyle(webOpt.element);
