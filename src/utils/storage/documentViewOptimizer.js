@@ -155,7 +155,7 @@ export const checkPartialUserAccess = async (userId, documentId) => {
     
     if (!userData.paidCategories) return false;
     
-    // ✅ KIỂM TRA THEO CẤU TRÚC THỰC TẾ
+    //  KIỂM TRA THEO CẤU TRÚC THỰC TẾ
     const paidCategories = userData.paidCategories;
     
     // Method 1: Kiểm tra trong paidCategories.documents[]
@@ -185,7 +185,7 @@ export const checkPartialUserAccess = async (userId, documentId) => {
     timestamps.userAccess[cacheKey] = Date.now();
     return false;
   } catch (error) {
-    console.error('❌ Error checking partial user access:', error);
+    console.error('Error checking partial user access:', error);
     return false;
   }
 };
@@ -315,7 +315,7 @@ export const optimizedTrackDocumentView = async (userId, documentId) => {
 export const loadDocumentWithParallelQueries = async (categoryId, documentId, isAdmin, isPuser, user, document = null) => {
   try {
 
-    // ✅ QUAN TRỌNG: Kiểm tra VIP access TRƯỚC KHI tải câu hỏi
+    //  QUAN TRỌNG: Kiểm tra VIP access TRƯỚC KHI tải câu hỏi
     if (document?.isVip) {
       
       // Import checkVipDocumentAccess function
@@ -323,7 +323,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       const vipAccessResult = checkVipDocumentAccess(user, document);
     
       
-      // ✅ Nếu không có quyền truy cập VIP, trả về rỗng ngay lập tức
+      //  Nếu không có quyền truy cập VIP, trả về rỗng ngay lập tức
       if (!vipAccessResult.hasAccess) {
         return {
           questions: [],
@@ -348,7 +348,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       // 3. Kiểm tra quyền truy cập cho người dùng partial (nếu cần)
       user?.subscriptionType === 'partial' ? checkPartialUserAccess(user.uid, documentId) : Promise.resolve(false)
     ]);
-    // ✅ QUAN TRỌNG: Admin luôn có quyền truy cập đầy đủ
+    //  QUAN TRỌNG: Admin luôn có quyền truy cập đầy đủ
     if (isAdmin || user?.role === "admin") {
       return {
         questions,
@@ -358,7 +358,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       };
     }
     
-    // ✅ QUAN TRỌNG: Ưu tiên subscriptionType hơn role legacy
+    //  QUAN TRỌNG: Ưu tiên subscriptionType hơn role legacy
     
     // Full subscription users có quyền truy cập đầy đủ
     if (user?.subscriptionType === 'full') {
@@ -381,7 +381,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
         };
       } else {
         
-        // ✅ QUAN TRỌNG: Nếu là tài liệu VIP và user chưa trả phí, trả về VIP access denied
+        //  QUAN TRỌNG: Nếu là tài liệu VIP và user chưa trả phí, trả về VIP access denied
         if (document?.isVip) {
           return {
             questions: [],
@@ -413,7 +413,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       }
     }
     
-    // ✅ QUAN TRỌNG: CHỈ CHO PHÉP legacy puser/isPuser NẾU KHÔNG CÓ subscriptionType
+    //  QUAN TRỌNG: CHỈ CHO PHÉP legacy puser/isPuser NẾU KHÔNG CÓ subscriptionType
     if ((isPuser || user?.role === 'puser') && !user?.subscriptionType) {
       return {
         questions,
@@ -453,7 +453,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       };
     }
   } catch (error) {
-    console.error("❌ Error in loadDocumentWithParallelQueries:", error);
+    console.error("Error in loadDocumentWithParallelQueries:", error);
     throw error;
   }
 };

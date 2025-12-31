@@ -86,7 +86,7 @@
 
 <body>
     <div class="container">
-        <h1>🎨 Tailieu Extension Icon Generator</h1>
+        <h1> Tailieu Extension Icon Generator</h1>
 
         <div class="info">
             <strong>Hướng dẫn:</strong> Tool này sẽ tự động load SVG icons và convert sang PNG cho Chrome Extension
@@ -119,7 +119,7 @@
         <!-- Generate All -->
         <div style="text-align: center; margin-top: 30px;">
             <button onclick="generateAllIcons()" style="background: #FF9800; font-size: 18px;">
-                🚀 Generate All Icons
+                Generate All Icons
             </button>
         </div>
     </div>
@@ -253,7 +253,7 @@
                     const downloadLink = document.getElementById(downloadId);
                     downloadLink.href = url;
                     downloadLink.style.display = 'inline-block';
-                    console.log(`✅ Generated PNG ${size}x${size}`);
+                    console.log(` Generated PNG ${size}x${size}`);
                 }, 'image/png');
 
                 URL.revokeObjectURL(url);
@@ -273,7 +273,7 @@
 
         // Generate all icons
         function generateAllIcons() {
-            console.log('🚀 Generating all icons...');
+            console.log(' Generating all icons...');
             generateIcon16();
             generateIcon128();
             alert('🎉 All icons generated! Click download links to save them.');

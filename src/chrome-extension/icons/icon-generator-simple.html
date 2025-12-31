@@ -68,10 +68,10 @@
 
 <body>
     <div class="container">
-        <h1>🎨 Tailieu Extension - Icon Generator</h1>
+        <h1> Tailieu Extension - Icon Generator</h1>
 
         <div class="info">
-            <strong>📋 Hướng dẫn:</strong><br>
+            <strong> Hướng dẫn:</strong><br>
             Click nút bên dưới để tự động tạo và download các file PNG cho Chrome Extension
         </div>
 
@@ -82,7 +82,7 @@
         </div>
 
         <button onclick="generateIcons()" id="generateBtn">
-            🚀 Generate & Download PNG Icons
+            Generate & Download PNG Icons
         </button>
 
         <div id="status" style="margin-top: 20px; font-size: 14px;"></div>
@@ -185,7 +185,7 @@
                         URL.revokeObjectURL(downloadUrl);
                         URL.revokeObjectURL(url);
 
-                        updateStatus(`✅ Generated ${filename}`, '#27ae60');
+                        updateStatus(` Generated ${filename}`, '#27ae60');
                         resolve();
                     }, 'image/png', 1.0);
                 };
@@ -199,7 +199,7 @@
             btn.disabled = true;
             btn.innerHTML = '⏳ Generating...';
 
-            updateStatus('🚀 Starting icon generation...', '#3498db');
+            updateStatus(' Starting icon generation...', '#3498db');
 
             try {
                 await createPngFromSvg(svg16Content, 16, 'canvas16', 'icon16.png');
@@ -208,12 +208,12 @@
 
                 updateStatus('🎉 All icons generated and downloaded successfully!', '#27ae60');
             } catch (error) {
-                updateStatus('❌ Error generating icons', '#e74c3c');
+                updateStatus('Error generating icons', '#e74c3c');
                 console.error(error);
             }
 
             btn.disabled = false;
-            btn.innerHTML = '🚀 Generate & Download PNG Icons';
+            btn.innerHTML = ' Generate & Download PNG Icons';
         }
 
         // Load preview on page load

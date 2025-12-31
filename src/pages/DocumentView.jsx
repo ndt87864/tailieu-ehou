@@ -151,12 +151,12 @@ function DocumentView() {
         setUserDataCache(fullUserData);
         return fullUserData;
       } else {
-        console.warn("⚠️ User document not found in Firestore");
+        console.warn(" User document not found in Firestore");
         setUserDataCache(user);
         return user;
       }
     } catch (error) {
-      console.error("❌ Error reloading user data:", error);
+      console.error("Error reloading user data:", error);
       return user;
     }
   };
@@ -178,7 +178,7 @@ function DocumentView() {
         ? userDoc.data().subscriptionType || "free"
         : "free";
     } catch (error) {
-      console.error("❌ Error fetching subscription type:", error);
+      console.error("Error fetching subscription type:", error);
       return "free";
     }
   }, []);
@@ -291,11 +291,11 @@ function DocumentView() {
 
           if (!isCancelled) setUserDataCache(fullUserData);
         } else {
-          console.warn("⚠️ User document not found in Firestore");
+          console.warn(" User document not found in Firestore");
           if (!isCancelled) setUserDataCache(user);
         }
       } catch (error) {
-        console.error("❌ Error loading user data:", error);
+        console.error("Error loading user data:", error);
         if (!isCancelled) setUserDataCache(user);
       }
     };
@@ -361,7 +361,7 @@ function DocumentView() {
           setPermissionLoading(false);
         }
       } catch (error) {
-        console.error("❌ Error checking Excel permission:", error);
+        console.error("Error checking Excel permission:", error);
         if (!isCancelled) {
           setExcelPermission({
             allowed: false,
@@ -438,7 +438,7 @@ function DocumentView() {
 
         const docWithCategory = { ...doc, categoryId: category.id };
         if (isCancelled) return;
-        setSelectedDocument(docWithCategory); // ✅ Sử dụng userDataCache hoặc user, ưu tiên userDataCache
+        setSelectedDocument(docWithCategory); //  Sử dụng userDataCache hoặc user, ưu tiên userDataCache
         const currentUser = userDataCache || user;
         const accessResult = checkVipDocumentAccess(
           currentUser,
@@ -475,7 +475,7 @@ function DocumentView() {
                 viewLimitExceeded: false,
                 viewsRemaining: 0,
               });
-              // ✅ Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
+              //  Cập nhật vipAccessResult để hiển thị đúng thông báo VIP
               setVipAccessResult({
                 hasAccess: false,
                 reason:
@@ -493,7 +493,7 @@ function DocumentView() {
           }
         }
       } catch (err) {
-        console.error("❌ fetchData error:", err);
+        console.error("fetchData error:", err);
         if (!isCancelled) setError(err.message || "Không thể tải dữ liệu.");
       } finally {
         if (!isCancelled) setLoading(false);
@@ -654,7 +654,7 @@ function DocumentView() {
         }
       }
     } catch (error) {
-      console.error("❌ Error reloading questions:", error);
+      console.error("Error reloading questions:", error);
       setError("Không thể tải lại câu hỏi.");
     } finally {
       setLoading(false);
@@ -710,7 +710,7 @@ function DocumentView() {
 
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
-      console.error("❌ Excel export error:", error);
+      console.error("Excel export error:", error);
       alert("Có lỗi xảy ra khi tạo file Excel.");
     }
   };

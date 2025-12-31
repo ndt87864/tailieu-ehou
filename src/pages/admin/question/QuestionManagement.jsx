@@ -1152,7 +1152,7 @@ const QuestionManagement = () => {
         questionsToDelete.push(...questionsToDeleteInGroup);
       });
 
-      // ✅ KIỂM TRA LOGIC: Đảm bảo tổng số đúng
+      //  KIỂM TRA LOGIC: Đảm bảo tổng số đúng
       const totalOriginalDuplicates = duplicateGroups.reduce(
         (sum, group) => sum + group.length,
         0
@@ -1170,7 +1170,7 @@ const QuestionManagement = () => {
         return;
       }
 
-      // ✅ KIỂM TRA AN TOÀN: Đảm bảo không xóa hết tất cả
+      //  KIỂM TRA AN TOÀN: Đảm bảo không xóa hết tất cả
       if (questionsToKeep.length === 0) {
         alert(
           "LỖI: Logic không đúng - không có câu hỏi nào được giữ lại! Hủy thao tác để tránh xóa sạch dữ liệu."
@@ -1180,7 +1180,7 @@ const QuestionManagement = () => {
       }
 
       if (questionsToDelete.length === 0) {
-        alert("⚠️ Không có câu hỏi nào để xóa. Có thể đã xử lý trước đó.");
+        alert(" Không có câu hỏi nào để xóa. Có thể đã xử lý trước đó.");
         setLoading(false);
         return;
       }
@@ -1290,7 +1290,7 @@ const QuestionManagement = () => {
         // Xóa cache hiện tại nếu có
         clearQuestionsCache();
       } catch (e) {
-        console.warn("⚠️ Không thể xóa cache:", e);
+        console.warn(" Không thể xóa cache:", e);
       }
 
       try {
@@ -1495,7 +1495,7 @@ const QuestionManagement = () => {
         const reloadedDuplicates = groupDuplicatesBoth(allQuestionsData);
       }, 500);
     } catch (err) {
-      console.error("❌ Lỗi khi reload questions:", err);
+      console.error("Lỗi khi reload questions:", err);
       setError("Không thể tải lại danh sách câu hỏi: " + err.message);
     } finally {
       setLoading(false);

@@ -45,13 +45,13 @@ app.get('/api/questions', async (req, res) => {
     await handler(mockReq, mockRes);
     
     if (mockRes.statusCode === 200) {
-      console.log(`✅ Thành công lấy ${mockRes.responseData.questions.length} questions`);
+      console.log(` Thành công lấy ${mockRes.responseData.questions.length} questions`);
       res.json(mockRes.responseData);
     } else {
       throw new Error('API handler failed');
     }
   } catch (error) {
-    console.error('❌ Lỗi khi lấy questions:', error);
+    console.error('Lỗi khi lấy questions:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -77,13 +77,13 @@ app.get('/api/categories', async (req, res) => {
     await handler(mockReq, mockRes);
     
     if (mockRes.statusCode === 200) {
-      console.log(`✅ Thành công lấy ${mockRes.responseData.categories.length} categories`);
+      console.log(` Thành công lấy ${mockRes.responseData.categories.length} categories`);
       res.json(mockRes.responseData);
     } else {
       throw new Error('API handler failed');
     }
   } catch (error) {
-    console.error('❌ Lỗi khi lấy categories:', error);
+    console.error('Lỗi khi lấy categories:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -112,13 +112,13 @@ app.get('/api/documents', async (req, res) => {
     await handler(mockReq, mockRes);
     
     if (mockRes.statusCode === 200) {
-      console.log(`✅ Thành công lấy ${mockRes.responseData.documents.length} documents`);
+      console.log(` Thành công lấy ${mockRes.responseData.documents.length} documents`);
       res.json(mockRes.responseData);
     } else {
       throw new Error('API handler failed');
     }
   } catch (error) {
-    console.error('❌ Lỗi khi lấy documents:', error);
+    console.error('Lỗi khi lấy documents:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -141,7 +141,7 @@ app.get('/api/documents', async (req, res) => {
     await handler(mockReq, mockRes);
     
     if (mockRes.statusCode === 200) {
-      console.log(`✅ Thành công lấy ${mockRes.responseData.documents.length} tài liệu`);
+      console.log(` Thành công lấy ${mockRes.responseData.documents.length} tài liệu`);
       res.json({
         success: true,
         count: mockRes.responseData.documents.length,
@@ -151,7 +151,7 @@ app.get('/api/documents', async (req, res) => {
       throw new Error(mockRes.responseData.error);
     }
   } catch (error) {
-    console.error('❌ Lỗi khi lấy documents:', error);
+    console.error('Lỗi khi lấy documents:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -166,14 +166,14 @@ app.get('/api/documents', async (req, res) => {
     console.log('🔄 Đang lấy dữ liệu documents từ Firestore...');
     const documents = await getDocumentsWithQuestionCount();
     
-    console.log(`✅ Thành công lấy ${documents.length} tài liệu`);
+    console.log(` Thành công lấy ${documents.length} tài liệu`);
     res.json({
       success: true,
       count: documents.length,
       documents: documents
     });
   } catch (error) {
-    console.error('❌ Lỗi khi lấy documents:', error);
+    console.error('Lỗi khi lấy documents:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -199,7 +199,7 @@ app.get('/health', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại: http://localhost:${PORT}`);
+  console.log(` Server đang chạy tại: http://localhost:${PORT}`);
   console.log(`📄 Trang test: http://localhost:${PORT}/test`);
   console.log(`🔗 API endpoints:`);
   console.log(`   - Categories: http://localhost:${PORT}/api/categories`);

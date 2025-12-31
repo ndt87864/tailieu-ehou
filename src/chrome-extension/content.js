@@ -13,6 +13,7 @@ if (window.tailieuExtensionLoaded) {
 // Store questions from extension for comparison
 let extensionQuestions = [];
 let answerHighlightingEnabled = true; // New setting
+let autoSelectEnabled = false; // New setting: controls automatic selection/compare (default OFF)
 // Track what QA pairs were highlighted in the current run
 let highlightedQA = [];
 
@@ -64,6 +65,19 @@ function normalizeForExactMatch(text) {
 (async () => {
     await loadCachedQuestions();
     console.log('[Tailieu Extension] Cached questions loaded:', extensionQuestions.length);
+    // Restore auto-select preference from storage if available
+    try {
+        if (chrome?.storage?.local) {
+            chrome.storage.local.get('tailieu_auto_select', (res) => {
+                if (res && typeof res.tailieu_auto_select !== 'undefined') {
+                    autoSelectEnabled = !!res.tailieu_auto_select;
+                    console.log('[Tailieu Extension] autoSelectEnabled restored:', autoSelectEnabled);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn('Could not restore autoSelect setting', e);
+    }
 })();
 
 // Auto-compare questions when page is fully loaded
@@ -111,6 +125,10 @@ async function performAutoCompare(force = false) {
         if (window.location.hostname !== 'learning.ehou.edu.vn') {
             return;
         }
+    // Respect auto-select toggle: skip automatic compares when disabled (unless forced)
+    if (!autoSelectEnabled && !force) {
+        return;
+    }
     // Throttle auto-compare to avoid too frequent calls (unless forced)
     const now = Date.now();
     if (!force && now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
@@ -346,7 +364,7 @@ if (chrome?.storage?.onChanged) {
             // Update local questions cache
             if (changes[QUESTIONS_CACHE_KEY].newValue) {
                 extensionQuestions = changes[QUESTIONS_CACHE_KEY].newValue;
-                setTimeout(() => performAutoCompare(true), 500);
+                setTimeout(() => performAutoCompare(false), 500);
             }
         }
     });
@@ -354,7 +372,15 @@ if (chrome?.storage?.onChanged) {
     // Also listen for more specific cache changes
     chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local') {
-            // Check for any tailieu cache updates
+            // If auto-select preference changed in storage, update local flag (do not trigger compare)
+            if (changes['tailieu_auto_select'] && typeof changes['tailieu_auto_select'].newValue !== 'undefined') {
+                try {
+                    autoSelectEnabled = !!changes['tailieu_auto_select'].newValue;
+                    console.log('[Tailieu Extension] tailieu_auto_select changed ->', autoSelectEnabled);
+                } catch (e) {}
+            }
+
+            // Check for other tailieu cache updates
             const tailieusKeys = ['tailieu_selected_category', 'tailieu_selected_document'];
             const hasRelevantChanges = tailieusKeys.some(key => changes[key]);
             
@@ -362,7 +388,7 @@ if (chrome?.storage?.onChanged) {
                 setTimeout(async () => {
                     await loadCachedQuestions();
                     if (extensionQuestions.length > 0) {
-                        performAutoCompare(true); // Force comparison
+                        performAutoCompare(false); // Respect auto-select toggle
                     }
                 }, 1000);
             }
@@ -512,6 +538,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     if (request.action === 'setAnswerHighlighting') {
         answerHighlightingEnabled = request.enabled;
+        sendResponse({ success: true });
+        return;
+    }
+    if (request.action === 'setAutoSelect') {
+        autoSelectEnabled = !!request.enabled;
         sendResponse({ success: true });
         return;
     }
@@ -865,11 +896,11 @@ async function compareAndHighlightQuestions(isManual = false) {
     
     // CRITICAL: Ensure questions are loaded before comparing
     if (extensionQuestions.length === 0) {
-        console.log('[Tailieu Extension] ⚠️ No questions loaded, trying to load from cache...');
+        console.log('[Tailieu Extension]  No questions loaded, trying to load from cache...');
         await loadCachedQuestions();
         
         if (extensionQuestions.length === 0) {
-            console.log('[Tailieu Extension] ❌ Still no questions after loading cache');
+            console.log('[Tailieu Extension] Still no questions after loading cache');
             // Show user-friendly message
             if (isManual) {
                 showNotification('Chưa có câu hỏi nào được tải. Vui lòng chọn danh mục và tài liệu trước.', 'warning');
@@ -978,7 +1009,7 @@ async function compareAndHighlightQuestions(isManual = false) {
         // Remove only duplicate highlights (same answer highlighted multiple times WITHIN same question)
         // TEMPORARILY DISABLED FOR DEBUGGING
         setTimeout(() => {
-            console.log('[Tailieu Extension] ⚠️ CLEANUP FUNCTION DISABLED FOR DEBUGGING');
+            console.log('[Tailieu Extension]  CLEANUP FUNCTION DISABLED FOR DEBUGGING');
             console.log('[Tailieu Extension] Nếu vẫn bị xóa highlight, vấn đề không phải ở cleanup function');
             
             // UNCOMMENT TO ENABLE CLEANUP:
@@ -1071,14 +1102,12 @@ function resetCompareButton(matchedCount) {
 
 // Check if two questions are similar - Enhanced for 100% accuracy
 function isQuestionSimilar(q1, q2) {
-    // Use enhanced similarity instead of strict equality to be more tolerant
+    // Require exact normalized equality: strip punctuation/whitespace/special chars then compare
     try {
-        const sim = calculateEnhancedSimilarity(q1 || '', q2 || '');
-        if (sim >= 0.72) return true;
-        
-        return false;
+        const n1 = normalizeForExactMatch(q1 || '');
+        const n2 = normalizeForExactMatch(q2 || '');
+        return n1 === n2 && n1.length > 0; // only accept non-empty exact matches
     } catch (e) {
-        // Fallback to safer normalize-equality if anything goes wrong
         return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
     }
 }
@@ -1169,60 +1198,17 @@ function calculateLCS(str1, str2) {
 
 // Final validation to ensure 100% accuracy before accepting a match
 function performFinalValidation(pageQuestionRaw, dbQuestionRaw) {
-    const pageClean = cleanQuestionText(pageQuestionRaw);
-    const dbClean = cleanQuestionText(dbQuestionRaw);
-    
-    // Stage 1: Core content comparison
-    const corePageWords = extractCoreContent(pageClean);
-    const coreDbWords = extractCoreContent(dbClean);
-    
-    const coreOverlap = calculateWordOverlap(corePageWords, coreDbWords);
-    if (coreOverlap < 0.7) {
-        return {
-            isValid: false,
-            reason: `Core content overlap too low: ${coreOverlap.toFixed(3)}`,
-            confidence: 0
-        };
+    // New strict rule: only accept if normalized strings are exactly equal
+    try {
+        const nPage = normalizeForExactMatch(pageQuestionRaw || '');
+        const nDb = normalizeForExactMatch(dbQuestionRaw || '');
+        if (nPage && nDb && nPage === nDb) {
+            return { isValid: true, reason: 'Exact normalized match', confidence: 1 };
+        }
+        return { isValid: false, reason: 'Not exact normalized match', confidence: 0 };
+    } catch (e) {
+        return { isValid: false, reason: 'Validation error', confidence: 0 };
     }
-    
-    // Stage 2: Critical terms validation
-    const criticalTermsMatch = validateCriticalTerms(pageClean, dbClean);
-    if (!criticalTermsMatch.isValid) {
-        return {
-            isValid: false,
-            reason: `Critical terms mismatch: ${criticalTermsMatch.reason}`,
-            confidence: 0
-        };
-    }
-    
-    // Stage 3: Question context validation
-    const contextMatch = validateQuestionContext(pageClean, dbClean);
-    if (!contextMatch.isValid) {
-        return {
-            isValid: false,
-            reason: `Context mismatch: ${contextMatch.reason}`,
-            confidence: 0
-        };
-    }
-    
-    // Stage 4: Final similarity check with lower threshold (fix strict matching)
-    const finalSimilarity = calculateEnhancedSimilarity(pageClean, dbClean);
-    if (finalSimilarity < 0.75) {
-        return {
-            isValid: false,
-            reason: `Final similarity too low: ${finalSimilarity.toFixed(3)}`,
-            confidence: finalSimilarity
-        };
-    }
-    
-    // Calculate overall confidence
-    const confidence = (coreOverlap + criticalTermsMatch.confidence + contextMatch.confidence + finalSimilarity) / 4;
-    
-    return {
-        isValid: true,
-        reason: 'All validation stages passed',
-        confidence: confidence
-    };
 }
 
 // Extract core content words (most important words)
@@ -1983,8 +1969,8 @@ function applyHighlightStyle(element) {
 function selectMatchingInput(optionElement) {
     if (!optionElement) return false;
 
-    // Don't auto-select if highlighting is disabled
-    if (!answerHighlightingEnabled) return false;
+    // Don't auto-select if auto-select is disabled in popup (we still allow visual highlight)
+    if (!autoSelectEnabled) return false;
 
     // Helper to dispatch events so frameworks notice the change
     function dispatchChange(el) {
@@ -3245,7 +3231,7 @@ function removeIncorrectAndDuplicateHighlights() {
                 if (seenTextsInThisQuestion.has(text)) {
                     // Duplicate within the SAME question - remove it
                     toRemove.push({highlight, reason: 'duplicate in same question', text});
-                    console.log(`[Tailieu Extension] ❌ Tìm thấy duplicate trong CÙNG câu hỏi:`, text);
+                    console.log(`[Tailieu Extension] Tìm thấy duplicate trong CÙNG câu hỏi:`, text);
                 } else {
                     // First time seeing this answer in THIS question - keep it
                     seenTextsInThisQuestion.add(text);
@@ -3254,7 +3240,7 @@ function removeIncorrectAndDuplicateHighlights() {
             } else {
                 // This is NOT a correct answer - remove it
                 toRemove.push({highlight, reason: 'incorrect answer', text});
-                console.log(`[Tailieu Extension] ❌ Tìm thấy đáp án SAI:`, text);
+                console.log(`[Tailieu Extension] Tìm thấy đáp án SAI:`, text);
             }
         });
     });

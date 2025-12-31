@@ -27,7 +27,7 @@ const CACHE_TTL = 15 * 60 * 1000; // 15 phút
 const isBrowser = () => typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
 
 /**
- * ✅ OPTIMIZED: Lấy questions với IndexedDB cache
+ *  OPTIMIZED: Lấy questions với IndexedDB cache
  * Tốc độ: 5-50ms (cached) | 100-300ms (uncached)
  */
 export const getQuestionsByDocument = async (documentId) => {
@@ -36,7 +36,7 @@ export const getQuestionsByDocument = async (documentId) => {
     
     const startTime = performance.now();
     
-    // ✅ Kiểm tra cache trước
+    //  Kiểm tra cache trước
     if (isBrowser()) {
       const cachedQuestions = await cacheDB.get(STORES.QUESTIONS, documentId, CACHE_TTL);
       if (cachedQuestions) {
@@ -69,7 +69,7 @@ export const getQuestionsByDocument = async (documentId) => {
         stt: doc.data().stt || 0
       }));
       
-      // ✅ Cache ngay lập tức
+      //  Cache ngay lập tức
       if (isBrowser()) {
         await cacheDB.set(STORES.QUESTIONS, documentId, questions);
       }
@@ -80,7 +80,7 @@ export const getQuestionsByDocument = async (documentId) => {
       
     } catch (indexError) {
       // Fallback: query không có sorting
-      console.warn("⚠️ Index error, using fallback query");
+      console.warn(" Index error, using fallback query");
       
       const fallbackQuery = query(
         collection(db, COLLECTIONS.QUESTIONS),
@@ -115,13 +115,13 @@ export const getQuestionsByDocument = async (documentId) => {
     }
     
   } catch (error) {
-    console.error(`❌ Error fetching questions for ${documentId}:`, error);
+    console.error(`Error fetching questions for ${documentId}:`, error);
     return [];
   }
 };
 
 /**
- * ✅ NEW: Lấy questions từ NHIỀU documents (parallel)
+ *  NEW: Lấy questions từ NHIỀU documents (parallel)
  * Tốc độ: ~100-400ms cho 3-5 documents
  */
 export const getQuestionsByDocuments = async (documentIds) => {
@@ -285,7 +285,7 @@ export const bulkDeleteQuestions = async (questionIds) => {
     return { success: successCount, failed: failedCount };
     
   } catch (error) {
-    console.error('❌ Bulk delete error:', error);
+    console.error('Bulk delete error:', error);
     throw error;
   }
 };
@@ -321,6 +321,6 @@ export const getAllQuestionsWithDocumentInfo = async () => {
 };
 
 export const getLimitedQuestionsWithDocumentInfo = async (limitCount = 1000) => {
-  console.warn('⚠️ DEPRECATED: Use getQuestionsByDocument instead');
+  console.warn(' DEPRECATED: Use getQuestionsByDocument instead');
   return getAllQuestionsWithDocumentInfo();
 };

@@ -1,5 +1,5 @@
 // Quick PNG Generator for Icons
-console.log('🎨 Icon PNG Generator Starting...');
+console.log(' Icon PNG Generator Starting...');
 
 // Function to create PNG from SVG using Canvas
 function createPngFromSvg(svgContent, size, filename) {
@@ -36,13 +36,13 @@ function createPngFromSvg(svgContent, size, filename) {
                 URL.revokeObjectURL(downloadUrl);
                 URL.revokeObjectURL(url);
                 
-                console.log(`✅ Generated ${filename}`);
+                console.log(` Generated ${filename}`);
                 resolve();
             }, 'image/png', 1.0);
         };
 
         img.onerror = () => {
-            console.error(`❌ Failed to generate ${filename}`);
+            console.error(`Failed to generate ${filename}`);
             reject();
         };
 
@@ -134,17 +134,17 @@ const svg128 = `<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg"
 
 // Generate icons when page loads
 async function generateAllIcons() {
-    console.log('🚀 Starting icon generation...');
+    console.log(' Starting icon generation...');
     
     try {
         await createPngFromSvg(svg16, 16, 'icon16.png');
         await createPngFromSvg(svg128, 128, 'icon128.png');
         
         console.log('🎉 All icons generated successfully!');
-        alert('✅ Icons generated! Files should be downloading automatically.');
+        alert(' Icons generated! Files should be downloading automatically.');
     } catch (error) {
-        console.error('❌ Error generating icons:', error);
-        alert('❌ Error generating icons. Check console for details.');
+        console.error('Error generating icons:', error);
+        alert('Error generating icons. Check console for details.');
     }
 }
 

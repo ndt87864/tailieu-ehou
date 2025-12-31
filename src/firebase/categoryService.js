@@ -77,7 +77,7 @@ export const getAllCategories = async () => {
     }
     return sortedCategories;
   } catch (error) {
-    console.error('❌ Error loading categories:', error);
+    console.error('Error loading categories:', error);
     throw new Error(`Không thể lấy danh mục: ${error.message}`);
   }
 };
@@ -138,7 +138,7 @@ export const getAllCategoriesWithDocuments = async () => {
             }))
           };
         } catch (error) {
-          console.error(`⚠️ Error loading docs for category ${queryObj.categoryId}:`, error);
+          console.error(` Error loading docs for category ${queryObj.categoryId}:`, error);
           return {
             categoryId: queryObj.categoryId,
             documents: []
@@ -164,7 +164,7 @@ export const getAllCategoriesWithDocuments = async () => {
     const loadTime = performance.now() - startTime;
     return categoriesData;
   } catch (error) {
-    console.error("❌ Error loading categories with documents:", error);
+    console.error("Error loading categories with documents:", error);
     throw new Error(`Không thể lấy danh mục với tài liệu: ${error.message}`);
   }
 };
@@ -213,7 +213,7 @@ export const getDocumentsByCategory = async (categoryId) => {
     }
     return sortedDocuments;
   } catch (error) {
-    console.error(`❌ Error loading documents for category ${categoryId}:`, error);
+    console.error(`Error loading documents for category ${categoryId}:`, error);
     return [];
   }
 };
@@ -249,7 +249,7 @@ export const addCategory = async (categoryData) => {
       ...newCategory
     };
   } catch (error) {
-    console.error('❌ Error adding category:', error);
+    console.error('Error adding category:', error);
     throw error;
   }
 };
@@ -278,7 +278,7 @@ export const updateCategory = async (categoryId, categoryData) => {
       ...updatedCategory
     };
   } catch (error) {
-    console.error('❌ Error updating category:', error);
+    console.error('Error updating category:', error);
     throw error;
   }
 };
@@ -321,7 +321,7 @@ export const deleteCategory = async (categoryId) => {
       message: "Đã xóa danh mục và tất cả tài liệu liên quan"
     };
   } catch (error) {
-    console.error('❌ Error deleting category:', error);
+    console.error('Error deleting category:', error);
     throw error;
   }
 };
@@ -342,7 +342,7 @@ export const getCategoryById = async (categoryId) => {
       return null;
     }
   } catch (error) {
-    console.error("❌ Error getting category:", error);
+    console.error("Error getting category:", error);
     throw error;
   }
 };
@@ -372,7 +372,7 @@ export const getCategoriesByPage = async (page = 1, limitCount = 10, lastDoc = n
       lastDoc: categoriesSnapshot.docs[categoriesSnapshot.docs.length - 1] || null
     };
   } catch (error) {
-    console.error('❌ Error getting categories by page:', error);
+    console.error('Error getting categories by page:', error);
     throw new Error(`Không thể lấy danh mục: ${error.message}`);
   }
 };

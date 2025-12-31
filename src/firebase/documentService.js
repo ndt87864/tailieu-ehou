@@ -190,12 +190,12 @@ export const checkVipDocumentAccess = (user, document) => {
     };
   }
 
-  // ✅ QUAN TRỌNG: Admin luôn có quyền truy cập
+  //  QUAN TRỌNG: Admin luôn có quyền truy cập
   if (user.role === "admin") {
     return { hasAccess: true, reason: "Quyền admin" };
   }
 
-  // ✅ QUAN TRỌNG: Ưu tiên subscriptionType hơn role legacy
+  //  QUAN TRỌNG: Ưu tiên subscriptionType hơn role legacy
   // Full subscription users có quyền truy cập tất cả VIP content
   if (user.subscriptionType === "full") {
     return { hasAccess: true, reason: "Gói trả phí toàn bộ" };
@@ -204,14 +204,14 @@ export const checkVipDocumentAccess = (user, document) => {
   // Partial subscription users - kiểm tra quyền truy cập cụ thể cho tài liệu
   if (user.subscriptionType === "partial") {
     
-    // ✅ KIỂM TRA CẢ accessibleVipDocuments VÀ paidCategories
+    //  KIỂM TRA CẢ accessibleVipDocuments VÀ paidCategories
     const accessibleVipDocuments = user.accessibleVipDocuments || [];
     const paidCategories = user.paidCategories || {};
     
     // Kiểm tra trực tiếp document ID trong accessibleVipDocuments
     const hasDirectDocumentAccess = accessibleVipDocuments.includes(document.id);
     
-    // ✅ KIỂM TRA TRONG paidCategories.documents[] (cấu trúc thực tế)
+    //  KIỂM TRA TRONG paidCategories.documents[] (cấu trúc thực tế)
     let hasCategoryAccess = false;
     
     // Kiểm tra xem document có trong paidCategories.documents[] không
@@ -219,13 +219,13 @@ export const checkVipDocumentAccess = (user, document) => {
       hasCategoryAccess = paidCategories.documents.includes(document.id);
     }
     
-    // ✅ KIỂM TRA TRONG paidCategories.categories[] để xác định categories đã trả phí
+    //  KIỂM TRA TRONG paidCategories.categories[] để xác định categories đã trả phí
     let hasPaidCategoryAccess = false;
     if (paidCategories.categories && Array.isArray(paidCategories.categories)) {
       hasPaidCategoryAccess = paidCategories.categories.includes(document.categoryId);
     }
     
-    // ✅ KIỂM TRA THEO STRUCTURE CŨ (nếu có)
+    //  KIỂM TRA THEO STRUCTURE CŨ (nếu có)
     let hasLegacyCategoryAccess = false;
     if (document.categoryId && paidCategories[document.categoryId]) {
       const categoryData = paidCategories[document.categoryId];
@@ -265,12 +265,12 @@ export const checkVipDocumentAccess = (user, document) => {
     }
   }
 
-  // ✅ QUAN TRỌNG: CHỈ CHO PHÉP legacy puser NẾU KHÔNG CÓ subscriptionType
+  //  QUAN TRỌNG: CHỈ CHO PHÉP legacy puser NẾU KHÔNG CÓ subscriptionType
   if (user.role === "puser" && !user.subscriptionType) {
     return { hasAccess: true, reason: "Tài khoản Premium legacy" };
   }
 
-  // ✅ QUAN TRỌNG: Nếu có subscriptionType nhưng không phải "full" hoặc "partial", từ chối
+  //  QUAN TRỌNG: Nếu có subscriptionType nhưng không phải "full" hoặc "partial", từ chối
   if (user.subscriptionType && user.subscriptionType !== "full" && user.subscriptionType !== "partial") {
     return { 
       hasAccess: false, 
@@ -303,7 +303,7 @@ export const checkPartialSubscriptionDocumentAccess = async (userId, documentId)
     }
     return false;
   } catch (error) {
-    console.error('❌ Error checking partial subscription document access:', error);
+    console.error('Error checking partial subscription document access:', error);
     return false;
   }
 };
@@ -335,7 +335,7 @@ export const addVipDocumentAccess = async (userId, documentId) => {
     
     return false;
   } catch (error) {
-    console.error('❌ Error adding VIP document access:', error);
+    console.error('Error adding VIP document access:', error);
     return false;
   }
 };
@@ -363,7 +363,7 @@ export const removeVipDocumentAccess = async (userId, documentId) => {
     
     return false;
   } catch (error) {
-    console.error('❌ Error removing VIP document access:', error);
+    console.error('Error removing VIP document access:', error);
     return false;
   }
 };

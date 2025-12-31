@@ -41,13 +41,13 @@ async function getAllCategories() {
     });
     
     if (querySnapshot.empty) {
-      console.warn('⚠️ No categories found in Firestore!');
+      console.warn(' No categories found in Firestore!');
       return [];
     }
     
     const categoriesData = querySnapshot.docs.map(doc => {
       const data = doc.data();
-      console.log(`  📁 Found category: ${data.title} (stt:${data.stt}, id:${doc.id})`);
+      console.log(`   Found category: ${data.title} (stt:${data.stt}, id:${doc.id})`);
       return {
         id: doc.id,
         ...data,
@@ -55,7 +55,7 @@ async function getAllCategories() {
       };
     });
     
-    console.log(`✅ Total categories fetched: ${categoriesData.length}`);
+    console.log(` Total categories fetched: ${categoriesData.length}`);
     
     // Đếm số tài liệu cho mỗi category
     const countPromises = categoriesData.map(async (category) => {
@@ -85,14 +85,14 @@ async function getAllCategories() {
     // Sắp xếp theo stt (giống web)
     const sortedCategories = [...categoriesWithCount].sort((a, b) => (a.stt || 0) - (b.stt || 0));
     
-    console.log('✅ Categories after sort:', sortedCategories.length);
+    console.log(' Categories after sort:', sortedCategories.length);
     sortedCategories.forEach(cat => {
       console.log(`  - stt:${cat.stt}, title:"${cat.title}"`);
     });
     
     return sortedCategories;
   } catch (error) {
-    console.error('❌ Error getting categories:', error);
+    console.error('Error getting categories:', error);
     throw error;
   }
 }

@@ -2,17 +2,17 @@
 > tailieu@1.0.1 build
 > node scripts/clear-cache.js && node scripts/build-extension.js --production && node scripts/generate-static-api.js && vite build
 
-🚀 Bắt đầu quá trình build mới: v1758705348539
-🧹 Xóa thư mục dist cũ...
-✅ Đã xóa thư mục dist cũ thành công
-✅ Đã tạo file version.json với phiên bản: v1758705348539
-✅ Đã tạo file .env.local với thông tin phiên bản
+ Bắt đầu quá trình build mới: v1758705348539
+ Xóa thư mục dist cũ...
+ Đã xóa thư mục dist cũ thành công
+ Đã tạo file version.json với phiên bản: v1758705348539
+ Đã tạo file .env.local với thông tin phiên bản
 🔄 Đang thử xóa cache Firebase Hosting...
 [1m[31mError:[39m[22m [1mhosting:clearCache[22m is not a Firebase command
-⚠️ Không thể xóa cache Firebase, nhưng quá trình build vẫn tiếp tục
-🚀 Sẵn sàng để build!
-✅ Updated Chrome Extension for production
-✅ Chrome Extension built successfully
+ Không thể xóa cache Firebase, nhưng quá trình build vẫn tiếp tục
+ Sẵn sàng để build!
+ Updated Chrome Extension for production
+ Chrome Extension built successfully
 🔄 Generating static API files...
 Error getting categories: Error: Unable to detect a Project Id in the current environment. 
 To learn more about authentication and Google APIs, visit: 
@@ -34,9 +34,9 @@ Caused by: Error
 🔄 Running in offline mode - using existing static files...
 📂 Checking existing static files...
 🔄 Updating timestamps in existing files...
-✅ Static API offline mode completed!
+ Static API offline mode completed!
 📊 Using 149 existing API files
-📋 Found 137 question files and 7 document files
+ Found 137 question files and 7 document files
 [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
 [36mvite v5.4.19 [32mbuilding for production...[36m[39m
 
