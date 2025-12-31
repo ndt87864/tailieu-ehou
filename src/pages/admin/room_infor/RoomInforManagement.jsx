@@ -33,7 +33,9 @@ import {
 import { deleteRoomInfor } from "../../../firebase/roomInforService";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../firebase/firebase";
+import RoomTable from "./RoomTable";
 import RoomMobileCard from "./RoomMobileCard";
+import RoomFormModal from "./RoomFormModal";
 
 const emptyRoom = {
   examDate: "",
@@ -53,6 +55,7 @@ const RoomInforManagement = () => {
   const [editingKey, setEditingKey] = useState(null);
   const [form, setForm] = useState(emptyRoom);
   const [isSaving, setIsSaving] = useState(false);
+
   // Excel import modal / progress
   const [importModal, setImportModal] = useState({
     open: false,
@@ -93,206 +96,20 @@ const RoomInforManagement = () => {
     }
   };
 
-  const computeRoomsFromStudents = (students = []) => {
-    const map = new Map();
-    for (const s of students) {
-      // build a composite key from the fields we care about (BỎ examTime khỏi key, NHƯNG LUÔN LƯU examTime vào object)
-      const key = `${s.examDate || ""}||${s.subject || ""}||${
-        s.examSession || ""
-      }||${s.examRoom || ""}||${s.examType || ""}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key, // deterministic id for display only
-          examDate: s.examDate || "",
-          subject: s.subject || "",
-          examSession: s.examSession || "",
-          examTime: s.examTime || "", // LUÔN LƯU examTime
-          examRoom: s.examRoom || "",
-          examType: s.examType || "",
-          examLink: s.examLink || "",
-        });
-      } else {
-        // prefer non-empty examLink if current has none
-        const existing = map.get(key);
-        if ((!existing.examLink || existing.examLink === "") && s.examLink)
-          existing.examLink = s.examLink;
-        // prefer non-empty examTime if current has none
-        if ((!existing.examTime || existing.examTime === "") && s.examTime)
-          existing.examTime = s.examTime;
-      }
-    }
-    return Array.from(map.values());
-  };
-
-  // layout / sidebar state
+  // Theme, auth and layout states (needed by header/sidebar and dark mode)
+  const [user] = useAuthState(auth);
   const { isDarkMode } = useTheme();
+  const { isAdmin } = useUserRole();
+  const [sidebarData, setSidebarData] = useState([]);
+  const [documents, setDocuments] = useState({});
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [openMain, setOpenMain] = useState(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1024
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState([]);
-  const [documents, setDocuments] = useState({});
-  const [openMain, setOpenMain] = useState(0);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [user] = useAuthState(auth);
-  const { isAdmin } = useUserRole();
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    let unsub = null;
-    setLoading(true);
-
-    // initial fetch fallback
-    getAllStudentInfor()
-      .then((students) => {
-        setRooms(computeRoomsFromStudents(students || []));
-      })
-      .catch((e) => {
-        console.error("getAllStudentInfor error", e);
-        setError("Không thể tải dữ liệu thí sinh");
-      })
-      .finally(() => setLoading(false));
-
-    // subscribe to realtime updates from student_infor and compute derived rooms
-    unsub = subscribeStudentInfor(
-      (students) => {
-        setRooms(computeRoomsFromStudents(students || []));
-      },
-      (err) => {
-        console.error("subscribeStudentInfor error", err);
-        setError("Không thể tải dữ liệu thí sinh (realtime)");
-      }
-    );
-
-    return () => {
-      if (typeof unsub === "function") unsub();
-    };
-  }, []);
-
-  // load sidebar categories/documents for navigation
-  useEffect(() => {
-    let mounted = true;
-    const loadSidebar = async () => {
-      try {
-        const cats = await getAllCategoriesWithDocuments();
-        if (!mounted) return;
-        setSidebarData(cats || []);
-        const map = {};
-        (cats || []).forEach((c) => {
-          map[c.id] = c.documents || [];
-        });
-        setDocuments(map);
-      } catch (e) {
-        console.error("Failed to load sidebar data", e);
-      }
-    };
-    loadSidebar();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const openAdd = () => {
-    setEditing(null);
-    setEditingKey(null);
-    setForm(emptyRoom);
-    setIsModalOpen(true);
-  };
-
-  const toggleSelect = (id) => {
-    setSelectedIds((prev) => {
-      if (!prev) return [id];
-      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-    });
-  };
-
-  const selectAllVisible = () => {
-    // when grouping is on, select all visible member ids
-    const ids = (visibleRooms || filteredRooms || []).map((r) => r.id);
-    setSelectedIds(ids);
-  };
-
-  const clearSelection = () => setSelectedIds([]);
-
-  const handleDeleteSelected = async () => {
-    if (!selectedIds || selectedIds.length === 0) return;
-    const proceed = await showConfirm(
-      `Xóa ${selectedIds.length} phòng đã chọn và tất cả bản ghi thí sinh trùng? Hành động không thể hoàn tác. Tiếp tục?`
-    );
-    if (!proceed) return;
-    setIsSaving(true);
-    try {
-      let totalDeletedStudents = 0;
-      let totalDeletedRooms = 0;
-
-      // Process each selected room sequentially
-      for (const id of selectedIds) {
-        const room =
-          (rooms || []).find((x) => x.id === id) ||
-          (filteredRooms || []).find((x) => x.id === id);
-        if (!room) continue;
-
-        // delete matching room_infor docs if any
-        const matches = await getMatchingRoomDocs({
-          examDate: room.examDate,
-          subject: room.subject,
-          examSession: room.examSession,
-          examTime: room.examTime,
-          examRoom: room.examRoom,
-          examType: room.examType,
-        });
-
-        for (const doc of matches) {
-          try {
-            await deleteRoomInfor(doc.id);
-            totalDeletedRooms++;
-          } catch (e) {
-            console.warn("Failed to delete room_infor", doc.id, e);
-          }
-        }
-
-        // delete matching students
-        const criteria = {
-          subject: room.subject,
-          examSession: room.examSession,
-          examTime: room.examTime,
-          examRoom: room.examRoom,
-        };
-        if (room.examDate) criteria.examDate = room.examDate;
-        if (room.examType) criteria.examType = room.examType;
-
-        try {
-          const res = await deleteStudentsByMatch(criteria);
-          totalDeletedStudents += res.deleted || 0;
-        } catch (e) {
-          console.error("Failed to delete students for room", id, e);
-        }
-      }
-
-      alert(
-        `Hoàn thành. Đã xóa ${totalDeletedRooms} phòng (nếu có) và ${totalDeletedStudents} bản ghi thí sinh.`
-      );
-      clearSelection();
-    } catch (err) {
-      console.error("handleDeleteSelected error", err);
-      alert("Lỗi khi xóa các bản ghi đã chọn. Xem console để biết chi tiết.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // BỎ examTime khỏi key
-  const makeKey = (r) =>
-    `${r.examDate || ""}||${r.subject || ""}||${r.examSession || ""}||${
-      r.examRoom || ""
-    }||${r.examType || ""}`;
 
   const getMatchingRoomDocs = async (roomObj) => {
     try {
@@ -304,7 +121,7 @@ const RoomInforManagement = () => {
           const norm = (v) => normalizeForSearch(String(v || "")).trim();
           let logReason = [];
           // if caller provided examDate (non-empty), require date equality (normalized YMD)
-          if (roomObj.examDate) {
+          if (roomObj && roomObj.examDate) {
             const a = parseDateToYMD(roomObj.examDate || "");
             const b = parseDateToYMD(d.examDate || "");
             if (a !== b) {
@@ -314,30 +131,22 @@ const RoomInforManagement = () => {
           }
           if (norm(d.subject) !== norm(roomObj.subject)) {
             logReason.push(
-              `subject not match: excel=${norm(roomObj.subject)}, db=${norm(
-                d.subject
-              )}`
+              `subject not match: excel=${norm(roomObj.subject)}, db=${norm(d.subject)}`
             );
           }
           if (norm(d.examSession) !== norm(roomObj.examSession)) {
             logReason.push(
-              `examSession not match: excel=${norm(
-                roomObj.examSession
-              )}, db=${norm(d.examSession)}`
+              `examSession not match: excel=${norm(roomObj.examSession)}, db=${norm(d.examSession)}`
             );
           }
           if (norm(d.examRoom) !== norm(roomObj.examRoom)) {
             logReason.push(
-              `examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(
-                d.examRoom
-              )}`
+              `examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(d.examRoom)}`
             );
           }
           if (roomObj.examType && norm(d.examType) !== norm(roomObj.examType)) {
             logReason.push(
-              `examType not match: excel=${norm(roomObj.examType)}, db=${norm(
-                d.examType
-              )}`
+              `examType not match: excel=${norm(roomObj.examType)}, db=${norm(d.examType)}`
             );
           }
           if (logReason.length > 0) {
@@ -482,7 +291,9 @@ const RoomInforManagement = () => {
       const existingKeys = new Set(
         (rooms || []).map(
           (r) =>
-            `${r.examDate}||${r.subject}||${r.examSession}||${r.examTime}||${r.examRoom}||${r.examType}`
+            `${r.examDate}||${r.subject}||${r.examSession}||${r.examRoom}||${
+              r.examType
+            }||${r.majorCode || ""}`
         )
       );
 
@@ -491,7 +302,7 @@ const RoomInforManagement = () => {
       for (const s of students) {
         const key = `${s.examDate || ""}||${s.subject || ""}||${
           s.examSession || ""
-        }||${s.examTime || ""}||${s.examRoom || ""}||${s.examType || ""}`;
+        }||${s.examRoom || ""}||${s.examType || ""}||${s.majorCode || ""}`;
         if (!key) continue;
         // skip empty key
         if (!candidatesMap.has(key)) {
@@ -499,9 +310,9 @@ const RoomInforManagement = () => {
             examDate: s.examDate || "",
             subject: s.subject || "",
             examSession: s.examSession || "",
-            examTime: s.examTime || "",
             examRoom: s.examRoom || "",
             examType: s.examType || "",
+            majorCode: s.majorCode || "",
             examLink: s.examLink || "",
           });
         }
@@ -590,7 +401,19 @@ const RoomInforManagement = () => {
         if (mapped) headerMap[h] = mapped;
       });
       // Debug: log header map so admins can verify Excel headers map to expected fields
-      console.info("handleExcelImport: headerMap", headerMap);
+      console.info("📋 handleExcelImport: headerMap", headerMap);
+      console.info("📋 handleExcelImport: firstRow raw data", firstRow);
+
+      // Debug: log first row after mapping
+      const debugMappedFirstRow = {};
+      Object.entries(firstRow).forEach(([k, v]) => {
+        const key = headerMap[k];
+        if (key) debugMappedFirstRow[key] = v;
+      });
+      console.info(
+        "📋 handleExcelImport: firstRow mapped data",
+        debugMappedFirstRow
+      );
 
       // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
       let updatedCount = 0;
@@ -662,6 +485,232 @@ const RoomInforManagement = () => {
           return !hasKey && link;
         });
 
+      // NEW LOGIC: Detect file with majorCode, examRoom, examLink columns (or with examDate, subject, examSession)
+      const hasThreeColumnFormat =
+        rowsMapped.length > 0 &&
+        rowsMapped.some((m) => {
+          const hasMajorCode =
+            m.mapped.majorCode && String(m.mapped.majorCode).trim() !== "";
+          const hasExamRoom =
+            m.mapped.examRoom && String(m.mapped.examRoom).trim() !== "";
+          const hasExamLink =
+            (m.mapped.examLink && String(m.mapped.examLink).trim() !== "") ||
+            Boolean(findUrlInAnyCell(m.raw));
+          // Also detect if file has examDate, subject, examSession columns (even without majorCode)
+          const hasExamDate =
+            m.mapped.examDate && String(m.mapped.examDate).trim() !== "";
+          const hasSubject =
+            m.mapped.subject && String(m.mapped.subject).trim() !== "";
+          const hasExamSession =
+            m.mapped.examSession && String(m.mapped.examSession).trim() !== "";
+
+          // Accept if: (majorCode + examRoom + link) OR (examDate + subject + examSession + examRoom + link)
+          return (
+            (hasMajorCode && hasExamRoom && hasExamLink) ||
+            (hasExamDate &&
+              hasSubject &&
+              hasExamSession &&
+              hasExamRoom &&
+              hasExamLink)
+          );
+        });
+
+      if (hasThreeColumnFormat) {
+        // Process file with multiple formats:
+        // Format 1: majorCode + examRoom + examLink (+ optional subject, examDate, examSession)
+        // Format 2: examDate + subject + examSession + examRoom + examLink (without majorCode)
+        let applied = 0;
+        let studentsSynced = 0;
+        let notFoundCount = 0;
+
+        for (const m of rowsMapped) {
+          const majorCode = String(m.mapped.majorCode || "").trim();
+          const examRoom = String(m.mapped.examRoom || "").trim();
+          const examLink = String(
+            m.mapped.examLink || findUrlInAnyCell(m.raw) || ""
+          ).trim();
+          // Extract optional/required examDate, examSession, and subject from the row
+          const examDate = m.mapped.examDate
+            ? parseExcelDateToYMD(m.mapped.examDate, { date1904 })
+            : "";
+          const examSession = String(m.mapped.examSession || "").trim();
+          const subject = String(m.mapped.subject || "").trim();
+
+          // Validation: must have examRoom and examLink at minimum
+          if (!examRoom || !examLink) continue;
+
+          // Flexible validation based on available data:
+          // - If has majorCode: can work with just majorCode + examRoom
+          // - If no majorCode but has examDate + subject: can work
+          // - Allow matching even without examSession (many files don't have it)
+          if (!majorCode && !examDate && !subject) {
+            console.warn(
+              `Bỏ qua dòng thiếu dữ liệu: cần ít nhất (majorCode + examRoom) HOẶC (examDate + subject + examRoom)`
+            );
+            continue;
+          }
+
+          // Debug log for this row
+          console.log(`[Import] Processing row:`, {
+            majorCode,
+            examRoom,
+            subject,
+            examDate,
+            examSession,
+            examLink,
+          });
+
+          try {
+            // IMPORTANT: Room list is computed from student_infor, not room_infor collection!
+            // So we need to search in student_infor and update there directly
+            const allStudents = await getAllStudentInfor();
+            console.log(`[Import] Total students in DB: ${allStudents.length}`);
+
+            // Find matching students based on criteria
+            const matchingStudents = allStudents.filter((s) => {
+              const dbExamRoom = normalizeForSearch(
+                String(s.examRoom || "")
+              ).trim();
+              const inputExamRoom = normalizeForSearch(examRoom).trim();
+
+              // Basic match: examRoom must match
+              let isMatch = dbExamRoom === inputExamRoom;
+
+              // If majorCode is provided, match by majorCode
+              if (isMatch && majorCode) {
+                const dbMajorCode = String(s.majorCode || "").trim();
+                const majorMatch = dbMajorCode === majorCode;
+                isMatch = isMatch && majorMatch;
+                if (!majorMatch && dbExamRoom === inputExamRoom) {
+                  // Only log once per unique combination
+                }
+              }
+
+              // If subject is provided, match by subject
+              if (isMatch && subject) {
+                const dbSubject = normalizeForSearch(
+                  String(s.subject || "")
+                ).trim();
+                const inputSubject = normalizeForSearch(subject).trim();
+                const subjectMatch = dbSubject === inputSubject;
+                isMatch = isMatch && subjectMatch;
+              }
+
+              // If examDate is provided, match by examDate
+              if (isMatch && examDate) {
+                const dbExamDate = parseDateToYMD(s.examDate || "");
+                const dateMatch = dbExamDate === examDate;
+                isMatch = isMatch && dateMatch;
+              }
+
+              // If examSession is provided, match by examSession (OPTIONAL)
+              if (isMatch && examSession) {
+                const dbExamSession = normalizeForSearch(
+                  String(s.examSession || "")
+                ).trim();
+                const inputExamSession = normalizeForSearch(examSession).trim();
+                const sessionMatch = dbExamSession === inputExamSession;
+                isMatch = isMatch && sessionMatch;
+              }
+
+              return isMatch;
+            });
+
+            console.log(
+              `[Import] Found ${matchingStudents.length} matching students for examRoom="${examRoom}"`
+            );
+
+            if (matchingStudents.length === 0) {
+              notFoundCount++;
+              const criteria = [];
+              if (majorCode) criteria.push(`majorCode: ${majorCode}`);
+              if (examRoom) criteria.push(`examRoom: ${examRoom}`);
+              if (subject) criteria.push(`subject: ${subject}`);
+              if (examDate) criteria.push(`examDate: ${examDate}`);
+              if (examSession) criteria.push(`examSession: ${examSession}`);
+              console.warn(
+                `❌ Không tìm thấy sinh viên khớp cho: ${criteria.join(", ")}`
+              );
+
+              // Show sample of students with same examRoom to help debug
+              const sameRoomSamples = allStudents
+                .filter(
+                  (s) =>
+                    normalizeForSearch(String(s.examRoom || "")).trim() ===
+                    normalizeForSearch(examRoom).trim()
+                )
+                .slice(0, 3);
+              if (sameRoomSamples.length > 0) {
+                console.warn(
+                  `   Tìm thấy ${sameRoomSamples.length} sinh viên có cùng số phòng "${examRoom}" nhưng không khớp điều kiện khác:`,
+                  sameRoomSamples.map((s) => ({
+                    examRoom: s.examRoom,
+                    majorCode: s.majorCode,
+                    subject: s.subject,
+                    examDate: parseDateToYMD(s.examDate),
+                    examSession: s.examSession,
+                  }))
+                );
+              } else {
+                console.warn(
+                  `   Không có sinh viên nào có số phòng "${examRoom}" trong database`
+                );
+              }
+              continue;
+            }
+
+            console.log(
+              `✅ Tìm thấy ${matchingStudents.length} sinh viên khớp, sẽ cập nhật link`
+            );
+
+            // Update examLink for all matching students using updateStudentsByMatch
+            const updateCriteria = {
+              examRoom: examRoom,
+            };
+            if (majorCode) updateCriteria.majorCode = majorCode;
+            if (subject) updateCriteria.subject = subject;
+            if (examDate) updateCriteria.examDate = examDate;
+            if (examSession) updateCriteria.examSession = examSession;
+
+            const res = await updateStudentsByMatch(
+              updateCriteria,
+              { examLink },
+              { allowBulk: true }
+            );
+
+            if (res && typeof res.updated === "number" && res.updated > 0) {
+              applied++;
+              studentsSynced += res.updated;
+              console.log(
+                `✅ Đã cập nhật ${res.updated} sinh viên với link: ${examLink}`
+              );
+            }
+          } catch (e) {
+            console.error(
+              "Error processing row with majorCode/examRoom/examLink:",
+              e
+            );
+          }
+        }
+
+        setImportModal((m) => ({
+          ...m,
+          open: true,
+          title: "Hoàn tất nhập Excel",
+          message: `Đã xử lý file. Cập nhật ${applied} nhóm phòng, đồng bộ ${studentsSynced} bản ghi thí sinh. ${
+            notFoundCount > 0 ? `Không tìm thấy: ${notFoundCount} phòng.` : ""
+          }`,
+          processed: json.length,
+          total: json.length,
+          updatedCount: applied,
+          studentUpdatedCount: studentsSynced,
+          done: true,
+        }));
+
+        setIsSaving(false);
+        return; // finish three-column format flow
+      }
+
       if (allRowsHaveNoKeyAndHaveLink) {
         // Build ordered list of links from the file
         const links = rowsMapped
@@ -724,7 +773,6 @@ const RoomInforManagement = () => {
                 examDate: example.examDate,
                 subject: example.subject,
                 examSession: example.examSession,
-                examTime: example.examTime,
                 examRoom: example.examRoom,
                 examType: example.examType,
               };
@@ -736,7 +784,6 @@ const RoomInforManagement = () => {
                   const studentCriteria = {
                     subject: example.subject,
                     examSession: example.examSession,
-                    examTime: example.examTime,
                     examRoom: example.examRoom,
                   };
                   if (example.examDate)
@@ -777,7 +824,6 @@ const RoomInforManagement = () => {
                     const studentCriteria = {
                       subject: doc.subject,
                       examSession: doc.examSession,
-                      examTime: doc.examTime,
                       examRoom: doc.examRoom,
                     };
                     if (doc.examDate) studentCriteria.examDate = doc.examDate;
@@ -829,11 +875,10 @@ const RoomInforManagement = () => {
           if (key) mapped[key] = v;
         });
 
-        // build match key from subject/session/time/room
+        // build match key from subject/session/room
         const keyObj = {
           subject: (mapped.subject || "").toString().trim(),
           examSession: (mapped.examSession || "").toString().trim(),
-          examTime: (mapped.examTime || "").toString().trim(),
           examRoom: (mapped.examRoom || "").toString().trim(),
           examType: (mapped.examType || "").toString().trim(),
         };
@@ -864,12 +909,7 @@ const RoomInforManagement = () => {
           }
         }
 
-        if (
-          !keyObj.subject &&
-          !keyObj.examSession &&
-          !keyObj.examTime &&
-          !keyObj.examRoom
-        ) {
+        if (!keyObj.subject && !keyObj.examSession && !keyObj.examRoom) {
           rowsSkippedNoKey++;
           // Log the skipped row for debugging: show mapped keys so we can see which headers were missing
           console.warn(
@@ -895,7 +935,6 @@ const RoomInforManagement = () => {
         const normKeyObj = {
           subject: normalizeForSearch(keyObj.subject || "").trim(),
           examSession: normalizeForSearch(keyObj.examSession || "").trim(),
-          examTime: normalizeForSearch(keyObj.examTime || "").trim(),
           examRoom: normalizeForSearch(keyObj.examRoom || "").trim(),
           examType: normalizeForSearch(keyObj.examType || "").trim(),
         };
@@ -1005,7 +1044,6 @@ const RoomInforManagement = () => {
               const criteria = {
                 subject: keyObj.subject,
                 examSession: keyObj.examSession,
-                examTime: keyObj.examTime,
                 examRoom: keyObj.examRoom,
               };
               // include examType if provided in the imported row
@@ -1075,7 +1113,6 @@ const RoomInforManagement = () => {
               const criteria = {
                 subject: doc.subject,
                 examSession: doc.examSession,
-                examTime: doc.examTime,
                 examRoom: doc.examRoom,
               };
               // include examType if available on the room doc
@@ -1167,12 +1204,10 @@ const RoomInforManagement = () => {
     setIsSaving(true);
     try {
       if (editing) {
-        // update all room_infor docs that match the original composite key
         const matches = await getMatchingRoomDocs({
           examDate: editing.examDate,
           subject: editing.subject,
           examSession: editing.examSession,
-          examTime: editing.examTime,
           examRoom: editing.examRoom,
           examType: editing.examType,
         });
@@ -1205,11 +1240,9 @@ const RoomInforManagement = () => {
         // 2) Update students that match the saved/updated room documents (affectedDocs) so missing fields
         //    like examDate/examLink are propagated.
         try {
-          // PASS 1: update students that matched the original editing key
           const origCriteria = {
             subject: editing.subject,
             examSession: editing.examSession,
-            examTime: editing.examTime,
             examRoom: editing.examRoom,
           };
           if (editing.examType) origCriteria.examType = editing.examType;
@@ -1348,6 +1381,137 @@ const RoomInforManagement = () => {
     }
   };
 
+  // Selection helpers
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(visibleRooms.map((r) => r.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  // Delete all selected rooms
+  const handleDeleteSelected = async () => {
+    if (!selectedIds || selectedIds.length === 0) return;
+    const proceed = await showConfirm(
+      `Xóa ${selectedIds.length} phòng đã chọn và tất cả bản ghi thí sinh liên quan? Hành động không thể hoàn tác.`
+    );
+    if (!proceed) return;
+
+    setIsSaving(true);
+    try {
+      const toDelete = visibleRooms.filter((r) => selectedIds.includes(r.id));
+      let totalDeleted = 0;
+      let totalStudentsDeleted = 0;
+
+      for (const r of toDelete) {
+        try {
+          const matches = await getMatchingRoomDocs({
+            examDate: r.examDate,
+            subject: r.subject,
+            examSession: r.examSession,
+            examTime: r.examTime,
+            examRoom: r.examRoom,
+            examType: r.examType,
+          });
+
+          for (const doc of matches) {
+            try {
+              await deleteRoomInfor(doc.id);
+              totalDeleted++;
+            } catch (e) {
+              console.warn("Failed to delete room_infor", doc.id, e);
+            }
+          }
+
+          const criteria = {
+            subject: r.subject,
+            examSession: r.examSession,
+            examTime: r.examTime,
+            examRoom: r.examRoom,
+          };
+          if (r.examDate) criteria.examDate = r.examDate;
+          if (r.examType) criteria.examType = r.examType;
+
+          const res = await deleteStudentsByMatch(criteria);
+          totalStudentsDeleted += res.deleted || 0;
+        } catch (e) {
+          console.error("Failed to delete room", r, e);
+        }
+      }
+
+      alert(
+        `Đã xóa ${totalDeleted} phòng và ${totalStudentsDeleted} bản ghi thí sinh.`
+      );
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("handleDeleteSelected error", err);
+      alert("Lỗi khi xóa. Xem console để biết chi tiết.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Helper to build a unique key for grouping rooms
+  const makeKey = (r) => {
+    return `${r.examDate || ""}|${r.subject || ""}|${r.examSession || ""}|${
+      r.examTime || ""
+    }|${r.examRoom || ""}|${r.examType || ""}`;
+  };
+
+  // Load data on mount and subscribe to realtime updates
+  useEffect(() => {
+    const unsubscribe = subscribeStudentInfor(
+      (data) => {
+        // Derive unique rooms from student records
+        const computeRoomsFromStudents = (students) => {
+          const roomsMap = new Map();
+          (students || []).forEach((s) => {
+            const key = makeKey(s);
+            if (!roomsMap.has(key)) {
+              roomsMap.set(key, {
+                id: key,
+                examDate: s.examDate || "",
+                subject: s.subject || "",
+                examSession: s.examSession || "",
+                examTime: s.examTime || "",
+                examRoom: s.examRoom || "",
+                examLink: s.examLink || "",
+                examType: s.examType || "",
+                majorCode: s.majorCode || "",
+              });
+            }
+          });
+          return Array.from(roomsMap.values());
+        };
+
+        const derived = computeRoomsFromStudents(data);
+        setRooms(derived);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("subscribeStudentInfor error", err);
+        setError("Lỗi khi tải dữ liệu");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
     <div
       className={`flex flex-col min-h-screen ${
@@ -1356,8 +1520,9 @@ const RoomInforManagement = () => {
     >
       {windowWidth < 770 && (
         <DocumentMobileHeader
+          selectedCategory={selectedCategory}
+          selectedDocument={selectedDocument}
           setIsSidebarOpen={setIsSidebarOpen}
-          isDarkMode={isDarkMode}
         />
       )}
 
@@ -1551,350 +1716,39 @@ const RoomInforManagement = () => {
                 <LoadingSpinner />
               </div>
             ) : windowWidth < 770 ? (
-              /* Mobile View - Card Layout */
-              <div className="space-y-3">
-                {/* Mobile Header with selection controls */}
-                <div className={`p-3 rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-white"} shadow-sm border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm">
-                      <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
-                        Tổng: <strong>{rooms.length}</strong> — Hiển thị: <strong>{visibleRooms.length}</strong>
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          if (selectedIds.length === visibleRooms.length) {
-                            clearSelection();
-                          } else {
-                            selectAllVisible();
-                          }
-                        }}
-                        className={`px-2 py-1 text-xs rounded ${
-                          isDarkMode
-                            ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
-                      >
-                        {selectedIds.length === visibleRooms.length && visibleRooms.length > 0 ? "Bỏ chọn" : "Chọn tất cả"}
-                      </button>
-                      {selectedIds.length > 0 && (
-                        <span className={`text-xs ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-                          ({selectedIds.length})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile Cards */}
+              <div className="space-y-4">
                 {visibleRooms.length === 0 ? (
-                  <div className={`p-8 text-center rounded-lg ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
-                    <svg
-                      className={`mx-auto h-12 w-12 ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                      Không có dữ liệu phòng thi
-                    </p>
-                  </div>
+                  <div className="p-6 text-center text-sm text-gray-500">Không có dữ liệu</div>
                 ) : (
-                  visibleRooms.map((room, idx) => (
+                  visibleRooms.map((r) => (
                     <RoomMobileCard
-                      key={room.id}
-                      room={room}
-                      index={idx + 1}
+                      key={r.id}
+                      room={r}
                       isDarkMode={isDarkMode}
-                      isSelected={selectedIds.includes(room.id)}
-                      onToggleSelect={toggleSelect}
-                      onEdit={openEdit}
-                      onDelete={handleDeleteRoom}
+                      isSelected={selectedIds.includes(r.id)}
+                      onToggleSelect={() => toggleSelect(r.id)}
+                      onEdit={() => openEdit(r)}
+                      onDelete={() => handleDeleteRoom(r)}
                     />
                   ))
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 md:overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                      Tổng: <strong>{rooms.length}</strong>
-                    </div>
-                  </div>
-                  <table className="min-w-max table-auto">
-                    <thead className="bg-gray-50 dark:bg-gray-900">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          <input
-                            type="checkbox"
-                            checked={
-                              (filteredRooms || []).length > 0 &&
-                              selectedIds.length ===
-                                (filteredRooms || []).length
-                            }
-                            onChange={(e) =>
-                              e.target.checked
-                                ? selectAllVisible()
-                                : clearSelection()
-                            }
-                          />
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          STT
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Ngày thi
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Tên môn học
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Ca thi
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Thời gian
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Phòng
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Link phòng
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-                          Hành động
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleRooms.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={9}
-                            className="p-6 text-center text-sm text-gray-500"
-                          >
-                            Không có dữ liệu
-                          </td>
-                        </tr>
-                      ) : groupByLink ? (
-                        // grouped view: render clusters by identical examLink
-                        (() => {
-                          const groups = new Map();
-                          const normalizeLink = (s) =>
-                            (s || "").toString().trim();
-                          (filteredRooms || []).forEach((r) => {
-                            const key =
-                              normalizeLink(r.examLink) || "(no-link)";
-                            if (!groups.has(key)) groups.set(key, []);
-                            groups.get(key).push(r);
-                          });
-
-                          const rows = [];
-                          let rowIndex = 0;
-                          groups.forEach((members, link) => {
-                            // group header row
-                            rows.push(
-                              <tr
-                                key={`group-${link}`}
-                                className="bg-gray-100 dark:bg-gray-700"
-                              >
-                                <td
-                                  colSpan={9}
-                                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200"
-                                >
-                                  Link:{" "}
-                                  {link === "(no-link)" ? (
-                                    <span className="text-gray-500">
-                                      (không)
-                                    </span>
-                                  ) : (
-                                    <a
-                                      href={link}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-blue-600 dark:text-blue-400 hover:underline"
-                                    >
-                                      {link}
-                                    </a>
-                                  )}{" "}
-                                  — Số phòng: {members.length}
-                                </td>
-                              </tr>
-                            );
-
-                            members.forEach((r, idx) => {
-                              const cls =
-                                rowIndex % 2 === 0
-                                  ? "bg-white dark:bg-gray-800"
-                                  : "bg-gray-50 dark:bg-gray-700";
-                              rows.push(
-                                <tr
-                                  key={r.id}
-                                  className={`${cls} hover:bg-gray-100 dark:hover:bg-gray-600`}
-                                >
-                                  <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedIds.includes(r.id)}
-                                      onChange={() => toggleSelect(r.id)}
-                                    />
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {rowIndex + 1}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.examDate ? (
-                                      formatDate(r.examDate)
-                                    ) : (
-                                      <span className="text-sm text-gray-500">
-                                        chưa cập nhật
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.subject || "-"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.examSession || "-"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.examTime || "-"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    {r.examRoom || "-"}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400 break-all">
-                                    {r.examLink ? (
-                                      <a
-                                        href={r.examLink}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="hover:underline break-words"
-                                      >
-                                        {r.examLink}
-                                      </a>
-                                    ) : (
-                                      <span className="text-sm text-gray-500">
-                                        (không)
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                                    <div className="flex items-center space-x-2">
-                                      <button
-                                        onClick={() => openEdit(r)}
-                                        className="px-2 py-1 rounded bg-yellow-400 text-xs text-white hover:opacity-90"
-                                      >
-                                        Sửa
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteRoom(r)}
-                                        disabled={isSaving}
-                                        className="px-2 py-1 rounded bg-red-600 text-xs text-white hover:opacity-90"
-                                      >
-                                        Xóa
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                              rowIndex++;
-                            });
-                          });
-
-                          return rows;
-                        })()
-                      ) : (
-                        // flat view
-                        filteredRooms.map((r, idx) => (
-                          <tr
-                            key={r.id}
-                            className={`${
-                              idx % 2 === 0
-                                ? "bg-white dark:bg-gray-800"
-                                : "bg-gray-50 dark:bg-gray-700"
-                            } hover:bg-gray-100 dark:hover:bg-gray-600`}
-                          >
-                            <td className="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.includes(r.id)}
-                                onChange={() => toggleSelect(r.id)}
-                              />
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {idx + 1}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.examDate ? (
-                                formatDate(r.examDate)
-                              ) : (
-                                <span className="text-sm text-gray-500">
-                                  chưa cập nhật
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.subject || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.examSession || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.examTime || "-"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              {r.examRoom || "-"}
-                            </td>
-                            {/* examType column hidden as requested */}
-                            <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400 break-all">
-                              {r.examLink ? (
-                                <a
-                                  href={r.examLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="hover:underline break-words"
-                                >
-                                  {r.examLink}
-                                </a>
-                              ) : (
-                                <span className="text-sm text-gray-500">
-                                  (không)
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-200">
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => openEdit(r)}
-                                  className="px-2 py-1 rounded bg-yellow-400 text-xs text-white hover:opacity-90"
-                                >
-                                  Sửa
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteRoom(r)}
-                                  disabled={isSaving}
-                                  className="px-2 py-1 rounded bg-red-600 text-xs text-white hover:opacity-90"
-                                >
-                                  Xóa
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <RoomTable
+                loading={loading}
+                roomsCount={rooms.length}
+                filteredRooms={filteredRooms}
+                visibleRooms={visibleRooms}
+                selectedIds={selectedIds}
+                toggleSelect={toggleSelect}
+                selectAllVisible={selectAllVisible}
+                clearSelection={clearSelection}
+                openEdit={openEdit}
+                handleDeleteRoom={handleDeleteRoom}
+                groupByLink={groupByLink}
+                isSaving={isSaving}
+                isDarkMode={isDarkMode}
+              />
             )}
           </div>
 
@@ -2058,8 +1912,7 @@ const RoomInforManagement = () => {
             </div>
           </Modal>
 
-          {/* Edit/Add modal for room_infor (updates all matching DB records when saving) */}
-          <Modal
+          <RoomFormModal
             isOpen={isModalOpen}
             onClose={() => {
               setIsModalOpen(false);
@@ -2067,93 +1920,13 @@ const RoomInforManagement = () => {
               setEditingKey(null);
               setForm(emptyRoom);
             }}
-            title={editing ? "Sửa thông tin phòng (đồng bộ)" : "Thêm phòng mới"}
-          >
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <div className="text-sm text-gray-600">Ngày thi</div>
-                  <input
-                    type="date"
-                    value={form.examDate || ""}
-                    onChange={(e) => handleChange("examDate", e.target.value)}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="text-sm text-gray-600">Tên môn học</div>
-                  <input
-                    value={form.subject || ""}
-                    onChange={(e) => handleChange("subject", e.target.value)}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  />
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label className="block">
-                  <div className="text-sm text-gray-600">Ca thi</div>
-                  <input
-                    value={form.examSession || ""}
-                    onChange={(e) =>
-                      handleChange("examSession", e.target.value)
-                    }
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="text-sm text-gray-600">Thời gian</div>
-                  <input
-                    value={form.examTime || ""}
-                    onChange={(e) => handleChange("examTime", e.target.value)}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="text-sm text-gray-600">Phòng</div>
-                  <input
-                    value={form.examRoom || ""}
-                    onChange={(e) => handleChange("examRoom", e.target.value)}
-                    className="mt-1 block w-full rounded border px-3 py-2"
-                  />
-                </label>
-              </div>
-
-              <label className="block">
-                <div className="text-sm text-gray-600">Link phòng</div>
-                <input
-                  value={form.examLink || ""}
-                  onChange={(e) => handleChange("examLink", e.target.value)}
-                  className="mt-1 block w-full rounded border px-3 py-2"
-                />
-              </label>
-
-              <div className="flex items-center justify-end space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsModalOpen(false);
-                    setEditing(null);
-                    setEditingKey(null);
-                    setForm(emptyRoom);
-                  }}
-                  className="px-4 py-2 rounded border text-sm"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-4 py-2 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
-                >
-                  {isSaving ? "Đang lưu..." : "Lưu và đồng bộ"}
-                </button>
-              </div>
-            </form>
-          </Modal>
+            editing={editing}
+            form={form}
+            handleChange={handleChange}
+            handleSave={handleSave}
+            isSaving={isSaving}
+            isDarkMode={isDarkMode}
+          />
 
           <Footer />
         </div>
