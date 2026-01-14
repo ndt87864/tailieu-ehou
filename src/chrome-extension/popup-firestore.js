@@ -27,6 +27,55 @@ const CACHE_KEYS = {
     ,AUTO_SELECT: 'tailieu_auto_select'
 };
 
+// Helper: Check if tab can receive messages (valid URL, not chrome:// etc)
+function isTabMessageable(tab) {
+    if (!tab || !tab.id || tab.id === chrome.tabs.TAB_ID_NONE) return false;
+    if (!tab.url) return false;
+    const url = tab.url;
+    // Skip internal browser pages
+    if (url.startsWith('chrome://') || 
+        url.startsWith('chrome-extension://') ||
+        url.startsWith('edge://') ||
+        url.startsWith('about:') ||
+        url.startsWith('moz-extension://') ||
+        url.startsWith('devtools://')) {
+        return false;
+    }
+    return true;
+}
+
+// Helper: Safely send message to active tab's content script
+async function safeSendToContentScript(message) {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!isTabMessageable(tab)) {
+            console.log('Tab not messageable, skipping message:', message.action);
+            return { success: false, reason: 'tab_not_messageable' };
+        }
+        
+        // Use Promise with timeout to avoid hanging
+        return await new Promise((resolve) => {
+            const timeoutId = setTimeout(() => {
+                resolve({ success: false, reason: 'timeout' });
+            }, 2000);
+            
+            chrome.tabs.sendMessage(tab.id, message, (response) => {
+                clearTimeout(timeoutId);
+                if (chrome.runtime.lastError) {
+                    // Silently handle - content script not ready
+                    console.log('Message not delivered:', chrome.runtime.lastError.message);
+                    resolve({ success: false, reason: chrome.runtime.lastError.message });
+                } else {
+                    resolve({ success: true, response });
+                }
+            });
+        });
+    } catch (error) {
+        console.log('safeSendToContentScript error:', error.message);
+        return { success: false, reason: error.message };
+    }
+}
+
 // Initialize Firebase khi DOM loaded
 document.addEventListener('DOMContentLoaded', async () => {
   try {
@@ -35,17 +84,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wait for Firebase to be ready
     await waitForFirebase();
     
-    // Initialize Firebase app (sử dụng cùng project với web)
+    // Initialize Firebase app using config from firebase.extends.js
     if (!firebase.apps || !firebase.apps.find(app => app.name === 'extendsApp')) {
-      const config = {
-        apiKey: "AIzaSyDj_FhdiYG8sgrqzSBlf9SrGF8FQR4fCI4",
-        authDomain: "tailieu-89ca9.firebaseapp.com",
-        projectId: "tailieu-89ca9",
-        storageBucket: "tailieu-89ca9.firebasestorage.app",
-        messagingSenderId: "739034600322",
-        appId: "1:739034600322:web:771c49578c29c8cabe359b",
-        measurementId: "G-4KTZWXH5KE"
-      };
+      // Use config from firebase.extends.js (loaded before this script)
+      const config = window.extendsFirebaseConfig || extendsFirebaseConfig;
+      if (!config || !config.projectId) {
+        throw new Error('Firebase config not found. Make sure firebase.extends.js is loaded first.');
+      }
       firebase.initializeApp(config, "extendsApp");
       console.log('Firebase initialized with project:', config.projectId);
     }
@@ -255,12 +300,7 @@ async function restoreFromCache() {
     }
 
     // Always notify content script of current auto-select state
-    try {
-      const [tabNotify] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabNotify && tabNotify.id) {
-        chrome.tabs.sendMessage(tabNotify.id, { action: 'setAutoSelect', enabled: !!autoSelectEnabled }).catch(() => {});
-      }
-    } catch (e) {}
+    safeSendToContentScript({ action: 'setAutoSelect', enabled: !!autoSelectEnabled });
 
     if (hasUsefulCache) {
       showCacheSection();
@@ -503,13 +543,9 @@ function onHighlightAnswersChange() {
   highlightAnswersEnabled = highlightAnswersCheckbox.checked;
   saveToCache(CACHE_KEYS.HIGHLIGHT_ANSWERS, highlightAnswersEnabled);
   
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        action: 'setAnswerHighlighting',
-        enabled: highlightAnswersEnabled
-      }).catch(() => {});
-    }
+  safeSendToContentScript({
+    action: 'setAnswerHighlighting',
+    enabled: highlightAnswersEnabled
   });
 }
 
@@ -518,13 +554,9 @@ function onAutoSelectChange() {
     autoSelectEnabled = !!autoSelectCheckbox.checked;
     saveToCache(CACHE_KEYS.AUTO_SELECT, autoSelectEnabled);
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, {
-          action: 'setAutoSelect',
-          enabled: autoSelectEnabled
-        }).catch(() => {});
-      }
+    safeSendToContentScript({
+      action: 'setAutoSelect',
+      enabled: autoSelectEnabled
     });
   } catch (e) {
     console.error('onAutoSelectChange error', e);
@@ -673,56 +705,39 @@ function showQuestionsStatus(count) {
 }
 
 async function compareQuestionsWithPage() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) return;
-    
-    await chrome.tabs.sendMessage(tab.id, {
-      action: 'compareQuestions'
-    });
-    
+  const result = await safeSendToContentScript({
+    action: 'compareQuestions'
+  });
+  
+  if (result.success) {
     console.log(' Sent compare command to content script');
-  } catch (error) {
-    console.log('Could not compare questions:', error.message);
+  } else {
+    console.log('Could not compare questions:', result.reason);
   }
 }
 
 async function sendQuestionsToContentScript(questionsData) {
-  try {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!activeTab || !activeTab.id) return;
+  // Send questions
+  const result = await safeSendToContentScript({
+    action: 'setExtensionQuestions',
+    questions: questionsData
+  });
+  
+  if (result.success) {
+    console.log('Questions sent to content script successfully');
     
-    if (activeTab.status === 'loading' || !activeTab.url || 
-        activeTab.url.startsWith('chrome://') || 
-        activeTab.url.startsWith('chrome-extension://') ||
-        activeTab.url.startsWith('edge://') ||
-        activeTab.url.startsWith('about:')) {
-      return;
-    }
+    // Also send highlight and auto-select settings
+    await safeSendToContentScript({
+      action: 'setAnswerHighlighting',
+      enabled: highlightAnswersEnabled
+    });
     
-    try {
-      await chrome.tabs.sendMessage(activeTab.id, {
-        action: 'setExtensionQuestions',
-        questions: questionsData
-      });
-      
-      chrome.tabs.sendMessage(activeTab.id, {
-        action: 'setAnswerHighlighting',
-        enabled: highlightAnswersEnabled
-      }).catch(() => {});
-        // Also inform content script of auto-select preference
-        chrome.tabs.sendMessage(activeTab.id, {
-          action: 'setAutoSelect',
-          enabled: !!(autoSelectCheckbox ? autoSelectCheckbox.checked : autoSelectEnabled)
-        }).catch(() => {});
-      
-      console.log('Questions sent to content script successfully');
-    } catch (messageError) {
-      console.log('Content script not ready for questions');
-    }
-    
-  } catch (error) {
-    console.log('Error sending questions to content script:', error.message);
+    await safeSendToContentScript({
+      action: 'setAutoSelect',
+      enabled: !!(autoSelectCheckbox ? autoSelectCheckbox.checked : autoSelectEnabled)
+    });
+  } else {
+    console.log('Content script not ready for questions:', result.reason);
   }
 }
 
@@ -741,11 +756,9 @@ async function clearAllCache() {
     resetUI();
     hideCacheSection();
     
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) {
-      chrome.tabs.sendMessage(tab.id, { action: 'clearCache' }).catch(() => {});
-      chrome.tabs.sendMessage(tab.id, { action: 'updateQuestionsPopup', questions: [] }).catch(() => {});
-    }
+    // Notify content script to clear its cache
+    await safeSendToContentScript({ action: 'clearCache' });
+    await safeSendToContentScript({ action: 'updateQuestionsPopup', questions: [] });
     
     // Force reload categories from Firestore
     await loadCategories(true);

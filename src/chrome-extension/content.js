@@ -173,7 +173,7 @@ async function performAutoCompare(force = false) {
 
                 showAutoCompareNotification(result.matched, extensionQuestions.length);
                 
-                // Notify popup about successful comparison
+                // Notify popup about successful comparison (if popup is open)
                 try {
                     // Check if extension context is valid before sending message
                     if (chrome?.runtime?.sendMessage) {
@@ -181,14 +181,16 @@ async function performAutoCompare(force = false) {
                             action: 'comparisonComplete',
                             matched: result.matched,
                             total: extensionQuestions.length
+                        }, () => {
+                            // Suppress "Receiving end does not exist" error when popup is closed
+                            if (chrome.runtime.lastError) {
+                                // Popup not open - this is expected, ignore silently
+                            }
                         });
                     }
                 } catch (err) {
-                    if (err.message.includes('Extension context invalidated')) {
-
-                    } else {
-
-                    }
+                    // Extension context invalidated or other error - ignore silently
+                    debugLog('Message to popup failed (expected if popup closed):', err.message);
                 }
             } else {
 
