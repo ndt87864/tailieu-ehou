@@ -48,6 +48,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(error => sendResponse({ success: false, error: error.message }));
         return true; // Keep channel open for async response
     }
+
+    if (request.action === 'verifyQuestionsExist') {
+        // request.questions: array of { question, documentId }
+        (async () => {
+            try {
+                const db = getDb();
+                const checks = [];
+                for (const q of request.questions || []) {
+                    try {
+                        const exists = await checkQuestionExists(db, q.question, q.documentId || null);
+                        checks.push({ question: q.question, documentId: q.documentId || null, exists });
+                    } catch (e) {
+                        checks.push({ question: q.question, documentId: q.documentId || null, exists: false, error: e.message || String(e) });
+                    }
+                }
+                sendResponse({ success: true, checks });
+            } catch (err) {
+                sendResponse({ success: false, error: err.message || String(err) });
+            }
+        })();
+        return true;
+    }
 });
 
 // Batch Add Logic
@@ -102,13 +124,26 @@ async function handleBatchAddQuestions(questions) {
                 results.push({ index: q.index, status: 'exists', message: `Đã có trong DB`, documentId: docId, documentTitle, categoryId, categoryTitle });
             } else {
                 // Add (will attach documentId/categoryId if possible)
-                await addQuestionToDB(db, q);
+                const addedId = await addQuestionToDB(db, q);
+
+                // Verify write by reading back the created document
+                let addedDoc = null;
+                try {
+                    addedDoc = await db.collection('questions').doc(addedId).get();
+                } catch (e) {
+                    console.warn('[Background] Unable to re-read added question:', e.message || e);
+                }
+
+                if (!addedDoc || !addedDoc.exists) {
+                    throw new Error('Không xác nhận được câu hỏi đã được ghi vào Firestore');
+                }
+
                 const msgParts = [];
                 if (documentTitle) msgParts.push(`tài liệu: "${documentTitle}"`);
                 else if (docId) msgParts.push(`tài liệuId: ${docId}`);
                 if (categoryTitle) msgParts.push(`danh mục: "${categoryTitle}"`);
                 const msg = msgParts.length ? `Đã thêm vào ${msgParts.join(' / ')}` : 'Đã thêm';
-                results.push({ index: q.index, status: 'success', message: msg, documentId: docId, documentTitle, categoryId, categoryTitle });
+                results.push({ index: q.index, status: 'success', message: msg, documentId: docId, documentTitle, categoryId, categoryTitle, addedId });
             }
         } catch (error) {
             console.error('Error processing question', q.index, error);
@@ -136,31 +171,33 @@ async function addQuestionToDB(db, questionObj) {
         .map(a => a.text)
         .join('\n');
 
-    // Format data matching the App's structure
+    // Calculate STT (Order Number)
+    let stt = 1;
+    if (questionObj.documentId) {
+        try {
+            const snapshot = await db.collection('questions')
+                .where('documentId', '==', questionObj.documentId)
+                .get();
+            stt = snapshot.size + 1;
+        } catch (e) {
+            console.warn('[Background] Failed to calculate STT:', e);
+        }
+    }
+
+    // Format data matching the App's structure (Standard Schema)
     const data = {
         question: questionObj.question,
         answer: correctAnswers || '',
-        answers: questionObj.answers || [],
-        type: questionObj.type || 'scanner',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        source: 'scanner_extension'
+        stt: stt
     };
 
     // Attach documentId if caller provided it
     if (questionObj.documentId) {
         data.documentId = questionObj.documentId;
-        try {
-            const docSnap = await db.collection('documents').doc(questionObj.documentId).get();
-            if (docSnap.exists) {
-                const docData = docSnap.data();
-                if (docData && docData.categoryId) data.categoryId = docData.categoryId;
-            }
-        } catch (e) {
-            console.warn('[Background] Failed to fetch document for categoryId:', e.message || e);
-        }
     }
 
-    await db.collection('questions').add(data);
-    return true;
+    const docRef = await db.collection('questions').add(data);
+    return docRef.id;
 }
