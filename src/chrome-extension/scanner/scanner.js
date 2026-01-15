@@ -653,13 +653,6 @@
                     </svg>
                     Xóa đã chọn
                 </button>
-                <button class="scanner-btn scanner-btn-primary" id="scanner-highlight-all">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="m9 11-6 6v3h9l3-3"></path>
-                        <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"></path>
-                    </svg>
-                    Highlight trên trang
-                </button>
                 <button class="scanner-btn scanner-btn-primary" id="scanner-add-db" style="background: linear-gradient(135deg, #10B981, #059669);">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
@@ -701,18 +694,17 @@
 
         // Event listeners
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeScannerPopup();
+            if (e.target === overlay) {
+                // If an edit form is currently open, ignore accidental overlay clicks
+                if (scannerPopup && scannerPopup.querySelector('.scanner-edit-form')) return;
+                closeScannerPopup();
+            }
         });
 
         scannerPopup.querySelector('.scanner-close-btn').addEventListener('click', closeScannerPopup);
 
         scannerPopup.querySelector('#scanner-copy-all').addEventListener('click', () => {
             copyAllQuestions(questions);
-        });
-
-        scannerPopup.querySelector('#scanner-highlight-all').addEventListener('click', () => {
-            highlightAllQuestions(questions);
-            closeScannerPopup();
         });
 
         scannerPopup.querySelector('#scanner-add-db').addEventListener('click', () => {
@@ -759,12 +751,15 @@
             item.addEventListener('click', (ev) => {
                 // avoid clicks that originated from controls (remove, checkbox, edit, or edit form)
                 if (ev.target.closest('.scanner-remove-btn') || ev.target.closest('.scanner-remove-checkbox') || ev.target.closest('.scanner-edit-btn') || ev.target.closest('.scanner-edit-form')) return;
+
+                // If the click target is the item itself (i.e. blank/padding area), do not close the popup
+                if (ev.target === item) return;
+
                 const dataIndex = Number(item.getAttribute('data-index'));
                 const question = questions.find(q => q.index === dataIndex) || questions[idx];
                 if (question && question.element) {
-                    closeScannerPopup();
+                    // Scroll to the question but keep the popup open
                     question.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    highlightElement(question.element);
                 }
             });
         });
@@ -1112,26 +1107,7 @@
         });
     }
 
-    function highlightAllQuestions(questions) {
-        questions.forEach(q => {
-            if (q.element) {
-                highlightElement(q.element);
-            }
-        });
-        showNotification('Đã highlight ' + questions.length + ' câu hỏi trên trang!', 'success');
-    }
-
-    function highlightElement(element) {
-        element.style.transition = 'all 0.3s ease';
-        element.style.backgroundColor = '#fff3cd';
-        element.style.boxShadow = '0 0 0 3px #ffc107';
-        element.style.borderRadius = '4px';
-
-        setTimeout(() => {
-            element.style.backgroundColor = '';
-            element.style.boxShadow = '';
-        }, 3000);
-    }
+    
 
     // ==================== NOTIFICATION ====================
     function showNotification(message, type = 'info') {
