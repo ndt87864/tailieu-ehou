@@ -637,6 +637,22 @@
                     </svg>
                     Copy tất cả
                 </button>
+                <button class="scanner-btn scanner-btn-secondary" id="scanner-select-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    Chọn tất cả
+                </button>
+                <button class="scanner-btn scanner-btn-secondary" id="scanner-delete-selected">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18"></path>
+                        <path d="M8 6v14a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6"></path>
+                        <path d="M10 11v6"></path>
+                        <path d="M14 11v6"></path>
+                    </svg>
+                    Xóa đã chọn
+                </button>
                 <button class="scanner-btn scanner-btn-primary" id="scanner-highlight-all">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="m9 11-6 6v3h9l3-3"></path>
@@ -692,9 +708,47 @@
         });
 
         // Click vào câu hỏi để scroll đến
+        // Helpers to remove question and update UI
+        function updateCount() {
+            const countEl = scannerPopup.querySelector('.scanner-count');
+            if (countEl) countEl.textContent = `${questions.length} câu hỏi`;
+        }
+
+        function removeQuestionByIndex(idxValue) {
+            const num = Number(idxValue);
+            // remove from data array
+            for (let i = questions.length - 1; i >= 0; i--) {
+                if (questions[i].index === num) questions.splice(i, 1);
+            }
+            // remove DOM element(s)
+            const el = scannerPopup.querySelector(`.scanner-question-item[data-index="${num}"]`);
+            if (el) el.remove();
+            updateCount();
+        }
+
+        // Selection state for bulk actions
+        const selectedForDelete = new Set();
+
+        function markItemSelectedDOM(item, selected) {
+            if (!item) return;
+            if (selected) {
+                item.classList.add('marked-for-delete');
+                const cb = item.querySelector('.scanner-remove-checkbox');
+                if (cb) cb.checked = true;
+            } else {
+                item.classList.remove('marked-for-delete');
+                const cb = item.querySelector('.scanner-remove-checkbox');
+                if (cb) cb.checked = false;
+            }
+        }
+
+        // Click into question to scroll
         scannerPopup.querySelectorAll('.scanner-question-item').forEach((item, idx) => {
-            item.addEventListener('click', () => {
-                const question = questions[idx];
+            item.addEventListener('click', (ev) => {
+                // avoid clicks that originated from remove controls
+                if (ev.target.closest('.scanner-remove-btn') || ev.target.closest('.scanner-remove-checkbox')) return;
+                const dataIndex = Number(item.getAttribute('data-index'));
+                const question = questions.find(q => q.index === dataIndex) || questions[idx];
                 if (question && question.element) {
                     closeScannerPopup();
                     question.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -702,6 +756,70 @@
                 }
             });
         });
+
+        // Attach remove button handlers
+        scannerPopup.querySelectorAll('.scanner-remove-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.scanner-question-item');
+                if (!item) return;
+                const idxValue = item.getAttribute('data-index');
+                // remove immediately single item
+                removeQuestionByIndex(idxValue);
+                // also clear from selection set
+                selectedForDelete.delete(Number(idxValue));
+            });
+        });
+
+        // Attach checkbox handlers (mark selection)
+        scannerPopup.querySelectorAll('.scanner-remove-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const item = cb.closest('.scanner-question-item');
+                if (!item) return;
+                const idxValue = Number(item.getAttribute('data-index'));
+                if (cb.checked) {
+                    selectedForDelete.add(idxValue);
+                    markItemSelectedDOM(item, true);
+                } else {
+                    selectedForDelete.delete(idxValue);
+                    markItemSelectedDOM(item, false);
+                }
+            });
+        });
+
+        // Select all button
+        const selectAllBtn = scannerPopup.querySelector('#scanner-select-all');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                scannerPopup.querySelectorAll('.scanner-question-item').forEach(item => {
+                    const idxValue = Number(item.getAttribute('data-index'));
+                    selectedForDelete.add(idxValue);
+                    markItemSelectedDOM(item, true);
+                });
+            });
+        }
+
+        // Delete selected button
+        const deleteSelectedBtn = scannerPopup.querySelector('#scanner-delete-selected');
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedForDelete.size === 0) {
+                    showNotification('Chưa có câu hỏi nào được chọn', 'info');
+                    return;
+                }
+                // Proceed to remove without confirmation
+                const toRemove = Array.from(selectedForDelete);
+                toRemove.forEach(idx => {
+                    removeQuestionByIndex(idx);
+                });
+                // clear selection
+                selectedForDelete.clear();
+                showNotification('Đã xóa ' + toRemove.length + ' câu hỏi đã chọn', 'success');
+            });
+        }
     }
 
     function createQuestionItemHTML(q) {
@@ -728,8 +846,17 @@
         return `
             <div class="scanner-question-item" data-index="${q.index}">
                 <div class="scanner-question-header">
-                    <span class="question-number">Câu ${q.index}</span>
-                    <span class="question-type">${q.type}</span>
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <input type="checkbox" class="scanner-remove-checkbox" title="Chọn để xóa" />
+                        <span class="question-number">Câu ${q.index}</span>
+                        <span class="question-type">${q.type}</span>
+                    </div>
+                    <button class="scanner-remove-btn" title="Xóa câu hỏi">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6 6 18"></path>
+                            <path d="m6 6 12 12"></path>
+                        </svg>
+                    </button>
                 </div>
                 <div class="scanner-question-text">${escapeHTML(q.question)}</div>
                 ${answersHTML}
@@ -1053,6 +1180,38 @@
             .scanner-btn-secondary:hover {
                 border-color: #667eea;
                 color: #667eea;
+            }
+
+            .scanner-remove-btn {
+                background: transparent;
+                border: none;
+                width: 32px;
+                height: 32px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                color: #6c757d;
+                border-radius: 6px;
+                transition: background 0.15s, color 0.15s, transform 0.12s;
+            }
+
+            .scanner-remove-btn:hover {
+                background: rgba(0,0,0,0.04);
+                color: #dc3545;
+                transform: translateY(-1px);
+            }
+
+            .scanner-remove-checkbox {
+                width: 16px;
+                height: 16px;
+                cursor: pointer;
+            }
+
+            .scanner-question-item.marked-for-delete {
+                background: #fff5f5;
+                border-color: #f5c6cb;
+                box-shadow: 0 0 0 3px rgba(220,53,69,0.06);
             }
         `;
 
