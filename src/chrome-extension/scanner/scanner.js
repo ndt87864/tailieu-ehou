@@ -124,8 +124,6 @@
         // ===== MOODLE STRUCTURE =====
         const moodleQuestions = document.querySelectorAll('.que');
         if (moodleQuestions.length > 0) {
-            console.log('[Tailieu Scanner] Phát hiện cấu trúc Moodle:', moodleQuestions.length, 'câu hỏi');
-
             moodleQuestions.forEach((queContainer, index) => {
                 if (isExtensionElement(queContainer)) return;
 
@@ -139,12 +137,16 @@
                 // Tìm các đáp án
                 const answers = extractAnswersFromContainer(queContainer);
 
+                // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích
+                const hasTickedAnswer = answers.some(a => a.isTicked || a.isSelected || a.isCorrect);
+                if (!hasTickedAnswer) return;
+
                 questions.push({
                     index: index + 1,
                     question: questionText,
                     answers: answers,
                     element: qtextElement,
-                    type: 'moodle'
+                    type: 'câu hỏi'
                 });
             });
 
@@ -178,6 +180,10 @@
 
             // Tìm các đáp án gần đó
             const answers = findNearbyAnswers(element);
+
+            // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích
+            const hasTickedAnswer = answers.some(a => a.isTicked || a.isSelected || a.isCorrect);
+            if (!hasTickedAnswer) return;
 
             questions.push({
                 index: questions.length + 1,
@@ -245,6 +251,15 @@
     function extractAnswersFromContainer(container) {
         const answers = [];
         const seen = new Set();
+        function isVisible(el) {
+            if (!el) return false;
+            try {
+                const style = window.getComputedStyle(el);
+                return style && style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+            } catch (e) {
+                return true;
+            }
+        }
 
         // Prefer dedicated answer containers but fall back to container itself
         const answerContainer = container.querySelector('.answer, .answers, .options, .choices') || container;
@@ -282,15 +297,91 @@
             seen.add(answerText);
 
             const input = el.querySelector('input[type="radio"], input[type="checkbox"]');
-            const isSelected = !!(input?.checked || el.classList.contains('checked') || el.querySelector('input:checked'));
             const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+            const isIncorrect = el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
+            
+            const isTicked = (() => {
+                try {
+                    const text = el.textContent || '';
+                    const classList = (el.className || '') + ' ' + (el.querySelector?.('*')?.className || '');
+                    
+                    // BƯỚC 1: Loại trừ ngay nếu có dấu X hoặc incorrect
+                    if (isIncorrect) return false;
+                    if (/[✗×❌]/.test(text) && !/[✓✔]/.test(text)) return false;
+                    if (/\b(incorrect|wrong|false|error)\b/i.test(classList)) return false;
+                    if (el.querySelector('.fa-times, .fa-close, .glyphicon-remove, .icon-wrong, .icon-incorrect, .icon-error')) return false;
+                    
+                    // BƯỚC 2: Kiểm tra CSS styles (viền xanh, background xanh)
+                    // BỎ QUA kiểm tra màu CSS vì có thể tất cả đáp án đều có viền xanh
+                    
+                    // BƯỚC 2: ƯU TIÊN tìm dấu tick thật sự (ký tự, icon, SVG)
+                    // Kiểm tra ký tự tick trong nội dung
+                    if (/[✓✔✅]/.test(text)) {
+                        console.log('[Scanner] Phát hiện ký tự tick:', label, answerText.substring(0, 50));
+                        return true;
+                    }
+                    
+                    // Kiểm tra SVG hoặc img có chứa tick/check
+                    const svgs = el.querySelectorAll('svg, img, i, span[class*="icon"]');
+                    for (const icon of svgs) {
+                        const iconClass = icon.className?.baseVal || icon.className || '';
+                        const iconSrc = icon.src || icon.getAttribute('xlink:href') || '';
+                        const iconContent = icon.textContent || '';
+                        
+                        // Kiểm tra class có chứa check/tick/ok
+                        if (/\b(check|tick|correct|ok|success|selected)\b/i.test(iconClass)) {
+                            console.log('[Scanner] Phát hiện icon tick qua class:', label, iconClass);
+                            return true;
+                        }
+                        
+                        // Kiểm tra src có chứa check/tick
+                        if (/check|tick|correct|ok/i.test(iconSrc)) {
+                            console.log('[Scanner] Phát hiện icon tick qua src:', label, iconSrc);
+                            return true;
+                        }
+                        
+                        // Kiểm tra nội dung icon có ký tự tick
+                        if (/[✓✔✅]/.test(iconContent)) {
+                            console.log('[Scanner] Phát hiện ký tự tick trong icon:', label);
+                            return true;
+                        }
+                    }
+                    
+                    // Kiểm tra FontAwesome/Glyphicon classes
+                    if (el.querySelector('.fa-check, .fa-check-circle, .glyphicon-ok, .glyphicon-ok-circle, .icon-checked, .tick-icon, .icon-correct, .icon-ok')) {
+                        console.log('[Scanner] Phát hiện icon class tick:', label);
+                        return true;
+                    }
+                    
+                    // BƯỚC 3: Kiểm tra input checkbox/radio được checked
+                    if (input?.checked) {
+                        console.log('[Scanner] Phát hiện input checked:', label);
+                        return true;
+                    }
+                    
+                    // BƯỚC 4: Kiểm tra aria và class correct (BỎ QUA CSS màu)
+                    if (el.querySelector('[aria-checked="true"]')) return true;
+                    // BỎ QUA isCorrect và classList check vì không đáng tin
+                    // if (isCorrect) return true;
+                    // if (/\b(correct|right)\b/i.test(classList)) return true;
+                    
+                } catch (e) {
+                    console.error('[Scanner] Lỗi khi kiểm tra tick:', e);
+                }
+                return false;
+            })();
+            
+            const isSelected = isTicked;
+            
+            
 
             answers.push({
                 label: label || '',
                 text: answerText,
                 fullText: text,
                 isSelected: isSelected,
-                isCorrect: isCorrect
+                isCorrect: isCorrect,
+                isTicked: isTicked
             });
         });
 
@@ -309,7 +400,56 @@
                     text: text,
                     fullText: text,
                     isSelected: !!input.checked,
-                    isCorrect: false
+                    isCorrect: false,
+                    isTicked: !!input.checked
+                });
+            });
+        }
+
+        // Extra fallback: if still too few answers (or only detected selected ones), do a broader search
+        if (answers.length <= 1) {
+            const fallbackEls = answerContainer.querySelectorAll('label, li, .option, .answer, .choice, .choice-text, .answertext, div');
+            fallbackEls.forEach((el) => {
+                if (!el || isExtensionElement(el) || !isVisible(el)) return;
+                const text = getElementVisibleText(el);
+                if (!text || text.length > 500) return;
+
+                // Extract label if present
+                const labelMatch = text.match(/^([A-Da-d])[\.\)\:\s]+/);
+                let label = '';
+                let answerText = text;
+                if (labelMatch) {
+                    label = labelMatch[1].toUpperCase();
+                    answerText = text.replace(labelMatch[0], '').trim();
+                }
+
+                answerText = normalizeText(answerText);
+                if (!answerText) return;
+                if (seen.has(answerText)) return;
+                seen.add(answerText);
+
+                // Try to find input state if exists
+                const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
+                const isSelected = !!(input?.checked || el.classList.contains('checked') || el.querySelector('input:checked'));
+                const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+                const isTicked = (() => {
+                    try {
+                        if (isSelected) return true;
+                        if (el.querySelector('[aria-checked="true"]')) return true;
+                        if (/check|tick|ok|selected|checked/i.test(el.className || '')) return true;
+                        if (/[✓✔]/.test(el.textContent || '')) return true;
+                        if (el.querySelector('.fa-check, .glyphicon-ok, .icon-checked, .tick-icon')) return true;
+                    } catch (e) {}
+                    return false;
+                })();
+
+                answers.push({
+                    label: label || '',
+                    text: answerText,
+                    fullText: text,
+                    isSelected: isSelected,
+                    isCorrect: isCorrect,
+                    isTicked: isTicked
                 });
             });
         }
@@ -347,14 +487,91 @@
             if (seen.has(answerText)) return;
             seen.add(answerText);
 
+            const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
+            const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+            const isIncorrect = el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
+            
+            const isTicked = (() => {
+                try {
+                    const text = el.textContent || '';
+                    const classList = el.className || '';
+                    
+                    // BƯỚC 1: Loại trừ ngay nếu có dấu X hoặc incorrect
+                    if (isIncorrect) return false;
+                    if (/[✗×❌]/.test(text) && !/[✓✔]/.test(text)) return false;
+                    if (/\b(incorrect|wrong|false|error)\b/i.test(classList)) return false;
+                    if (el.querySelector('.fa-times, .fa-close, .glyphicon-remove, .icon-wrong, .icon-incorrect, .icon-error')) return false;
+                    
+                    // BƯỚC 2: ƯU TIÊN tìm dấu tick thật sự
+                    if (/[✓✔✅]/.test(text)) return true;
+                    
+                    const svgs = el.querySelectorAll('svg, img, i, span[class*="icon"]');
+                    for (const icon of svgs) {
+                        const iconClass = icon.className?.baseVal || icon.className || '';
+                        const iconSrc = icon.src || icon.getAttribute('xlink:href') || '';
+                        const iconContent = icon.textContent || '';
+                        
+                        if (/\b(check|tick|correct|ok|success|selected)\b/i.test(iconClass)) return true;
+                        if (/check|tick|correct|ok/i.test(iconSrc)) return true;
+                        if (/[✓✔✅]/.test(iconContent)) return true;
+                    }
+                    
+                    if (el.querySelector('.fa-check, .fa-check-circle, .glyphicon-ok, .glyphicon-ok-circle, .icon-checked, .tick-icon, .icon-correct, .icon-ok')) return true;
+                    if (input?.checked) return true;
+                    if (el.querySelector('[aria-checked="true"]')) return true;
+                    if (isCorrect) return true;
+                    if (/\b(correct|right)\b/i.test(classList)) return true;
+                    
+                } catch (e) {}
+                return false;
+            })();
+            
+            const isSelected = isTicked;
+
             answers.push({
                 label: label || String.fromCharCode(65 + idx),
                 text: answerText,
                 fullText: text,
-                isSelected: false,
-                isCorrect: false
+                isSelected: isSelected,
+                isCorrect: isCorrect,
+                isTicked: isTicked
             });
         });
+
+        // If too few candidates were found, do a deeper scan inside the container
+        if (answers.length <= 1) {
+            const fallbackEls = container.querySelectorAll('label, li, .option, .answer, .choice, [role="option"], div');
+            fallbackEls.forEach((el, idx) => {
+                if (!el || el === questionElement || isExtensionElement(el)) return;
+                const text = getElementVisibleText(el);
+                if (!text || text.length > 500) return;
+
+                const labelMatch = text.match(/^([A-Da-d])[\.\)\:\s]+/);
+                let label = '';
+                let answerText = text;
+                if (labelMatch) {
+                    label = labelMatch[1].toUpperCase();
+                    answerText = text.replace(labelMatch[0], '').trim();
+                }
+
+                answerText = normalizeText(answerText);
+                if (!answerText) return;
+                if (seen.has(answerText)) return;
+                seen.add(answerText);
+
+                const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
+                const isSelected = !!(input?.checked || el.classList.contains('checked') || el.querySelector('input:checked'));
+                const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+
+                answers.push({
+                    label: label || String.fromCharCode(65 + idx),
+                    text: answerText,
+                    fullText: text,
+                    isSelected: isSelected,
+                    isCorrect: isCorrect
+                });
+            });
+        }
 
         return answers;
     }
@@ -488,10 +705,19 @@
     }
 
     function createQuestionItemHTML(q) {
-        const answersHTML = q.answers.length > 0 
+        // Chỉ hiển thị đáp án có tick thật (không phải X)
+        const visibleAnswers = q.answers.filter(a => a.isTicked === true);
+        
+        // Debug log
+        if (visibleAnswers.length === 0) {
+            console.warn('[Scanner] Câu hỏi không có đáp án ticked:', q.question, q.answers);
+        }
+        
+        const answersToRender = visibleAnswers.length > 0 ? visibleAnswers : [];
+        const answersHTML = answersToRender.length > 0
             ? `<div class="scanner-answers">
-                ${q.answers.map(a => `
-                    <div class="scanner-answer ${a.isSelected ? 'selected' : ''} ${a.isCorrect ? 'correct' : ''}">
+                ${answersToRender.map(a => `
+                    <div class="scanner-answer ${a.isSelected ? 'selected' : ''} ${a.isCorrect ? 'correct' : ''} ${a.isTicked ? 'ticked' : ''}">
                         <span class="answer-label">${a.label || '•'}</span>
                         <span class="answer-text">${escapeHTML(a.text)}</span>
                     </div>
