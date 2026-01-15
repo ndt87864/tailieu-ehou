@@ -1,7 +1,7 @@
 // Scanner Module - Quét câu hỏi và đáp án trên trang
 // Tạo button kính lúp và popup hiển thị kết quả
 
-(function() {
+(function () {
     'use strict';
 
     // Tránh load nhiều lần
@@ -299,81 +299,81 @@
             const input = el.querySelector('input[type="radio"], input[type="checkbox"]');
             const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
             const isIncorrect = el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
-            
+
             const isTicked = (() => {
                 try {
                     const text = el.textContent || '';
                     const classList = (el.className || '') + ' ' + (el.querySelector?.('*')?.className || '');
-                    
+
                     // BƯỚC 1: Loại trừ ngay nếu có dấu X hoặc incorrect
                     if (isIncorrect) return false;
                     if (/[✗×❌]/.test(text) && !/[✓✔]/.test(text)) return false;
                     if (/\b(incorrect|wrong|false|error)\b/i.test(classList)) return false;
                     if (el.querySelector('.fa-times, .fa-close, .glyphicon-remove, .icon-wrong, .icon-incorrect, .icon-error')) return false;
-                    
+
                     // BƯỚC 2: Kiểm tra CSS styles (viền xanh, background xanh)
                     // BỎ QUA kiểm tra màu CSS vì có thể tất cả đáp án đều có viền xanh
-                    
+
                     // BƯỚC 2: ƯU TIÊN tìm dấu tick thật sự (ký tự, icon, SVG)
                     // Kiểm tra ký tự tick trong nội dung
                     if (/[✓✔✅]/.test(text)) {
                         console.log('[Scanner] Phát hiện ký tự tick:', label, answerText.substring(0, 50));
                         return true;
                     }
-                    
+
                     // Kiểm tra SVG hoặc img có chứa tick/check
                     const svgs = el.querySelectorAll('svg, img, i, span[class*="icon"]');
                     for (const icon of svgs) {
                         const iconClass = icon.className?.baseVal || icon.className || '';
                         const iconSrc = icon.src || icon.getAttribute('xlink:href') || '';
                         const iconContent = icon.textContent || '';
-                        
+
                         // Kiểm tra class có chứa check/tick/ok
                         if (/\b(check|tick|correct|ok|success|selected)\b/i.test(iconClass)) {
                             console.log('[Scanner] Phát hiện icon tick qua class:', label, iconClass);
                             return true;
                         }
-                        
+
                         // Kiểm tra src có chứa check/tick
                         if (/check|tick|correct|ok/i.test(iconSrc)) {
                             console.log('[Scanner] Phát hiện icon tick qua src:', label, iconSrc);
                             return true;
                         }
-                        
+
                         // Kiểm tra nội dung icon có ký tự tick
                         if (/[✓✔✅]/.test(iconContent)) {
                             console.log('[Scanner] Phát hiện ký tự tick trong icon:', label);
                             return true;
                         }
                     }
-                    
+
                     // Kiểm tra FontAwesome/Glyphicon classes
                     if (el.querySelector('.fa-check, .fa-check-circle, .glyphicon-ok, .glyphicon-ok-circle, .icon-checked, .tick-icon, .icon-correct, .icon-ok')) {
                         console.log('[Scanner] Phát hiện icon class tick:', label);
                         return true;
                     }
-                    
+
                     // BƯỚC 3: Kiểm tra input checkbox/radio được checked
                     if (input?.checked) {
                         console.log('[Scanner] Phát hiện input checked:', label);
                         return true;
                     }
-                    
+
                     // BƯỚC 4: Kiểm tra aria và class correct (BỎ QUA CSS màu)
                     if (el.querySelector('[aria-checked="true"]')) return true;
                     // BỎ QUA isCorrect và classList check vì không đáng tin
                     // if (isCorrect) return true;
                     // if (/\b(correct|right)\b/i.test(classList)) return true;
-                    
+
                 } catch (e) {
                     console.error('[Scanner] Lỗi khi kiểm tra tick:', e);
                 }
                 return false;
             })();
-            
+
             const isSelected = isTicked;
-            
-            
+
+
 
             answers.push({
                 label: label || '',
@@ -439,7 +439,7 @@
                         if (/check|tick|ok|selected|checked/i.test(el.className || '')) return true;
                         if (/[✓✔]/.test(el.textContent || '')) return true;
                         if (el.querySelector('.fa-check, .glyphicon-ok, .icon-checked, .tick-icon')) return true;
-                    } catch (e) {}
+                    } catch (e) { }
                     return false;
                 })();
 
@@ -490,42 +490,42 @@
             const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
             const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
             const isIncorrect = el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
-            
+
             const isTicked = (() => {
                 try {
                     const text = el.textContent || '';
                     const classList = el.className || '';
-                    
+
                     // BƯỚC 1: Loại trừ ngay nếu có dấu X hoặc incorrect
                     if (isIncorrect) return false;
                     if (/[✗×❌]/.test(text) && !/[✓✔]/.test(text)) return false;
                     if (/\b(incorrect|wrong|false|error)\b/i.test(classList)) return false;
                     if (el.querySelector('.fa-times, .fa-close, .glyphicon-remove, .icon-wrong, .icon-incorrect, .icon-error')) return false;
-                    
+
                     // BƯỚC 2: ƯU TIÊN tìm dấu tick thật sự
                     if (/[✓✔✅]/.test(text)) return true;
-                    
+
                     const svgs = el.querySelectorAll('svg, img, i, span[class*="icon"]');
                     for (const icon of svgs) {
                         const iconClass = icon.className?.baseVal || icon.className || '';
                         const iconSrc = icon.src || icon.getAttribute('xlink:href') || '';
                         const iconContent = icon.textContent || '';
-                        
+
                         if (/\b(check|tick|correct|ok|success|selected)\b/i.test(iconClass)) return true;
                         if (/check|tick|correct|ok/i.test(iconSrc)) return true;
                         if (/[✓✔✅]/.test(iconContent)) return true;
                     }
-                    
+
                     if (el.querySelector('.fa-check, .fa-check-circle, .glyphicon-ok, .glyphicon-ok-circle, .icon-checked, .tick-icon, .icon-correct, .icon-ok')) return true;
                     if (input?.checked) return true;
                     if (el.querySelector('[aria-checked="true"]')) return true;
                     if (isCorrect) return true;
                     if (/\b(correct|right)\b/i.test(classList)) return true;
-                    
-                } catch (e) {}
+
+                } catch (e) { }
                 return false;
             })();
-            
+
             const isSelected = isTicked;
 
             answers.push({
@@ -602,8 +602,8 @@
         // Tạo popup
         scannerPopup = document.createElement('div');
         scannerPopup.id = 'tailieu-scanner-popup';
-        
-        const questionsHTML = questions.length > 0 
+
+        const questionsHTML = questions.length > 0
             ? questions.map(q => createQuestionItemHTML(q)).join('')
             : '<div class="scanner-empty">Không tìm thấy câu hỏi nào trên trang này.</div>';
 
@@ -660,6 +660,14 @@
                     </svg>
                     Highlight trên trang
                 </button>
+                <button class="scanner-btn scanner-btn-primary" id="scanner-add-db" style="background: linear-gradient(135deg, #10B981, #059669);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Thêm vào DB
+                </button>
             </div>
         `;
 
@@ -697,7 +705,7 @@
         });
 
         scannerPopup.querySelector('.scanner-close-btn').addEventListener('click', closeScannerPopup);
-        
+
         scannerPopup.querySelector('#scanner-copy-all').addEventListener('click', () => {
             copyAllQuestions(questions);
         });
@@ -705,6 +713,10 @@
         scannerPopup.querySelector('#scanner-highlight-all').addEventListener('click', () => {
             highlightAllQuestions(questions);
             closeScannerPopup();
+        });
+
+        scannerPopup.querySelector('#scanner-add-db').addEventListener('click', () => {
+            handleAddToDB(questions);
         });
 
         // Click vào câu hỏi để scroll đến
@@ -1018,12 +1030,12 @@
     function createQuestionItemHTML(q) {
         // Chỉ hiển thị đáp án có tick thật (không phải X)
         const visibleAnswers = q.answers.filter(a => a.isTicked === true);
-        
+
         // Debug log
         if (visibleAnswers.length === 0) {
             console.warn('[Scanner] Câu hỏi không có đáp án ticked:', q.question, q.answers);
         }
-        
+
         const answersToRender = visibleAnswers.length > 0 ? visibleAnswers : [];
         const answersHTML = answersToRender.length > 0
             ? `<div class="scanner-answers">
@@ -1114,7 +1126,7 @@
         element.style.backgroundColor = '#fff3cd';
         element.style.boxShadow = '0 0 0 3px #ffc107';
         element.style.borderRadius = '4px';
-        
+
         setTimeout(() => {
             element.style.backgroundColor = '';
             element.style.boxShadow = '';
@@ -1128,7 +1140,7 @@
 
         const notification = document.createElement('div');
         notification.id = 'tailieu-scanner-notification';
-        
+
         const colors = {
             success: { bg: '#d4edda', border: '#28a745', text: '#155724' },
             error: { bg: '#f8d7da', border: '#dc3545', text: '#721c24' },
@@ -1477,9 +1489,143 @@
                 border-color: #f5c6cb;
                 box-shadow: 0 0 0 3px rgba(220,53,69,0.06);
             }
+
+            .status-badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: 600;
+                margin-left: 8px;
+            }
+            .status-badge.processing { background: #e3f2fd; color: #2196f3; }
+            .status-badge.exists { background: #fff3cd; color: #856404; }
+            .status-badge.success { background: #d4edda; color: #155724; }
+            .status-badge.error { background: #f8d7da; color: #721c24; }
         `;
 
         document.head.appendChild(styles);
+    }
+
+
+    // ==================== DB INTEGRATION LOGIC ====================
+    // Helper: send runtime message with retries when port closes unexpectedly
+    function sendMessageWithRetries(message, maxRetries = 3, delay = 500) {
+        let attempt = 0;
+        return new Promise((resolve, reject) => {
+            function trySend() {
+                attempt++;
+                try {
+                    chrome.runtime.sendMessage(message, (res) => {
+                        if (chrome.runtime.lastError) {
+                            const errMsg = String(chrome.runtime.lastError.message || chrome.runtime.lastError);
+                            // If port closed, we can retry a few times
+                            if (errMsg.includes('The message port closed before a response was received') && attempt <= maxRetries) {
+                                console.warn('[Scanner] Message port closed, retrying', attempt, 'of', maxRetries);
+                                setTimeout(trySend, delay * attempt);
+                                return;
+                            }
+                            return reject(new Error(errMsg));
+                        }
+                        resolve(res);
+                    });
+                } catch (e) {
+                    if (attempt <= maxRetries) {
+                        setTimeout(trySend, delay * attempt);
+                    } else {
+                        reject(e);
+                    }
+                }
+            }
+            trySend();
+        });
+    }
+
+    async function handleAddToDB(questions) {
+        const btn = document.getElementById('scanner-add-db');
+        if (!btn) return;
+
+        // Disable button
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="scanner-spin">⟳</span> Đang xử lý...`;
+
+        // Reset status badges
+        questions.forEach(q => {
+            const item = scannerPopup.querySelector(`.scanner-question-item[data-index="${q.index}"]`);
+            if (item) {
+                const oldBadge = item.querySelector('.status-badge');
+                if (oldBadge) oldBadge.remove();
+            }
+        });
+
+        try {
+            // Send to background script
+            console.log('[Scanner] Sending batchAddQuestionsToDB message');
+            const response = await sendMessageWithRetries({ action: 'batchAddQuestionsToDB', questions: questions }, 3, 600);
+
+            if (!response || !response.success) {
+                throw new Error(response?.error || 'Unknown error');
+            }
+
+            const results = response.results || [];
+            let addedCount = 0;
+            let existsCount = 0;
+            let errorCount = 0;
+
+            // Update UI based on results
+            // We assume results are ordered or we can match by index if preserved
+            // The background script should return results for each question
+
+            // If background script blindly processes, we map results to questions.
+            // Let's assume the background script returns an array of { index, status, message }
+
+            results.forEach(res => {
+                const qIndex = res.index;
+                const status = res.status;
+                const msg = res.message;
+
+                if (status === 'success') addedCount++;
+                else if (status === 'exists') existsCount++;
+                else errorCount++;
+
+                updateItemStatus(qIndex, status, msg);
+            });
+
+            showNotification(`Hoàn tất! Thêm mới: ${addedCount}, Đã có: ${existsCount}, Lỗi: ${errorCount}`, 'success');
+
+        } catch (error) {
+            console.error('Batch error:', error);
+            showNotification('Lỗi: ' + error.message, 'error');
+
+            // Mark all as error if batch failed completely
+            questions.forEach(q => updateItemStatus(q.index, 'error', 'Lỗi kết nối'));
+        } finally {
+            // Restore button
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> Đã xong`;
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }, 3000);
+        }
+    }
+
+    function updateItemStatus(index, status, message) {
+        if (!scannerPopup) return;
+        const item = scannerPopup.querySelector(`.scanner-question-item[data-index="${index}"]`);
+        if (!item) return;
+
+        let badge = item.querySelector('.status-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'status-badge';
+            // Insert before edit button or in header
+            const header = item.querySelector('.scanner-question-header > div:first-child');
+            if (header) header.appendChild(badge);
+        }
+
+        badge.className = `status-badge ${status}`;
+        badge.textContent = message;
     }
 
     // ==================== INITIALIZE ====================
