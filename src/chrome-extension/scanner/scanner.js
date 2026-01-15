@@ -1560,9 +1560,25 @@
         });
 
         try {
+            // Get currently selected document(s) from extension storage (popup saves selected documents under this key)
+            const selectedDocId = await new Promise((resolve) => {
+                try {
+                    chrome.storage.local.get(['tailieu_selected_documents'], (res) => {
+                        const val = res && res.tailieu_selected_documents;
+                        if (Array.isArray(val) && val.length) resolve(val[0]);
+                        else resolve(val || null);
+                    });
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+
+            // Attach documentId to each question if available
+            const payloadQuestions = (questions || []).map(q => ({ ...q, documentId: selectedDocId }));
+
             // Send to background script
-            console.log('[Scanner] Sending batchAddQuestionsToDB message');
-            const response = await sendMessageWithRetries({ action: 'batchAddQuestionsToDB', questions: questions }, 3, 600);
+            console.log('[Scanner] Sending batchAddQuestionsToDB message, documentId=', selectedDocId);
+            const response = await sendMessageWithRetries({ action: 'batchAddQuestionsToDB', questions: payloadQuestions }, 3, 600);
 
             if (!response || !response.success) {
                 throw new Error(response?.error || 'Unknown error');
@@ -1591,8 +1607,19 @@
 
                 updateItemStatus(qIndex, status, msg);
             });
+            // Include document/category info in overall notification when available
+            let extraInfo = '';
+            if (results && results.length) {
+                const anyWithDoc = results.find(r => r.documentTitle || r.categoryTitle || r.documentId);
+                if (anyWithDoc) {
+                    const d = anyWithDoc.documentTitle || anyWithDoc.documentId || '';
+                    const c = anyWithDoc.categoryTitle || '';
+                    extraInfo = d ? ` trong tài liệu: ${d}` : '';
+                    if (c) extraInfo += ` (danh mục: ${c})`;
+                }
+            }
 
-            showNotification(`Hoàn tất! Thêm mới: ${addedCount}, Đã có: ${existsCount}, Lỗi: ${errorCount}`, 'success');
+            showNotification(`Hoàn tất! Thêm mới: ${addedCount}, Đã có: ${existsCount}, Lỗi: ${errorCount}${extraInfo}`, 'success');
 
         } catch (error) {
             console.error('Batch error:', error);

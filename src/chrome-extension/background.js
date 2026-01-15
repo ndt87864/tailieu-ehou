@@ -65,15 +65,50 @@ async function handleBatchAddQuestions(questions) {
 
     for (const q of questions) {
         try {
-            // Check exists
-            const exists = await checkQuestionExists(db, q.question);
+            // Prepare document/category metadata (for better messages)
+            const docId = q.documentId || null;
+            let documentTitle = null;
+            let categoryId = null;
+            let categoryTitle = null;
+
+            if (docId) {
+                try {
+                    const docSnap = await db.collection('documents').doc(docId).get();
+                    if (docSnap.exists) {
+                        const docData = docSnap.data();
+                        documentTitle = docData.title || null;
+                        categoryId = docData.categoryId || null;
+                    }
+                } catch (e) {
+                    console.warn('[Background] Unable to read document metadata for', docId, e.message || e);
+                }
+            }
+
+            if (categoryId) {
+                try {
+                    const catSnap = await db.collection('categories').doc(categoryId).get();
+                    if (catSnap.exists) {
+                        categoryTitle = (catSnap.data() && catSnap.data().title) || null;
+                    }
+                } catch (e) {
+                    console.warn('[Background] Unable to read category metadata for', categoryId, e.message || e);
+                }
+            }
+
+            // Prefer checking existence within the same document if provided
+            const exists = await checkQuestionExists(db, q.question, docId);
 
             if (exists) {
-                results.push({ index: q.index, status: 'exists', message: 'Đã có trong DB' });
+                results.push({ index: q.index, status: 'exists', message: `Đã có trong DB`, documentId: docId, documentTitle, categoryId, categoryTitle });
             } else {
-                // Add
+                // Add (will attach documentId/categoryId if possible)
                 await addQuestionToDB(db, q);
-                results.push({ index: q.index, status: 'success', message: 'Đã thêm' });
+                const msgParts = [];
+                if (documentTitle) msgParts.push(`tài liệu: "${documentTitle}"`);
+                else if (docId) msgParts.push(`tài liệuId: ${docId}`);
+                if (categoryTitle) msgParts.push(`danh mục: "${categoryTitle}"`);
+                const msg = msgParts.length ? `Đã thêm vào ${msgParts.join(' / ')}` : 'Đã thêm';
+                results.push({ index: q.index, status: 'success', message: msg, documentId: docId, documentTitle, categoryId, categoryTitle });
             }
         } catch (error) {
             console.error('Error processing question', q.index, error);
@@ -84,9 +119,12 @@ async function handleBatchAddQuestions(questions) {
 }
 
 // Check if question exists in Firestore
-async function checkQuestionExists(db, questionText) {
-    const q = db.collection('questions').where('question', '==', questionText.trim());
-    const snapshot = await q.get();
+async function checkQuestionExists(db, questionText, documentId = null) {
+    let queryRef = db.collection('questions').where('question', '==', questionText.trim());
+    if (documentId) {
+        queryRef = queryRef.where('documentId', '==', documentId);
+    }
+    const snapshot = await queryRef.get();
     return !snapshot.empty;
 }
 
@@ -108,6 +146,20 @@ async function addQuestionToDB(db, questionObj) {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         source: 'scanner_extension'
     };
+
+    // Attach documentId if caller provided it
+    if (questionObj.documentId) {
+        data.documentId = questionObj.documentId;
+        try {
+            const docSnap = await db.collection('documents').doc(questionObj.documentId).get();
+            if (docSnap.exists) {
+                const docData = docSnap.data();
+                if (docData && docData.categoryId) data.categoryId = docData.categoryId;
+            }
+        } catch (e) {
+            console.warn('[Background] Failed to fetch document for categoryId:', e.message || e);
+        }
+    }
 
     await db.collection('questions').add(data);
     return true;
