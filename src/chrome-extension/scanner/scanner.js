@@ -745,8 +745,8 @@
         // Click into question to scroll
         scannerPopup.querySelectorAll('.scanner-question-item').forEach((item, idx) => {
             item.addEventListener('click', (ev) => {
-                // avoid clicks that originated from remove controls
-                if (ev.target.closest('.scanner-remove-btn') || ev.target.closest('.scanner-remove-checkbox')) return;
+                // avoid clicks that originated from controls (remove, checkbox, edit, or edit form)
+                if (ev.target.closest('.scanner-remove-btn') || ev.target.closest('.scanner-remove-checkbox') || ev.target.closest('.scanner-edit-btn') || ev.target.closest('.scanner-edit-form')) return;
                 const dataIndex = Number(item.getAttribute('data-index'));
                 const question = questions.find(q => q.index === dataIndex) || questions[idx];
                 if (question && question.element) {
@@ -768,6 +768,19 @@
                 removeQuestionByIndex(idxValue);
                 // also clear from selection set
                 selectedForDelete.delete(Number(idxValue));
+            });
+        });
+
+        // Attach edit button handlers
+        scannerPopup.querySelectorAll('.scanner-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.scanner-question-item');
+                if (!item) return;
+                const idxValue = Number(item.getAttribute('data-index'));
+                const question = questions.find(q => q.index === idxValue);
+                if (!question) return;
+                openEditFormForItem(item, question);
             });
         });
 
@@ -820,6 +833,186 @@
                 showNotification('Đã xóa ' + toRemove.length + ' câu hỏi đã chọn', 'success');
             });
         }
+
+        // --- Edit form helpers ---
+        function openEditFormForItem(item, question) {
+            // prevent multiple forms
+            if (item.querySelector('.scanner-edit-form')) return;
+
+            const originalTextEl = item.querySelector('.scanner-question-text');
+            const answersContainer = item.querySelector('.scanner-answers');
+
+            const form = document.createElement('div');
+            form.className = 'scanner-edit-form';
+
+            // Question textarea
+            const ta = document.createElement('textarea');
+            ta.value = question.question || '';
+            form.appendChild(ta);
+
+            // Answers editor
+            const answersWrapper = document.createElement('div');
+            answersWrapper.className = 'edit-answers';
+
+            const answers = question.answers && question.answers.length ? question.answers : [];
+            answers.forEach((a, i) => {
+                const row = document.createElement('div');
+                row.className = 'edit-answer-row';
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.checked = !!a.isTicked;
+                chk.title = 'Đánh dấu là đáp án đã tick';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = a.text || '';
+                input.placeholder = 'Nội dung đáp án';
+
+                const lbl = document.createElement('div');
+                lbl.style.minWidth = '20px';
+                lbl.style.fontWeight = '600';
+                lbl.style.color = '#667eea';
+                lbl.textContent = a.label || String.fromCharCode(65 + i);
+
+                row.appendChild(lbl);
+                row.appendChild(chk);
+                row.appendChild(input);
+                answersWrapper.appendChild(row);
+            });
+
+            // allow adding one more answer row
+            const addRowBtn = document.createElement('button');
+            addRowBtn.type = 'button';
+            addRowBtn.textContent = '+ Thêm đáp án';
+            Object.assign(addRowBtn.style, { alignSelf: 'flex-start', padding: '6px 8px', borderRadius: '6px', cursor: 'pointer' });
+            addRowBtn.addEventListener('click', () => {
+                const idx = answersWrapper.querySelectorAll('.edit-answer-row').length;
+                const row = document.createElement('div');
+                row.className = 'edit-answer-row';
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = 'Nội dung đáp án';
+                const lbl = document.createElement('div');
+                lbl.style.minWidth = '20px';
+                lbl.style.fontWeight = '600';
+                lbl.style.color = '#667eea';
+                lbl.textContent = String.fromCharCode(65 + idx);
+                row.appendChild(lbl);
+                row.appendChild(chk);
+                row.appendChild(input);
+                answersWrapper.appendChild(row);
+            });
+
+            form.appendChild(answersWrapper);
+            form.appendChild(addRowBtn);
+
+            // Actions
+            const actions = document.createElement('div');
+            actions.className = 'scanner-edit-actions';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'scanner-btn scanner-btn-primary';
+            saveBtn.textContent = 'Lưu';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'scanner-btn scanner-btn-secondary';
+            cancelBtn.textContent = 'Hủy';
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(saveBtn);
+            form.appendChild(actions);
+
+            item.appendChild(form);
+
+            cancelBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                form.remove();
+            });
+
+            saveBtn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                // collect values
+                const newQ = ta.value.trim();
+                const rows = answersWrapper.querySelectorAll('.edit-answer-row');
+                const newAnswers = [];
+                rows.forEach((r, i) => {
+                    const txt = (r.querySelector('input[type="text"]')?.value || '').trim();
+                    if (!txt) return;
+                    const checked = !!r.querySelector('input[type="checkbox"]')?.checked;
+                    newAnswers.push({
+                        label: r.querySelector('div')?.textContent || String.fromCharCode(65 + i),
+                        text: txt,
+                        fullText: txt,
+                        isSelected: checked,
+                        isCorrect: false,
+                        isTicked: checked
+                    });
+                });
+
+                // update data model
+                const qObj = questions.find(q => q.index === question.index);
+                if (qObj) {
+                    qObj.question = newQ || qObj.question;
+                    qObj.answers = newAnswers.length ? newAnswers : qObj.answers;
+                }
+
+                // update DOM: question text
+                if (originalTextEl) originalTextEl.innerHTML = escapeHTML(qObj.question);
+
+                // update answers list using DOM nodes to avoid accidental HTML injection/DOM reflow
+                // remove any existing .scanner-answers inside this item, then append newly built container
+                (function rebuildAnswersInItem() {
+                    // ensure we're working with the popup item DOM only
+                    const itemRoot = item;
+                    if (!itemRoot) return;
+
+                    // build new answers container
+                    const newAnswersEl = document.createElement('div');
+                    newAnswersEl.className = 'scanner-answers';
+
+                    // only render answers that are marked as ticked
+                    (qObj.answers || []).filter(a => !!a.isTicked).forEach(a => {
+                        const aDiv = document.createElement('div');
+                        const classes = ['scanner-answer'];
+                        if (a.isSelected) classes.push('selected');
+                        if (a.isCorrect) classes.push('correct');
+                        if (a.isTicked) classes.push('ticked');
+                        aDiv.className = classes.join(' ');
+
+                        const lbl = document.createElement('span');
+                        lbl.className = 'answer-label';
+                        lbl.textContent = a.label || '•';
+
+                        const txt = document.createElement('span');
+                        txt.className = 'answer-text';
+                        txt.innerHTML = escapeHTML(a.text || '');
+
+                        aDiv.appendChild(lbl);
+                        aDiv.appendChild(txt);
+                        newAnswersEl.appendChild(aDiv);
+                    });
+
+                    // remove any existing answer containers inside the popup item
+                    const existingContainers = itemRoot.querySelectorAll('.scanner-answers');
+                    existingContainers.forEach(c => c.remove());
+
+                    // append newAnswersEl if it has children
+                    if (newAnswersEl.children.length > 0) {
+                        // append after question text
+                        const textEl = itemRoot.querySelector('.scanner-question-text');
+                        if (textEl && textEl.parentNode) {
+                            textEl.insertAdjacentElement('afterend', newAnswersEl);
+                        } else {
+                            itemRoot.appendChild(newAnswersEl);
+                        }
+                    }
+                })();
+
+                // remove form
+                form.remove();
+                showNotification('Đã lưu sửa đổi', 'success');
+            });
+        }
     }
 
     function createQuestionItemHTML(q) {
@@ -851,12 +1044,20 @@
                         <span class="question-number">Câu ${q.index}</span>
                         <span class="question-type">${q.type}</span>
                     </div>
-                    <button class="scanner-remove-btn" title="Xóa câu hỏi">
+                    <div style="display:flex; gap:6px; align-items:center">
+                        <button class="scanner-edit-btn" title="Sửa câu hỏi">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="scanner-remove-btn" title="Xóa câu hỏi">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 6 6 18"></path>
                             <path d="m6 6 12 12"></path>
                         </svg>
-                    </button>
+                        </button>
+                    </div>
                 </div>
                 <div class="scanner-question-text">${escapeHTML(q.question)}</div>
                 ${answersHTML}
@@ -1200,6 +1401,69 @@
                 background: rgba(0,0,0,0.04);
                 color: #dc3545;
                 transform: translateY(-1px);
+            }
+
+            .scanner-edit-btn {
+                background: transparent;
+                border: none;
+                width: 32px;
+                height: 32px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                color: #6c757d;
+                border-radius: 6px;
+                transition: background 0.12s, color 0.12s, transform 0.12s;
+            }
+
+            .scanner-edit-btn:hover {
+                background: rgba(0,0,0,0.04);
+                color: #2b8cff;
+                transform: translateY(-1px);
+            }
+
+            .scanner-edit-form {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                padding: 8px 0;
+                background: #fffaf6;
+                border-radius: 8px;
+                border: 1px dashed #ffecb5;
+                margin-top: 8px;
+            }
+
+            .scanner-edit-form textarea {
+                width: 100%;
+                min-height: 64px;
+                padding: 8px;
+                font-size: 13px;
+            }
+
+            .scanner-edit-form .edit-answers {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .scanner-edit-form .edit-answer-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .scanner-edit-form input[type="text"] {
+                flex: 1;
+                padding: 6px 8px;
+                font-size: 13px;
+            }
+
+            .scanner-edit-actions {
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+                margin-top: 6px;
             }
 
             .scanner-remove-checkbox {
