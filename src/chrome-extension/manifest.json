@@ -24,7 +24,7 @@
         "https://learning.ehou.edu.vn/*",
         "https://tailieuehou.id.vn/editor"
       ],
-      "js": ["content.js"],
+      "js": ["content.js", "scanner/scanner.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
