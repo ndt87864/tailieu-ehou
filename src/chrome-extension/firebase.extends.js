@@ -15,26 +15,22 @@ const extendsFirebaseConfig = {
 let extendsApp, extendsDb, extendsAnalytics;
 
 function initializeFirebase() {
+  
   if (typeof firebase === 'undefined') {
-    throw new Error('Firebase chưa được load.');
+    throw new Error('Firebase chưa được load. Vui lòng đảm bảo Firebase SDK đã được load từ CDN.');
   }
-
+  
+  console.log('🔧 Config:', {
+    projectId: extendsFirebaseConfig.projectId,
+    authDomain: extendsFirebaseConfig.authDomain,
+    apiKey: extendsFirebaseConfig.apiKey.substring(0, 15) + '...'
+  });
+  
+  // Khởi tạo app Firebase riêng cho extends
   extendsApp = firebase.initializeApp(extendsFirebaseConfig, "extendsApp");
   extendsDb = firebase.firestore(extendsApp);
   extendsAnalytics = null;
-
-  // Try anonymous auth so extension has an auth context for rules/App Check fallback
-  if (firebase.auth && typeof firebase.auth === 'function') {
-    try {
-      firebase.auth().signInAnonymously().catch(err => console.warn('Anon sign-in failed', err));
-    } catch (e) { console.warn('Auth init error', e); }
-  }
-
-  // Expose AFTER initialization
-  window.extendsApp = extendsApp;
-  window.extendsDb = extendsDb;
-  window.extendsAnalytics = extendsAnalytics;
-
+  
   return { extendsApp, extendsDb, extendsAnalytics };
 }
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tailieu Questions - Tự động tìm đáp án câu hỏi",
-  "version": "1.1",
+  "version": "1.122",
   "description": "Tự động tìm và highlight đáp án đúng cho câu hỏi trắc nghiệm từ cơ sở dữ liệu Tailieu. Hỗ trợ học tập hiệu quả.",
   "homepage_url": "https://tailieuehou.id.vn",
   "privacy_policy": "https://tailieuehou.id.vn/privacy-policy",

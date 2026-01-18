@@ -1549,8 +1549,14 @@
                 }
             });
 
-            // Attach documentId to each question if available
-            const payloadQuestions = (questions || []).map(q => ({ ...q, documentId: selectedDocId }));
+            // Attach documentId and filter answers to only include ticked/selected ones
+            const payloadQuestions = (questions || []).map(q => {
+                const filteredAnswers = (q.answers || []).filter(a => !!a.isTicked || !!a.isSelected);
+                if (!filteredAnswers || filteredAnswers.length === 0) {
+                    console.warn('[Scanner] No ticked answers found for question index', q.index, '— payload will include empty answer list');
+                }
+                return { ...q, answers: filteredAnswers, documentId: selectedDocId };
+            });
 
             // Send to background script
             console.log('[Scanner] Sending batchAddQuestionsToDB message, documentId=', selectedDocId);
