@@ -119,7 +119,10 @@
     // ==================== SCAN QUESTIONS FROM PAGE ====================
     function scanQuestionsFromPage() {
         const questions = [];
-        const seenTexts = new Set();
+        // Use signatures (question text + answers) to dedupe so
+        // identical question text with different answer sets are kept
+        // as separate items.
+        const seenSignatures = new Set();
 
         // ===== MOODLE STRUCTURE =====
         const moodleQuestions = document.querySelectorAll('.que');
@@ -131,15 +134,20 @@
                 if (!qtextElement) return;
 
                 const questionText = qtextElement.textContent?.trim() || '';
-                if (questionText.length < 5 || seenTexts.has(questionText)) return;
-                seenTexts.add(questionText);
+                if (questionText.length < 5) return;
 
-                // Tìm các đáp án
+                // Tìm các đáp án (do dedupe phải bao gồm đáp án)
                 const answers = extractAnswersFromContainer(queContainer);
+                if (!answers || answers.length === 0) return;
 
                 // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích
                 const hasTickedAnswer = answers.some(a => a.isTicked || a.isSelected || a.isCorrect);
                 if (!hasTickedAnswer) return;
+
+                // Build signature using question text + normalized answer texts
+                const signature = cleanQuestionText(questionText) + '||' + answers.map(a => normalizeText(a.text)).join('||');
+                if (seenSignatures.has(signature)) return;
+                seenSignatures.add(signature);
 
                 questions.push({
                     index: index + 1,
@@ -171,19 +179,23 @@
             if (isExtensionElement(element)) return;
 
             const text = element.textContent?.trim() || '';
-            if (text.length < 10 || text.length > 1000 || seenTexts.has(text)) return;
+            if (text.length < 10 || text.length > 1000) return;
 
             // Kiểm tra có phải câu hỏi không
             if (!isQuestionLike(text)) return;
 
-            seenTexts.add(text);
-
             // Tìm các đáp án gần đó
             const answers = findNearbyAnswers(element);
+            if (!answers || answers.length === 0) return;
 
             // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích
             const hasTickedAnswer = answers.some(a => a.isTicked || a.isSelected || a.isCorrect);
             if (!hasTickedAnswer) return;
+
+            // Build signature and dedupe by full signature
+            const signature = cleanQuestionText(text) + '||' + answers.map(a => normalizeText(a.text)).join('||');
+            if (seenSignatures.has(signature)) return;
+            seenSignatures.add(signature);
 
             questions.push({
                 index: questions.length + 1,

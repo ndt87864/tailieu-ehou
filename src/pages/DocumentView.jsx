@@ -56,66 +56,15 @@ function DocumentView() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Tối ưu: chỉ load categories và document cần thiết khi vào trang
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
-    // Lấy categories
-    import("../firebase/categoryService.js").then(
-      ({ getAllCategories, getDocumentsByCategory }) => {
-        getAllCategories()
-          .then((cats) => {
-            if (!isMounted) return;
-            setCategories(cats || []);
-            // Tìm category từ slug
-            const cat = (cats || []).find((c) => c.slug === categorySlug);
-            setSelectedCategory(cat || null);
-            if (cat) {
-              // Lấy documents cho category này
-              getDocumentsByCategory(cat.id)
-                .then((docs) => {
-                  if (!isMounted) return;
-                  setDocuments(docs || []);
-                  // Tìm document từ slug
-                  const doc = (docs || []).find((d) => d.slug === documentSlug);
-                  setSelectedDocument(doc || null);
-                  setLoading(false);
-                })
-                .catch(() => setLoading(false));
-            } else {
-              setLoading(false);
-            }
-          })
-          .catch(() => {
-            setError("Không thể tải danh mục hoặc tài liệu.");
-            setLoading(false);
-          });
-      }
-    );
-    return () => {
-      isMounted = false;
-    };
-  }, [categorySlug, documentSlug]);
+  // Main Data Loading is now handled by the optimized effect below
 
-  // Khi đã có selectedDocument, lazy load questions khi cần
-  useEffect(() => {
-    if (!selectedDocument || !selectedDocument.id) return;
-    setQuestions([]);
-    import("../firebase/questionService.js").then(
-      ({ getQuestionsByDocument }) => {
-        getQuestionsByDocument(selectedDocument.id)
-          .then((qs) => setQuestions(qs || []))
-          .catch(() => setQuestions([]));
-      }
-    );
-  }, [selectedDocument]);
   const [openMain, setOpenMain] = useState(-1);
   const [search, setSearch] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1024
+    typeof window !== "undefined" ? window.innerWidth : 1024,
   );
+  const [showNoContentModal, setShowNoContentModal] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [excelPermission, setExcelPermission] = useState(null);
   const [permissionLoading, setPermissionLoading] = useState(true);
@@ -215,7 +164,7 @@ function DocumentView() {
       (q) =>
         (q.question &&
           q.question.toLowerCase().includes(search.toLowerCase())) ||
-        (q.answer && q.answer.toLowerCase().includes(search.toLowerCase()))
+        (q.answer && q.answer.toLowerCase().includes(search.toLowerCase())),
     );
   }, [questions, search]);
 
@@ -350,7 +299,7 @@ function DocumentView() {
 
         const result = await checkExcelDownloadPermission(
           userDataCache,
-          categories
+          categories,
         );
         if (result.allowed && userDataCache?.excelPercentage !== undefined) {
           result.percentage = userDataCache.excelPercentage;
@@ -386,9 +335,8 @@ function DocumentView() {
         setLoading(true);
         setError(null);
 
-        const documentViewOptimizer = await import(
-          "../utils/storage/documentViewOptimizer"
-        );
+        const documentViewOptimizer =
+          await import("../utils/storage/documentViewOptimizer");
         const startTime = performance.now();
 
         const [categoriesDataRaw] = await Promise.all([
@@ -442,7 +390,7 @@ function DocumentView() {
         const currentUser = userDataCache || user;
         const accessResult = checkVipDocumentAccess(
           currentUser,
-          docWithCategory
+          docWithCategory,
         );
         if (isCancelled) return;
         setVipAccessResult(accessResult);
@@ -464,7 +412,7 @@ function DocumentView() {
               isAdmin,
               isPuser,
               currentUser,
-              doc
+              doc,
             );
 
           if (!isCancelled) {
@@ -528,6 +476,48 @@ function DocumentView() {
     handleResize();
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Show the no-content modal when there are no questions to display.
+  // Make sure the overlay captures clicks so the sidebar doesn't receive them.
+  useEffect(() => {
+    if (
+      !loading &&
+      filteredQuestions.length === 0 &&
+      !viewState.viewLimitExceeded
+    ) {
+      setShowNoContentModal(true);
+      if (windowWidth < 770) setIsSidebarOpen(true);
+    } else {
+      setShowNoContentModal(false);
+    }
+  }, [
+    loading,
+    filteredQuestions.length,
+    viewState.viewLimitExceeded,
+    windowWidth,
+  ]);
+
+  // Ensure the sidebar accordion for the selected category is open
+  // when navigating between documents so the document list remains visible.
+  useEffect(() => {
+    if (
+      !selectedCategory ||
+      !Array.isArray(categories) ||
+      categories.length === 0
+    )
+      return;
+    const idx = categories.findIndex((c) => {
+      if (!c) return false;
+      if (selectedCategory.id && c.id) return c.id === selectedCategory.id;
+      if (selectedCategory.slug && c.slug)
+        return c.slug === selectedCategory.slug;
+      return c.title === selectedCategory.title;
+    });
+    if (idx !== -1) {
+      setOpenMain(idx);
+      if (windowWidth < 770) setIsSidebarOpen(true);
+    }
+  }, [selectedCategory?.id, selectedDocument?.id, categories, windowWidth]);
 
   useEffect(() => {
     if (!isAdmin && !isPuser) {
@@ -600,15 +590,14 @@ function DocumentView() {
       setLoading(true);
       setError(null);
 
-      const documentViewOptimizer = await import(
-        "../utils/storage/documentViewOptimizer"
-      );
+      const documentViewOptimizer =
+        await import("../utils/storage/documentViewOptimizer");
       documentViewOptimizer.clearQuestionsCache(selectedDocument.id);
 
       const currentUser = userDataCache || user;
       const accessResult = checkVipDocumentAccess(
         currentUser,
-        selectedDocument
+        selectedDocument,
       );
       setVipAccessResult(accessResult);
 
@@ -627,7 +616,7 @@ function DocumentView() {
             isAdmin,
             isPuser,
             currentUser,
-            selectedDocument
+            selectedDocument,
           );
 
         if (result.vipAccessDenied) {
@@ -677,12 +666,12 @@ function DocumentView() {
 
       if (downloadPercentage < 100) {
         const limitedCount = Math.floor(
-          filteredQuestions.length * (downloadPercentage / 100)
+          filteredQuestions.length * (downloadPercentage / 100),
         );
         dataToExport = filteredQuestions.slice(0, limitedCount);
         if (limitedCount < filteredQuestions.length) {
           alert(
-            `Tài khoản được tải ${downloadPercentage}% câu hỏi (${limitedCount}/${filteredQuestions.length} câu).`
+            `Tài khoản được tải ${downloadPercentage}% câu hỏi (${limitedCount}/${filteredQuestions.length} câu).`,
           );
         }
       }
@@ -699,14 +688,13 @@ function DocumentView() {
       XLSX.utils.book_append_sheet(
         workbook,
         worksheet,
-        documentTitle.substring(0, 30)
+        documentTitle.substring(0, 30),
       );
 
       const percentageSuffix =
         downloadPercentage < 100 ? `_${downloadPercentage}percent` : "";
-      const fileName = `${
-        selectedCategory?.title || "Category"
-      } - ${documentTitle}${percentageSuffix}.xlsx`;
+      const fileName = `${selectedCategory?.title || "Category"
+        } - ${documentTitle}${percentageSuffix}.xlsx`;
 
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
@@ -719,17 +707,15 @@ function DocumentView() {
   if (error) {
     return (
       <div
-        className={`min-h-screen ${
-          isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"
-        } flex items-center justify-center`}
+        className={`min-h-screen ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"
+          } flex items-center justify-center`}
       >
         <div className="text-center">
           <div
-            className={`${
-              isDarkMode
+            className={`${isDarkMode
                 ? "bg-red-900/30 border-red-700"
                 : "bg-red-100 border-red-400"
-            } border text-red-500 px-4 py-3 rounded relative`}
+              } border text-red-500 px-4 py-3 rounded relative`}
             role="alert"
           >
             <strong className="font-bold">Lỗi!</strong>
@@ -766,9 +752,8 @@ function DocumentView() {
       {showScreenshotWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
           <div
-            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
-              isDarkMode ? "bg-gray-800" : "bg-white"
-            }`}
+            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${isDarkMode ? "bg-gray-800" : "bg-white"
+              }`}
           >
             <div className="mb-4 flex justify-center">
               <svg
@@ -787,16 +772,14 @@ function DocumentView() {
               </svg>
             </div>
             <h3
-              className={`text-xl font-bold mb-2 ${
-                isDarkMode ? "text-red-400" : "text-red-600"
-              }`}
+              className={`text-xl font-bold mb-2 ${isDarkMode ? "text-red-400" : "text-red-600"
+                }`}
             >
               Cảnh báo bảo mật!
             </h3>
             <p
-              className={`${
-                isDarkMode ? "text-gray-300" : "text-gray-700"
-              } mb-2`}
+              className={`${isDarkMode ? "text-gray-300" : "text-gray-700"
+                } mb-2`}
             >
               Chụp ảnh màn hình đã bị phát hiện và bị cấm!
             </p>
@@ -815,16 +798,14 @@ function DocumentView() {
 
       <div className="flex min-h-screen w-full">
         <div
-          className={`theme-sidebar ${
-            windowWidth < 770
-              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${
-                  isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                }`
+          className={`theme-sidebar ${windowWidth < 770
+              ? `fixed inset-y-0 left-0 z-20 transition-all duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+              }`
               : "sticky top-0 h-screen z-10"
-          }`}
+            }`}
         >
           <Sidebar
-            sidebarData={loading ? [] : categories}
+            sidebarData={categories}
             documents={documents}
             openMain={openMain}
             setOpenMain={setOpenMain}
@@ -849,9 +830,8 @@ function DocumentView() {
         )}
 
         <div
-          className={`theme-content-container document-view-container flex-1 shadow-sm flex flex-col ${
-            isDarkMode ? "dark" : "light"
-          }`}
+          className={`theme-content-container document-view-container flex-1 shadow-sm flex flex-col ${isDarkMode ? "dark" : "light"
+            }`}
         >
           {windowWidth >= 770 && (
             <div className="w-full">
@@ -874,9 +854,8 @@ function DocumentView() {
           <div className="flex-1 flex flex-col">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4 px-4 mt-6">
               <p
-                className={`text-sm ${
-                  isDarkMode ? "text-gray-400" : "text-slate-500"
-                }`}
+                className={`text-sm ${isDarkMode ? "text-gray-400" : "text-slate-500"
+                  }`}
               >
                 {loading
                   ? ""
@@ -889,17 +868,16 @@ function DocumentView() {
                     disabled={
                       loading || !excelButtonState.enabled || permissionLoading
                     }
-                    className={`action-btn flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${
-                      !excelButtonState.enabled || permissionLoading
+                    className={`action-btn flex items-center gap-1 px-3 py-2 rounded-md text-white transition-colors ${!excelButtonState.enabled || permissionLoading
                         ? "bg-gray-400 cursor-not-allowed"
                         : "bg-green-600 hover:bg-green-700"
-                    }`}
+                      }`}
                     title={
                       loading
                         ? "Đang tải dữ liệu..."
                         : permissionLoading
-                        ? "Đang kiểm tra quyền truy cập..."
-                        : excelButtonState.reason
+                          ? "Đang kiểm tra quyền truy cập..."
+                          : excelButtonState.reason
                     }
                   >
                     {permissionLoading ? (
@@ -939,22 +917,19 @@ function DocumentView() {
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       disabled={loading}
-                      className={`w-full md:w-80 pl-12 pr-4 py-3 text-sm rounded-xl border-0 outline-none transition-all duration-300 ease-in-out shadow-lg backdrop-blur-md ${
-                        isDarkMode
+                      className={`w-full md:w-80 pl-12 pr-4 py-3 text-sm rounded-xl border-0 outline-none transition-all duration-300 ease-in-out shadow-lg backdrop-blur-md ${isDarkMode
                           ? "bg-gray-800/80 text-gray-100 placeholder-gray-400 border-gray-600/50 hover:bg-gray-700/90 hover:border-gray-500/70 focus:bg-gray-700/95 focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400/70"
                           : "bg-white/80 text-gray-900 placeholder-gray-500 border-gray-200/50 hover:bg-white/95 hover:border-gray-300/70 focus:bg-white focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400/70"
-                      } ${
-                        loading
+                        } ${loading
                           ? "opacity-50 cursor-not-allowed"
                           : "hover:shadow-xl focus:shadow-xl"
-                      }`}
+                        }`}
                     />
                     <div
-                      className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors duration-200 ${
-                        isDarkMode
+                      className={`absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors duration-200 ${isDarkMode
                           ? "text-gray-400 group-hover:text-gray-300"
                           : "text-gray-500 group-hover:text-gray-600"
-                      }`}
+                        }`}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -974,11 +949,10 @@ function DocumentView() {
                     {search && (
                       <button
                         onClick={() => setSearch("")}
-                        className={`absolute inset-y-0 right-0 pr-4 flex items-center transition-all duration-200 ${
-                          isDarkMode
+                        className={`absolute inset-y-0 right-0 pr-4 flex items-center transition-all duration-200 ${isDarkMode
                             ? "text-gray-400 hover:text-gray-200 hover:bg-gray-600/50"
                             : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/50"
-                        } rounded-r-xl`}
+                          } rounded-r-xl`}
                       >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -999,11 +973,10 @@ function DocumentView() {
                   </div>
                   {search && (
                     <div
-                      className={`absolute top-full mt-2 left-0 right-0 md:right-auto md:w-80 p-3 rounded-lg shadow-lg backdrop-blur-md border transition-all duration-200 ${
-                        isDarkMode
+                      className={`absolute top-full mt-2 left-0 right-0 md:right-auto md:w-80 p-3 rounded-lg shadow-lg backdrop-blur-md border transition-all duration-200 ${isDarkMode
                           ? "bg-gray-800/95 border-gray-600/50 text-gray-200"
                           : "bg-white/95 border-gray-200/50 text-gray-700"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between text-sm">
                         <span>
@@ -1012,11 +985,10 @@ function DocumentView() {
                         </span>
                         <button
                           onClick={() => setSearch("")}
-                          className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                            isDarkMode
+                          className={`px-2 py-1 text-xs rounded-md transition-colors ${isDarkMode
                               ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
                               : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                          }`}
+                            }`}
                         >
                           Xóa
                         </button>
@@ -1030,11 +1002,10 @@ function DocumentView() {
               filteredQuestions.length === 0 &&
               viewState.limitedView && (
                 <div
-                  className={`mt-4 p-4 rounded-lg ${
-                    isDarkMode
+                  className={`mt-4 p-4 rounded-lg ${isDarkMode
                       ? "bg-gray-800 border border-gray-700"
                       : "bg-white border border-gray-200"
-                  } text-center shadow-sm`}
+                    } text-center shadow-sm`}
                 >
                   <p className="mb-2">
                     Không tìm thấy kết quả phù hợp với tìm kiếm của bạn.
@@ -1047,18 +1018,16 @@ function DocumentView() {
               )}{" "}
             {!loading && viewState.limitedView && (
               <div
-                className={`mx-4 md:mx-auto max-w-4xl px-4 mb-6 ${
-                  isDarkMode
+                className={`mx-4 md:mx-auto max-w-4xl px-4 mb-6 ${isDarkMode
                     ? "bg-yellow-900/30 border border-yellow-700"
                     : "bg-yellow-50 border border-yellow-200"
-                } rounded-lg py-3`}
+                  } rounded-lg py-3`}
               >
                 <div className="flex items-center">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`h-5 w-5 mr-2 ${
-                      isDarkMode ? "text-yellow-500" : "text-yellow-400"
-                    }`}
+                    className={`h-5 w-5 mr-2 ${isDarkMode ? "text-yellow-500" : "text-yellow-400"
+                      }`}
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -1069,9 +1038,8 @@ function DocumentView() {
                     />
                   </svg>
                   <p
-                    className={`text-sm ${
-                      isDarkMode ? "text-yellow-200" : "text-yellow-700"
-                    }`}
+                    className={`text-sm ${isDarkMode ? "text-yellow-200" : "text-yellow-700"
+                      }`}
                   >
                     {viewState.viewLimitExceeded ? (
                       user ? (
@@ -1079,11 +1047,10 @@ function DocumentView() {
                           Bạn đã sử dụng hết 5 lượt xem tài liệu này hôm nay.
                           <a
                             href="/pricing"
-                            className={`font-medium underline ml-1 ${
-                              isDarkMode
+                            className={`font-medium underline ml-1 ${isDarkMode
                                 ? "text-yellow-300 hover:text-yellow-400"
                                 : "text-yellow-800 hover:text-yellow-900"
-                            }`}
+                              }`}
                           >
                             Nâng cấp tài khoản Premium
                           </a>{" "}
@@ -1094,22 +1061,20 @@ function DocumentView() {
                           Bạn đã sử dụng hết 5 lượt xem tài liệu này hôm nay.
                           <Link
                             to="/login"
-                            className={`font-medium underline ml-1 ${
-                              isDarkMode
+                            className={`font-medium underline ml-1 ${isDarkMode
                                 ? "text-yellow-300 hover:text-yellow-400"
                                 : "text-yellow-800 hover:text-yellow-900"
-                            }`}
+                              }`}
                           >
                             Đăng nhập
                           </Link>{" "}
                           hoặc
                           <Link
                             to="/register"
-                            className={`font-medium underline mx-1 ${
-                              isDarkMode
+                            className={`font-medium underline mx-1 ${isDarkMode
                                 ? "text-yellow-300 hover:text-yellow-400"
                                 : "text-yellow-800 hover:text-yellow-900"
-                            }`}
+                              }`}
                           >
                             đăng ký
                           </Link>
@@ -1123,11 +1088,10 @@ function DocumentView() {
                         nay.
                         <a
                           href="/pricing"
-                          className={`font-medium underline ml-1 ${
-                            isDarkMode
+                          className={`font-medium underline ml-1 ${isDarkMode
                               ? "text-yellow-300 hover:text-yellow-400"
                               : "text-yellow-800 hover:text-yellow-900"
-                          }`}
+                            }`}
                         >
                           Nâng cấp tài khoản
                         </a>{" "}
@@ -1140,22 +1104,20 @@ function DocumentView() {
                         nay.
                         <Link
                           to="/login"
-                          className={`font-medium underline ml-1 ${
-                            isDarkMode
+                          className={`font-medium underline ml-1 ${isDarkMode
                               ? "text-yellow-300 hover:text-yellow-400"
                               : "text-yellow-800 hover:text-yellow-900"
-                          }`}
+                            }`}
                         >
                           Đăng nhập
                         </Link>{" "}
                         hoặc
                         <Link
                           to="/register"
-                          className={`font-medium underline mx-1 ${
-                            isDarkMode
+                          className={`font-medium underline mx-1 ${isDarkMode
                               ? "text-yellow-300 hover:text-yellow-400"
                               : "text-yellow-800 hover:text-yellow-900"
-                          }`}
+                            }`}
                         >
                           đăng ký
                         </Link>
@@ -1169,23 +1131,20 @@ function DocumentView() {
             {loading ? (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                 <div
-                  className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${
-                    isDarkMode ? "bg-gray-800" : "bg-white"
-                  }`}
+                  className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${isDarkMode ? "bg-gray-800" : "bg-white"
+                    }`}
                 >
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-green-500 mb-4" />
                     <p
-                      className={`${
-                        isDarkMode ? "text-gray-300" : "text-gray-700"
-                      } text-center`}
+                      className={`${isDarkMode ? "text-gray-300" : "text-gray-700"
+                        } text-center`}
                     >
                       Đang tải dữ liệu tài liệu...
                     </p>
                     <p
-                      className={`${
-                        isDarkMode ? "text-gray-400" : "text-gray-500"
-                      } text-sm text-center mt-2`}
+                      className={`${isDarkMode ? "text-gray-400" : "text-gray-500"
+                        } text-sm text-center mt-2`}
                     >
                       Chúng tôi đang chuẩn bị nội dung theo yêu cầu của bạn.
                     </p>
@@ -1195,13 +1154,12 @@ function DocumentView() {
             ) : (
               <>
                 {selectedDocument?.isVip &&
-                vipAccessResult &&
-                !vipAccessResult.hasAccess ? (
+                  vipAccessResult &&
+                  !vipAccessResult.hasAccess ? (
                   <div className="mx-auto max-w-4xl px-4 py-12 text-center rounded-lg">
                     <div
-                      className={`p-8 rounded-lg shadow-md ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      }`}
+                      className={`p-8 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-white"
+                        }`}
                     >
                       <div className="mb-4 flex justify-center">
                         <svg
@@ -1213,16 +1171,14 @@ function DocumentView() {
                         </svg>
                       </div>
                       <h2
-                        className={`text-xl font-bold mb-2 ${
-                          isDarkMode ? "text-white" : "text-gray-800"
-                        }`}
+                        className={`text-xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"
+                          }`}
                       >
                         🌟 Nội dung VIP
                       </h2>
                       <p
-                        className={`mb-6 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
+                        className={`mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                          }`}
                       >
                         {vipAccessResult.reason}
                       </p>
@@ -1261,18 +1217,28 @@ function DocumentView() {
                   </div>
                 ) : (
                   <>
-                    {!loading &&
-                      filteredQuestions.length === 0 &&
-                      !viewState.viewLimitExceeded && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
-                          <div
-                            className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center pointer-events-auto ${
-                              isDarkMode ? "bg-gray-800" : "bg-white"
+                    {showNoContentModal && (
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-auto"
+                        onClick={() => setShowNoContentModal(false)}
+                      >
+                        <div
+                          className={`relative p-6 rounded-lg shadow-xl max-w-md mx-4 text-center ${isDarkMode ? "bg-gray-800" : "bg-white"
                             }`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            aria-label="Đóng"
+                            onClick={() => setShowNoContentModal(false)}
+                            className="absolute top-3 right-3 text-gray-400 hover:text-gray-200"
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                            }}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
-                              className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                              className="h-6 w-6"
                               fill="none"
                               viewBox="0 0 24 24"
                               stroke="currentColor"
@@ -1280,69 +1246,83 @@ function DocumentView() {
                               <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
                               />
                             </svg>
-                            <h3
-                              className={`text-lg font-medium ${
-                                isDarkMode ? "text-gray-200" : "text-gray-700"
+                          </button>
+
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-16 w-16 mx-auto mb-4 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1.5}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
+                          </svg>
+
+                          <h3
+                            className={`text-lg font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"
                               }`}
-                            >
-                              Không có nội dung
-                            </h3>
-                            <p
-                              className={`mt-2 ${
-                                isDarkMode ? "text-gray-400" : "text-gray-500"
+                          >
+                            Không có nội dung
+                          </h3>
+                          <p
+                            className={`mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"
                               }`}
+                          >
+                            Tài liệu này hiện chưa có câu hỏi hoặc đáp án nào.
+                          </p>
+
+                          <div className="mt-6 flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-3 justify-center">
+                            <button
+                              onClick={reloadQuestions}
+                              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
                             >
-                              Tài liệu này hiện chưa có câu hỏi hoặc đáp án nào.
-                            </p>
-                            <div className="mt-6 flex flex-col space-y-3 md:flex-row md:space-y-0 md:space-x-3 justify-center">
-                              <button
-                                onClick={reloadQuestions}
-                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5 mr-1"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
                               >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className="h-5 w-5 mr-1"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                  />
-                                </svg>
-                                Tải lại
-                              </button>
-                              <Link
-                                to="/"
-                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                              >
-                                Quay về trang chủ
-                              </Link>
-                            </div>
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                />
+                              </svg>
+                              Tải lại
+                            </button>
+                            <Link
+                              to="/"
+                              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                            >
+                              Quay về trang chủ
+                            </Link>
                           </div>
                         </div>
-                      )}
+                      </div>
+                    )}
                     {viewState.viewLimitExceeded && !isPuser && !isAdmin ? (
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80 pointer-events-none">
                         <div
-                          className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center pointer-events-auto ${
-                            isDarkMode ? "bg-gray-800" : "bg-white"
-                          }`}
+                          className={`p-6 rounded-lg shadow-xl max-w-md mx-4 text-center pointer-events-auto ${isDarkMode ? "bg-gray-800" : "bg-white"
+                            }`}
                         >
                           <div className="mb-4 flex justify-center">
                             <svg
-                              className={`w-16 h-16 ${
-                                isDarkMode
+                              className={`w-16 h-16 ${isDarkMode
                                   ? "text-yellow-500"
                                   : "text-yellow-400"
-                              }`}
+                                }`}
                               fill="currentColor"
                               viewBox="0 0 20 20"
                               xmlns="http://www.w3.org/2000/svg"
@@ -1355,16 +1335,14 @@ function DocumentView() {
                             </svg>
                           </div>
                           <h2
-                            className={`text-xl font-bold mb-2 ${
-                              isDarkMode ? "text-white" : "text-gray-800"
-                            }`}
+                            className={`text-xl font-bold mb-2 ${isDarkMode ? "text-white" : "text-gray-800"
+                              }`}
                           >
                             Giới hạn lượt xem đã hết
                           </h2>
                           <p
-                            className={`mb-6 ${
-                              isDarkMode ? "text-gray-300" : "text-gray-600"
-                            }`}
+                            className={`mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"
+                              }`}
                           >
                             Bạn đã sử dụng hết 5 lượt xem tài liệu này trong
                             ngày hôm nay.
@@ -1405,7 +1383,7 @@ function DocumentView() {
                     ) : (
                       <>
                         {categorySlug === "admin" &&
-                        documentSlug === "users" ? (
+                          documentSlug === "users" ? (
                           <UserManagementContent />
                         ) : (
                           !viewState.viewLimitExceeded && (
