@@ -20,11 +20,24 @@ export const getAppSettings = async () => {
         // Trả về giá trị mặc định nếu chưa có
         return {
             studentPageEnabled: true, // Mặc định bật
+            // Default question rate settings (percent)
+            questionRates: {
+                guest: 20,
+                free: 50,
+                paidPerCategoryDefault: 50,
+                paidFullOrPaidCategoryPaid: 100,
+            },
         };
     } catch (error) {
         console.error("Error fetching app settings:", error);
         return {
             studentPageEnabled: true,
+            questionRates: {
+                guest: 20,
+                free: 50,
+                paidPerCategoryDefault: 50,
+                paidFullOrPaidCategoryPaid: 100,
+            },
         };
     }
 };
@@ -68,15 +81,27 @@ export const subscribeAppSettings = (callback) => {
                 callback(docSnap.data());
             } else {
                 // Trả về giá trị mặc định
-                callback({
-                    studentPageEnabled: true,
-                });
+                    callback({
+                        studentPageEnabled: true,
+                        questionRates: {
+                            guest: 20,
+                            free: 50,
+                            paidPerCategoryDefault: 50,
+                            paidFullOrPaidCategoryPaid: 100,
+                        },
+                    });
             }
         },
         (error) => {
             console.error("Error subscribing to app settings:", error);
             callback({
                 studentPageEnabled: true,
+                questionRates: {
+                    guest: 20,
+                    free: 50,
+                    paidPerCategoryDefault: 50,
+                    paidFullOrPaidCategoryPaid: 100,
+                },
             });
         }
     );

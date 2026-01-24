@@ -5,6 +5,7 @@
 import { db } from '../../firebase/firebase';
 import { doc, getDoc, collection, query, where, getDocs, setDoc, serverTimestamp, updateDoc, writeBatch, orderBy } from 'firebase/firestore';
 import { COLLECTIONS } from '../../firebase/firestoreService';
+import { getAppSettings } from '../../firebase/appSettingsService';
 
 // Cache cho dữ liệu để tránh truy vấn lặp lại
 const cache = {
@@ -337,6 +338,9 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
     }
 
 
+    // Determine effective subscription type: treat logged-in users with no subscriptionType as 'free'
+    const effectiveSubscription = user ? (user.subscriptionType ?? 'free') : null;
+
     // Tải song song các truy vấn khác nhau
     const [questions, viewTrackResult, userAccessCheck] = await Promise.all([
       // 1. Lấy danh sách câu hỏi
@@ -346,7 +350,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       optimizedTrackDocumentView(user?.uid, documentId),
       
       // 3. Kiểm tra quyền truy cập cho người dùng partial (nếu cần)
-      user?.subscriptionType === 'partial' ? checkPartialUserAccess(user.uid, documentId) : Promise.resolve(false)
+      effectiveSubscription === 'partial' ? checkPartialUserAccess(user.uid, documentId) : Promise.resolve(false)
     ]);
     //  QUAN TRỌNG: Admin luôn có quyền truy cập đầy đủ
     if (isAdmin || user?.role === "admin") {
@@ -359,9 +363,9 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
     }
     
     //  QUAN TRỌNG: Ưu tiên subscriptionType hơn role legacy
-    
+
     // Full subscription users có quyền truy cập đầy đủ
-    if (user?.subscriptionType === 'full') {
+    if (effectiveSubscription === 'full') {
       return {
         questions,
         limitedView: false,
@@ -370,7 +374,7 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
       };
     }
       // Partial subscription users
-    if (user?.subscriptionType === 'partial') {
+    if (effectiveSubscription === 'partial') {
       
       if (userAccessCheck) {
         return {
@@ -402,9 +406,19 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
             viewsRemaining: 0
           };
         } else {
-          const halfCount = Math.ceil(questions.length / 2);
+          // Determine percent to show based on app settings
+          let pct = 50; // fallback
+          try {
+            const settings = await getAppSettings();
+            const rates = (settings && settings.questionRates) || {};
+            pct = rates.paidPerCategoryDefault ?? rates.free ?? 50;
+          } catch (e) {
+            // ignore and use fallback
+          }
+
+          const sliceCount = Math.max(1, Math.ceil((questions.length * pct) / 100));
           return {
-            questions: questions.slice(0, halfCount),
+            questions: questions.slice(0, sliceCount),
             limitedView: true,
             viewLimitExceeded: false,
             viewsRemaining: viewTrackResult.remaining
@@ -444,9 +458,27 @@ export const loadDocumentWithParallelQueries = async (categoryId, documentId, is
         viewsRemaining: 0
       };
     } else {
-      const halfCount = Math.ceil(questions.length / 2);
+      // Default for anonymous / free / legacy non-paid users: use app settings
+      let pct = 20;
+      try {
+        const settings = await getAppSettings();
+        const rates = (settings && settings.questionRates) || {};
+        if (effectiveSubscription === 'free') {
+          pct = rates.free ?? 50;
+        } else if (effectiveSubscription === null) {
+          // anonymous
+          pct = rates.guest ?? 20;
+        } else {
+          // any other logged-in subscription type not handled earlier => fallback to guest behavior
+          pct = rates.guest ?? 20;
+        }
+      } catch (e) {
+        // ignore and use fallback
+      }
+
+      const sliceCount = Math.max(1, Math.ceil((questions.length * pct) / 100));
       return {
-        questions: questions.slice(0, halfCount),
+        questions: questions.slice(0, sliceCount),
         limitedView: true,
         viewLimitExceeded: false,
         viewsRemaining: viewTrackResult.remaining

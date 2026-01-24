@@ -11,6 +11,7 @@ import {
   updateDocument,
   deleteDocument,
 } from "../../firebase/firestoreService";
+import { getAppSettings, updateAppSettings } from "../../firebase/appSettingsService";
 import Sidebar from "../../components/Sidebar";
 import { DocumentMobileHeader } from "../../components/MobileHeader";
 import UserHeader from "../../components/UserHeader";
@@ -28,6 +29,14 @@ const DocumentManagement = () => {
   const navigate = useNavigate();
 
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+  const [questionRates, setQuestionRates] = useState({
+    guest: 20,
+    free: 50,
+    paidPerCategoryDefault: 50,
+    paidFullOrPaidCategoryPaid: 100,
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState("");
 
   const [sidebarData, setSidebarData] = useState([]);
   const [sidebarDocuments, setSidebarDocuments] = useState({});
@@ -102,6 +111,18 @@ const DocumentManagement = () => {
 
         setCategories(categoriesData);
         setDocuments(allDocuments);
+        // load app settings (question rates)
+        try {
+          setSettingsLoading(true);
+          const settings = await getAppSettings();
+          if (settings && settings.questionRates) {
+            setQuestionRates(settings.questionRates);
+          }
+        } catch (e) {
+          console.warn("Unable to load app settings:", e);
+        } finally {
+          setSettingsLoading(false);
+        }
       } catch (err) {
         console.error("Error loading data:", err);
         setError("Không thể tải danh sách tài liệu và danh mục");
@@ -426,10 +447,97 @@ const DocumentManagement = () => {
           >
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold mb-4 md:mb-0">
-                  Quản lý Tài Liệu
-                </h1>
-              </div>
+                  <h1 className="text-2xl font-bold mb-4 md:mb-0">
+                    Quản lý Tài Liệu
+                  </h1>
+                  {/* Question rate settings for admins */}
+                  {isAdmin && (
+                    <div className="mt-4 md:mt-0 w-full md:w-auto">
+                      <details className="bg-white dark:bg-gray-800 rounded-md p-3 shadow-sm">
+                        <summary className="cursor-pointer font-medium">
+                          Tỷ lệ câu hỏi
+                        </summary>
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-sm">Khách (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={questionRates.guest}
+                              onChange={(e) =>
+                                setQuestionRates({ ...questionRates, guest: Number(e.target.value) })
+                              }
+                              className="mt-1 w-full px-2 py-1 rounded border"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm">User miễn phí (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={questionRates.free}
+                              onChange={(e) =>
+                                setQuestionRates({ ...questionRates, free: Number(e.target.value) })
+                              }
+                              className="mt-1 w-full px-2 py-1 rounded border"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm">User trả phí (chưa trả mục) (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={questionRates.paidPerCategoryDefault}
+                              onChange={(e) =>
+                                setQuestionRates({ ...questionRates, paidPerCategoryDefault: Number(e.target.value) })
+                              }
+                              className="mt-1 w-full px-2 py-1 rounded border"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm">User trả phí (đã trả mục / full) (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={questionRates.paidFullOrPaidCategoryPaid}
+                              onChange={(e) =>
+                                setQuestionRates({ ...questionRates, paidFullOrPaidCategoryPaid: Number(e.target.value) })
+                              }
+                              className="mt-1 w-full px-2 py-1 rounded border"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-3">
+                          <button
+                            onClick={async () => {
+                              try {
+                                setSettingsLoading(true);
+                                await updateAppSettings({ questionRates });
+                                setSettingsSuccess("Đã lưu");
+                                setTimeout(() => setSettingsSuccess(""), 2000);
+                              } catch (e) {
+                                console.error(e);
+                                setSettingsSuccess("Lỗi khi lưu");
+                                setTimeout(() => setSettingsSuccess(""), 3000);
+                              } finally {
+                                setSettingsLoading(false);
+                              }
+                            }}
+                            className="px-3 py-1 bg-blue-600 text-white rounded"
+                          >
+                            Lưu
+                          </button>
+                          {settingsLoading ? <span>Đang lưu...</span> : null}
+                          {settingsSuccess ? <span>{settingsSuccess}</span> : null}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </div>
             </div>
             {/* Rest of the DocumentManagement content */}
             <div className="flex-1 p-6">

@@ -62,6 +62,7 @@ import {
   forceRefresh,
 } from "./utils/storage/cacheManager";
 import PricingContentManagement from "./pages/admin/PricingContentManagement";
+import DocumentSettings from "./pages/admin/DocumentSettings";
 
 // Component bảo vệ route admin đơn giản
 const ProtectedAdminRoute = ({ children }) => {
@@ -577,6 +578,15 @@ function App() {
                   element={
                     <ProtectedAdminRoute>
                       <PricingContentManagement />
+                    </ProtectedAdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/document-settings"
+                  element={
+                    <ProtectedAdminRoute>
+                      {/* lazy simple page for document settings */}
+                      {<React.Suspense fallback={<div>Loading...</div>}><DocumentSettings /></React.Suspense>}
                     </ProtectedAdminRoute>
                   }
                 />

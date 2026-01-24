@@ -1270,6 +1270,30 @@ function Sidebar({
                   </span>
                 )}
               </Link>
+              <Link
+                to="/admin/document-settings"
+                onClick={(e) => handleAdminRefresh(e, "/admin/document-settings")}
+                className={`flex items-center px-4 py-3 transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-green-800"
+                  }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5 mr-3 text-white flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1"
+                  />
+                </svg>
+                {showFullContent && (
+                  <span className="text-white font-medium">Tỷ lệ câu hỏi</span>
+                )}
+              </Link>
             </div>
           )}
         </div>
