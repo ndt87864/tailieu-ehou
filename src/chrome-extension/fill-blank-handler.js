@@ -913,23 +913,7 @@
                 }
             });
 
-            // Thêm indicator cho user biết đã tự động điền
-            const autoFilledBadge = document.createElement('span');
-            autoFilledBadge.className = 'tailieu-autofilled-badge';
-            autoFilledBadge.innerHTML = '✓ Đã tự động điền';
-            autoFilledBadge.style.cssText = `
-                position: absolute;
-                top: -10px;
-                right: 10px;
-                background: #4CAF50;
-                color: white;
-                padding: 2px 8px;
-                border-radius: 10px;
-                font-size: 11px;
-                font-weight: bold;
-                z-index: 10002;
-            `;
-            element.appendChild(autoFilledBadge);
+            console.log('[Tailieu FillBlank] AUTO-FILL: Đã tự động điền các đáp án.');
         }
         // ==================== END AUTO-FILL LOGIC ====================
 
