@@ -171,7 +171,7 @@
 
                 questions.push({
                     index: index + 1,
-                    question: questionText,
+                    question: cleanQuestionText(questionText),
                     answers: answers,
                     element: qtextElement,
                     type: 'câu hỏi'
@@ -761,8 +761,51 @@
     }
 
     function cleanQuestionText(text) {
-        // Loại bỏ prefix
-        return text.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+        if (!text) return '';
+
+        // 1. Loại bỏ đoạn văn đọc hiểu nếu có marker "Choose the best answer"
+        const markers = [
+            'Choose the best answer',
+            'Choose the correct answer',
+            'Select the best answer',
+            'Select the correct answer',
+            'Chọn câu trả lời đúng nhất',
+            'Chọn đáp án đúng nhất',
+            'Trả lời câu hỏi',
+            'Answer the question'
+        ];
+
+        let processedText = text;
+
+        // Tìm marker xuất hiện cuối cùng (gần câu hỏi nhất)
+        for (const marker of markers) {
+            // Sử dụng regex để match case-insensitive
+            const regex = new RegExp(marker, 'gi');
+            const matches = [...processedText.matchAll(regex)];
+
+            if (matches.length > 0) {
+                // Lấy match cuối cùng
+                const lastMatch = matches[matches.length - 1];
+                const lastIndex = lastMatch.index;
+
+                // Kiểm tra xem phần sau marker có nội dung không
+                const contentAfter = processedText.substring(lastIndex + lastMatch[0].length).trim();
+
+                // Chỉ cắt nếu phần sau đủ dài (lớn hơn 5 ký tự) để tránh cắt mất câu hỏi nếu nó quá ngắn hoặc lỗi
+                // Và phần sau phải chứa ít nhất một từ (không phải toàn ký tự đặc biệt)
+                if (contentAfter.length > 5 && /[a-zA-Z0-9]/.test(contentAfter)) {
+                    // Cập nhật text để xử lý tiếp
+                    processedText = contentAfter;
+                    // Break sau khi tìm thấy marker phù hợp nhất (ưu tiên marker nào khớp thì cắt luôn, 
+                    // nhưng logic này có thể cần refine nếu một bài có nhiều marker. 
+                    // Hiện tại ưu tiên cắt theo marker tìm thấy đầu tiên trong loop valid)
+                    break;
+                }
+            }
+        }
+
+        // 2. Loại bỏ prefix (Câu 1:, Question 1:, ...)
+        return processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
     }
 
     // Normalize and extract visible text from an element
