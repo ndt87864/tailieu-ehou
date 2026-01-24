@@ -772,7 +772,13 @@
             'Chọn câu trả lời đúng nhất',
             'Chọn đáp án đúng nhất',
             'Trả lời câu hỏi',
-            'Answer the question'
+            'Answer the question',
+            'Are these following sentences true \\(T\\) or false \\(F\\)',
+            'Are these following sentences true or false',
+            'Are the following sentences true or false',
+            'True or False',
+            'True \\(T\\) or false \\(F\\)',
+            'Read the text and do the activities that follow'
         ];
 
         let processedText = text;

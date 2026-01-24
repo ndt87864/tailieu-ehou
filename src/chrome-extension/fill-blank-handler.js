@@ -14,6 +14,7 @@
     // ==================== CONSTANTS ====================
 
     // Patterns để nhận diện câu hỏi điền từ
+    // Patterns để nhận diện câu hỏi điền từ
     const FILL_BLANK_TRIGGER_PATTERNS = [
         /match\s+(the|these)\s+(word|words|following|sentences)/i,
         /match\s+.*\s+with/i,
@@ -25,7 +26,12 @@
         /complete\s+the\s+following/i,
         /fill\s+in\s+the\s+missing/i,
         /with\s+time\s+expressions/i,
-        /complete\s+.*\s+with/i
+        /complete\s+.*\s+with/i,
+        /true\s+or\s+false/i,
+        /true\s*\(t\)\s*or\s*false\s*\(f\)/i,
+        /incorrect\s+or\s+correct/i,
+        /(sentences|statements).*true.*false/i,
+        /correct.*answer/i
     ];
 
     // Pattern để nhận diện chỗ trống cần điền
@@ -101,7 +107,7 @@
         });
 
         // 2. Remove leading numbers/labels (1. or a))
-        normalized = normalized.replace(/^[\d+a-z]+[\.\):]\s*/i, '');
+        normalized = normalized.replace(/^\s*([a-z]|\d+)[\.\):]\s*/i, '');
 
         // 3. Remove punctuation and special characters
         // We strip dots, commas, brackets, etc., but keep alphanumeric and spaces
@@ -372,6 +378,49 @@
     }
 
     /**
+     * Clean reading passages and instructions from text
+     */
+    function cleanFillBlankContext(text) {
+        if (!text) return text;
+
+        const markers = [
+            'Choose the best answer',
+            'Choose the correct answer',
+            'Select the best answer',
+            'Select the correct answer',
+            'Chọn câu trả lời đúng nhất',
+            'Chọn đáp án đúng nhất',
+            'Trả lời câu hỏi',
+            'Answer the question',
+            'Are these following sentences true \\(T\\) or false \\(F\\)',
+            'Are these following sentences true or false',
+            'Are the following sentences true or false',
+            'True or False',
+            'True \\(T\\) or false \\(F\\)',
+            'Read the text and do the activities that follow'
+        ];
+
+        let processedText = text;
+
+        for (const marker of markers) {
+            const regex = new RegExp(marker, 'gi');
+            const matches = [...processedText.matchAll(regex)];
+
+            if (matches.length > 0) {
+                const lastMatch = matches[matches.length - 1];
+                const contentAfter = processedText.substring(lastMatch.index + lastMatch[0].length).trim();
+
+                // Only keep if content after is meaningful (length > 5 and has alphanumeric)
+                if (contentAfter.length > 5 && /[a-zA-Z0-9]/.test(contentAfter)) {
+                    processedText = contentAfter;
+                }
+            }
+        }
+
+        return processedText;
+    }
+
+    /**
      * Trích xuất text của một row/sentence có input fields
      * Thay input bằng placeholder "..." để tạo câu chuẩn hóa
      * @param {Element} element - Row element chứa text và input
@@ -421,6 +470,9 @@
             .replace(/\s*\.\.\.\s*/g, ' ... ')
             .replace(/^\s*[a-z]\.\s*/i, '')  // Remove leading labels like "a."
             .trim();
+
+        // Strip reading passages/instructions
+        text = cleanFillBlankContext(text);
 
         console.log('[Tailieu FillBlank] Extracted sentence:', text.substring(0, 80), '| inputs:', actualInputs.length);
 
