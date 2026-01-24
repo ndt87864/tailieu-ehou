@@ -994,6 +994,31 @@ async function compareAndHighlightQuestions(isManual = false) {
         }
     }
     
+    // ==================== FILL-BLANK PROCESSING ====================
+    // Process fill-in-the-blank questions separately using dedicated handler
+    let fillBlankMatches = [];
+    try {
+        if (window.TailieuFillBlank && typeof window.TailieuFillBlank.processFillBlankQuestions === 'function') {
+            console.log('[Tailieu Extension] Processing fill-in-the-blank questions...');
+            fillBlankMatches = window.TailieuFillBlank.processFillBlankQuestions(extensionQuestions);
+            console.log('[Tailieu Extension] Fill-blank matches found:', fillBlankMatches.length);
+            
+            // Add fill-blank matches to overall matched count
+            fillBlankMatches.forEach(fb => {
+                matched.push({
+                    pageQuestion: fb.sentence,
+                    extensionQuestion: fb.matchedQuestion,
+                    answer: fb.answers.map(a => `${a.index}. ${a.answer}`).join(', '),
+                    similarity: 1.0,
+                    confidence: 1.0,
+                    type: 'fill-blank'
+                });
+            });
+        }
+    } catch (fillBlankError) {
+        console.warn('[Tailieu Extension] Fill-blank processing error:', fillBlankError);
+    }
+    // ==================== END FILL-BLANK PROCESSING ====================
     
     if (matched.length > 0) {
         // Log average confidence

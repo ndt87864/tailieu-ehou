@@ -107,3 +107,124 @@
     overflow-y: auto !important;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
 }
+
+/* ==================== FILL-IN-THE-BLANK STYLES ==================== */
+
+/* Highlighted fill-blank question */
+.tailieu-fillblank-highlighted {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2) !important;
+    border-left: 4px solid #ff9800 !important;
+    padding: 8px 12px !important;
+    margin: 4px 0 !important;
+    border-radius: 4px !important;
+    position: relative !important;
+    transition: all 0.3s ease !important;
+}
+
+.tailieu-fillblank-highlighted:hover {
+    background: linear-gradient(135deg, #ffe0b2, #ffcc80) !important;
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3) !important;
+}
+
+/* Fill-blank answer tooltip */
+.tailieu-fillblank-tooltip {
+    position: absolute !important;
+    right: -300px !important;
+    top: 0 !important;
+    width: 280px !important;
+    background: linear-gradient(135deg, #4CAF50, #8BC34A) !important;
+    color: white !important;
+    padding: 12px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    z-index: 10001 !important;
+    font-size: 13px !important;
+    max-height: 300px !important;
+    overflow-y: auto !important;
+    animation: slideInRight 0.3s ease-out !important;
+}
+
+/* Answer item in tooltip */
+.tailieu-fillblank-tooltip .answer-item {
+    background: rgba(255,255,255,0.2) !important;
+    padding: 6px 10px !important;
+    margin: 4px 0 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+.tailieu-fillblank-tooltip .answer-item:hover {
+    background: rgba(255,255,255,0.4) !important;
+    transform: translateX(5px) !important;
+}
+
+/* Input fields in fill-blank questions */
+input.tailieu-fillblank-input,
+.tailieu-fillblank-highlighted input[type="text"] {
+    border: 2px solid #ff9800 !important;
+    background-color: #fff8e1 !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    transition: all 0.2s !important;
+}
+
+input.tailieu-fillblank-input:focus,
+.tailieu-fillblank-highlighted input[type="text"]:focus {
+    border-color: #f57c00 !important;
+    background-color: #fff !important;
+    box-shadow: 0 0 4px rgba(255, 152, 0, 0.5) !important;
+}
+
+/* Filled input (has answer) */
+input.tailieu-fillblank-filled,
+.tailieu-fillblank-highlighted input.filled {
+    background-color: #e8f5e9 !important;
+    border-color: #4CAF50 !important;
+}
+
+/* Fill button next to input */
+.tailieu-fill-btn {
+    margin-left: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+    border: 1px solid #ff9800 !important;
+    background: #fff3e0 !important;
+    border-radius: 4px !important;
+    transition: all 0.2s !important;
+}
+
+.tailieu-fill-btn:hover {
+    background: #ffe0b2 !important;
+    transform: scale(1.05) !important;
+}
+
+/* Blank placeholder highlighting */
+.tailieu-blank-marker {
+    background: linear-gradient(135deg, #ffeb3b, #ffc107) !important;
+    color: #333 !important;
+    padding: 2px 8px !important;
+    border-radius: 3px !important;
+    font-weight: bold !important;
+    display: inline-block !important;
+    min-width: 40px !important;
+    text-align: center !important;
+}
+
+/* Animation for fill-blank match */
+@keyframes fillBlankPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+    }
+}
+
+.tailieu-fillblank-highlighted.new-match {
+    animation: fillBlankPulse 1.5s ease-out !important;
+}
