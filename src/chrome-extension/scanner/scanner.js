@@ -411,26 +411,19 @@
     function extractSingleFillBlankRow(element) {
         if (!element) return null;
         
-        // Tìm tất cả inputs VÀ selects trong element
+        // Tìm tất cả inputs VÀ selects trong element GỐC (không phải clone)
         const inputs = element.querySelectorAll('input[type="text"], input:not([type]), select');
         if (inputs.length === 0) return null;
         
-        // Clone element để xử lý
-        const clone = element.cloneNode(true);
-        
-        // Xóa các feedback elements (✓, ✗, icons)
-        const feedbackEls = clone.querySelectorAll('.feedback, .feedbackspan, .incorrect, .correct, [class*="feedback"], img, svg, i.fa, i.icon');
-        feedbackEls.forEach(fb => fb.remove());
-        
         // Lấy label nếu có (a., b., c., 1., 2., etc.)
         let label = '';
-        const labelMatch = clone.textContent?.match(/^[\s]*([a-z]|[0-9]+)[\.\)]/i);
+        const rawText = element.textContent || '';
+        const labelMatch = rawText.match(/^[\s]*([a-z]|[0-9]+)[\.\)]/i);
         if (labelMatch) {
             label = labelMatch[1].toUpperCase();
         }
         
         // Trích xuất correct answer từ các input có giá trị đúng
-        // Lưu theo thứ tự để format answer với số thứ tự
         const correctAnswers = [];
         
         inputs.forEach((input, idx) => {
@@ -475,23 +468,9 @@
             correctAnswer = correctAnswers.map(a => `${a.index}.${a.value}`).join(', ');
         }
         
-        // Tạo question text: thay MỖI input/select bằng "..." RIÊNG BIỆT
-        const cloneInputs = clone.querySelectorAll('input[type="text"], input:not([type]), select');
-        cloneInputs.forEach((input) => {
-            // Mỗi input được thay bằng "..." riêng
-            const marker = document.createTextNode('...');
-            if (input.parentNode) {
-                input.parentNode.replaceChild(marker, input);
-            }
-        });
-        
-        // Clean up question text
-        let questionText = clone.textContent || '';
-        questionText = questionText
-            .replace(/[✓✗×✕✔❌]/g, '')  // Remove check/cross marks
-            .replace(/\s+/g, ' ')
-            .replace(/^\s*[a-z0-9][\.\)]\s*/i, '')  // Remove label prefix
-            .trim();
+        // ===== TẠO QUESTION TEXT BẰNG CÁCH XÂY DỰNG TỪ DOM =====
+        // Duyệt qua element và thay thế input bằng "..." trong text
+        const questionText = buildQuestionTextWithBlanks(element);
         
         // Validate: question should have at least some text besides "..."
         const textWithoutDots = questionText.replace(/\.{3,}/g, '').trim();
@@ -505,6 +484,95 @@
             correctAnswer: correctAnswer,
             element: element
         };
+    }
+    
+    /**
+     * Xây dựng question text bằng cách thay thế input/select bằng "..."
+     * Duyệt qua DOM tree và build text
+     */
+    function buildQuestionTextWithBlanks(element) {
+        if (!element) return '';
+        
+        let result = '';
+        
+        // Hàm đệ quy duyệt qua các node
+        function traverse(node) {
+            if (!node) return;
+            
+            // Text node - lấy text
+            if (node.nodeType === Node.TEXT_NODE) {
+                result += node.textContent || '';
+                return;
+            }
+            
+            // Element node
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tagName = node.tagName?.toUpperCase() || '';
+                
+                // Skip các element không cần thiết
+                if (/^(SCRIPT|STYLE|SVG|IMG)$/.test(tagName)) return;
+                
+                // Skip feedback elements
+                const className = node.className || '';
+                if (/feedback|feedbackspan/i.test(className)) return;
+                
+                // INPUT hoặc SELECT -> thay bằng "..."
+                if (tagName === 'INPUT' || tagName === 'SELECT') {
+                    result += '...';
+                    return;
+                }
+                
+                // Duyệt qua children
+                const children = node.childNodes;
+                for (let i = 0; i < children.length; i++) {
+                    traverse(children[i]);
+                }
+            }
+        }
+        
+        traverse(element);
+        
+        // Clean up result
+        result = result
+            .replace(/[✓✗×✕✔❌]/g, '')  // Remove check/cross marks
+            .replace(/\s+/g, ' ')         // Collapse whitespace
+            .replace(/^\s*[a-z0-9][\.\)]\s*/i, '')  // Remove label prefix like "a." or "1."
+            .trim();
+        
+        // ===== XỬ LÝ DẠNG "TEXT + Ô TRỐNG" (trailing blank) =====
+        // Nếu "..." chỉ xuất hiện ở cuối (dạng: "German ..." hoặc "German..."), 
+        // thì bỏ "..." đi vì đây là dạng text + ô trống đơn giản
+        // Chỉ giữ "..." khi nó nằm XEN KẼ trong text (như "Br...z...l")
+        
+        // Đếm số lần xuất hiện của "..."
+        const dotsMatches = result.match(/\.{3}/g);
+        const dotsCount = dotsMatches ? dotsMatches.length : 0;
+        
+        // Nếu chỉ có 1 "..." và nó ở cuối -> bỏ đi
+        if (dotsCount === 1 && result.endsWith('...')) {
+            result = result.slice(0, -3).trim();
+        }
+        // Nếu có nhiều "..." nhưng tất cả đều ở cuối (dạng: "German ... ... ...") -> bỏ hết
+        else if (dotsCount > 0) {
+            // Check if all "..." are trailing (no text after last "...")
+            const lastDotsIndex = result.lastIndexOf('...');
+            const textAfterDots = result.slice(lastDotsIndex + 3).trim();
+            
+            // Nếu không có text sau "..." cuối cùng, kiểm tra xem có text xen kẽ không
+            if (textAfterDots.length === 0) {
+                // Tìm vị trí "..." đầu tiên
+                const firstDotsIndex = result.indexOf('...');
+                const textBeforeDots = result.slice(0, firstDotsIndex).trim();
+                const textBetween = result.slice(firstDotsIndex).replace(/\.{3}/g, '').trim();
+                
+                // Nếu không có text xen kẽ giữa các "...", chỉ có text trước -> bỏ tất cả "..."
+                if (textBetween.length === 0 && textBeforeDots.length > 0) {
+                    result = textBeforeDots;
+                }
+            }
+        }
+        
+        return result;
     }
     
     /**
