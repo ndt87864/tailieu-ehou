@@ -93,22 +93,30 @@
         if (!text) return '';
 
         let normalized = text;
+        const TEMP_PLACEHOLDER = '___BLANK___';
 
-        // Replace all blank patterns with unified placeholder
+        // 1. Replace all blank patterns with temp placeholder
         BLANK_PATTERNS.forEach(pattern => {
-            normalized = normalized.replace(pattern, BLANK_PLACEHOLDER);
+            normalized = normalized.replace(pattern, ` ${TEMP_PLACEHOLDER} `);
         });
 
-        // Normalize whitespace
+        // 2. Remove leading numbers/labels (1. or a))
+        normalized = normalized.replace(/^[\d+a-z]+[\.\):]\s*/i, '');
+
+        // 3. Remove punctuation and special characters
+        // We strip dots, commas, brackets, etc., but keep alphanumeric and spaces
+        // Important: dashes and underscores might be part of words, but usually safe to remove for sentence matching
+        normalized = normalized.replace(/[\.,;?!:"'()\[\]\{\}\-\_\/]+/g, ' ');
+
+        // 4. Restore placeholder
+        normalized = normalized.split(TEMP_PLACEHOLDER).join('...');
+
+        // 5. Final normalization
         normalized = normalized
             .replace(/\s+/g, ' ')
             .replace(/\s*\.\.\.\s*/g, ' ... ') // Ensure spaces around blanks
-            .replace(/^[\d+a-z]+[\.\):]\s*/i, '') // Remove leading numbers/labels like 1. or a)
             .trim()
             .toLowerCase();
-
-        // Remove extra spaces
-        normalized = normalized.replace(/\s+/g, ' ');
 
         return normalized;
     }
