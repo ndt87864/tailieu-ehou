@@ -124,6 +124,26 @@
         // as separate items.
         const seenSignatures = new Set();
 
+        // ===== FILL-BLANK WITH INPUT FIELDS (e.g., "Br" + [a][z][i][l] = Brazil) =====
+        // Xử lý dạng câu hỏi điền từ với chữ cái + input liên tiếp
+        const fillBlankQuestions = scanFillBlankWithInputs();
+        if (fillBlankQuestions.length > 0) {
+            fillBlankQuestions.forEach((fbq, idx) => {
+                const signature = cleanQuestionText(fbq.question) + '||' + fbq.answers.map(a => normalizeText(a.text)).join('||');
+                if (seenSignatures.has(signature)) return;
+                seenSignatures.add(signature);
+                
+                questions.push({
+                    index: questions.length + 1,
+                    question: fbq.question,
+                    answers: fbq.answers,
+                    element: fbq.element,
+                    type: 'điền từ'
+                });
+            });
+            console.log('[Scanner] Tìm thấy', fillBlankQuestions.length, 'câu điền từ');
+        }
+
         // ===== MOODLE STRUCTURE =====
         const moodleQuestions = document.querySelectorAll('.que');
         if (moodleQuestions.length > 0) {
@@ -207,6 +227,405 @@
         });
 
         return questions;
+    }
+
+    // ==================== FILL-BLANK WITH INPUTS SCANNER ====================
+    /**
+     * Quét các câu hỏi điền từ dạng: chữ cái + input fields liên tiếp
+     * Ví dụ: "Br" + [a][z][i][l] = "Brazil"
+     * - Question: "Br...." (thay input bằng "...")
+     * - Answer: các ký tự trong input đúng (correct/green)
+     */
+    function scanFillBlankWithInputs() {
+        const results = [];
+        
+        // Tìm các container Moodle có câu hỏi điền từ
+        const queContainers = document.querySelectorAll('.que');
+        
+        queContainers.forEach((queContainer) => {
+            if (isExtensionElement(queContainer)) return;
+            
+            // Lấy instruction/header của câu hỏi
+            const qtext = queContainer.querySelector('.qtext');
+            const instructionText = qtext?.textContent?.trim() || '';
+            
+            // Kiểm tra có input fields trong container không (bất kể instruction)
+            const hasInputs = queContainer.querySelectorAll('input[type="text"], input:not([type]), select').length > 0;
+            
+            // Kiểm tra có phải dạng fill-blank không (qua instruction HOẶC có inputs)
+            const isFillBlank = isFillBlankInstruction(instructionText) || hasInputs;
+            if (!isFillBlank) return;
+            
+            console.log('[Scanner FillBlank] Processing container:', instructionText.substring(0, 60), '| hasInputs:', hasInputs);
+            
+            // Tìm các sub-questions (dạng a. Italy, b. Brazil, etc.)
+            const subQuestions = extractFillBlankSubQuestions(queContainer);
+            
+            if (subQuestions.length > 0) {
+                console.log('[Scanner FillBlank] Tìm thấy', subQuestions.length, 'sub-questions trong:', instructionText.substring(0, 50));
+                
+                subQuestions.forEach((sq, idx) => {
+                    // Chỉ thêm nếu có đáp án đúng (correct inputs)
+                    if (sq.correctAnswer && sq.correctAnswer.length > 0) {
+                        results.push({
+                            question: sq.questionText,
+                            answers: [{
+                                label: sq.label || String.fromCharCode(65 + idx),
+                                text: sq.correctAnswer,
+                                fullText: sq.correctAnswer,
+                                isSelected: true,
+                                isCorrect: true,
+                                isTicked: true
+                            }],
+                            element: sq.element,
+                            instruction: instructionText
+                        });
+                    }
+                });
+            }
+        });
+        
+        return results;
+    }
+    
+    /**
+     * Kiểm tra xem instruction có phải dạng fill-blank không
+     */
+    function isFillBlankInstruction(text) {
+        if (!text) return false;
+        const patterns = [
+            /write\s+(the\s+)?missing/i,
+            /fill\s+(in\s+)?(the\s+)?(blank|gap|missing)/i,
+            /complete\s+(these|the|this)/i,
+            /điền\s+(từ|vào)/i,
+            /hoàn\s+(thành|thiện)/i,
+            /missing\s+(vowels?|letters?|words?)/i,
+            /match\s+(these|the|this)/i,
+            /appropriate\s+form/i,
+            /verb\s+to\s+be/i,
+            /in\s+these\s+(countries|sentences|words)/i,
+            /to\s+the\s+(countries|words)/i
+        ];
+        return patterns.some(p => p.test(text));
+    }
+    
+    /**
+     * Trích xuất các sub-questions từ container fill-blank
+     * Mỗi sub-question có dạng: label + text + inputs
+     */
+    function extractFillBlankSubQuestions(container) {
+        const subQuestions = [];
+        const processedTexts = new Set();
+        
+        // Tìm các dòng/row chứa label (a., b., c.) hoặc subquestion containers
+        // Moodle thường dùng các class như: .subquestion, .answer, table rows, etc.
+        
+        // Method 1: Tìm theo structure .ablock .answer hoặc table rows
+        const answerBlocks = container.querySelectorAll('.ablock .answer, .answer table tr, .formulation table tr, .subquestion, table.answer tr');
+        
+        console.log('[Scanner FillBlank] Method 1 - Found', answerBlocks.length, 'answer blocks');
+        
+        if (answerBlocks.length > 0) {
+            answerBlocks.forEach((block) => {
+                const result = extractSingleFillBlankRow(block);
+                if (result && !processedTexts.has(result.questionText)) {
+                    processedTexts.add(result.questionText);
+                    subQuestions.push(result);
+                }
+            });
+        }
+        
+        // Method 2: Tìm các table rows có chứa input + text (dạng matching)
+        if (subQuestions.length === 0) {
+            const tableRows = container.querySelectorAll('table tr, .matching-question tr');
+            console.log('[Scanner FillBlank] Method 2 - Found', tableRows.length, 'table rows');
+            
+            tableRows.forEach((row) => {
+                const inputs = row.querySelectorAll('input[type="text"], input:not([type]), select');
+                if (inputs.length === 0) return;
+                
+                const result = extractSingleFillBlankRow(row);
+                if (result && !processedTexts.has(result.questionText)) {
+                    processedTexts.add(result.questionText);
+                    subQuestions.push(result);
+                }
+            });
+        }
+        
+        // Method 3: Quét các elements có input trực tiếp
+        if (subQuestions.length === 0) {
+            // Tìm tất cả inputs và lấy parent có nghĩa
+            const allInputs = container.querySelectorAll('input[type="text"], input:not([type]), select');
+            console.log('[Scanner FillBlank] Method 3 - Found', allInputs.length, 'inputs');
+            
+            allInputs.forEach((input) => {
+                // Tìm parent row/container gần nhất
+                let parentRow = input.closest('tr, p, div.answer, div.formulation, li, label, span');
+                if (!parentRow || isExtensionElement(parentRow)) return;
+                
+                // Skip nếu parent quá lớn (là container chính)
+                if (parentRow.querySelectorAll('input').length > 10) {
+                    parentRow = input.parentElement;
+                }
+                
+                const result = extractSingleFillBlankRow(parentRow);
+                if (result && !processedTexts.has(result.questionText)) {
+                    processedTexts.add(result.questionText);
+                    subQuestions.push(result);
+                }
+            });
+        }
+        
+        // Method 4: Fallback - quét toàn bộ container tìm pattern label + inputs
+        if (subQuestions.length === 0) {
+            const allElements = container.querySelectorAll('p, div, span, td, li, label');
+            console.log('[Scanner FillBlank] Method 4 - Scanning', allElements.length, 'elements');
+            
+            allElements.forEach((el) => {
+                if (isExtensionElement(el)) return;
+                
+                // Kiểm tra có chứa input không
+                const inputs = el.querySelectorAll('input[type="text"], input:not([type]), select');
+                if (inputs.length === 0) return;
+                
+                // Kiểm tra có text đi kèm (không chỉ có input)
+                const textLen = el.textContent?.trim().length || 0;
+                if (textLen <= inputs.length * 2) return;
+                
+                const result = extractSingleFillBlankRow(el);
+                if (result && !processedTexts.has(result.questionText)) {
+                    processedTexts.add(result.questionText);
+                    subQuestions.push(result);
+                }
+            });
+        }
+        
+        console.log('[Scanner FillBlank] Total sub-questions found:', subQuestions.length);
+        return subQuestions;
+    }
+    
+    /**
+     * Trích xuất thông tin từ một row/element chứa fill-blank
+     * @returns {{ label: string, questionText: string, correctAnswer: string, element: Element }}
+     */
+    function extractSingleFillBlankRow(element) {
+        if (!element) return null;
+        
+        // Tìm tất cả inputs VÀ selects trong element
+        const inputs = element.querySelectorAll('input[type="text"], input:not([type]), select');
+        if (inputs.length === 0) return null;
+        
+        // Clone element để xử lý
+        const clone = element.cloneNode(true);
+        
+        // Xóa các feedback elements (✓, ✗, icons)
+        const feedbackEls = clone.querySelectorAll('.feedback, .feedbackspan, .incorrect, .correct, [class*="feedback"], img, svg, i.fa, i.icon');
+        feedbackEls.forEach(fb => fb.remove());
+        
+        // Lấy label nếu có (a., b., c., 1., 2., etc.)
+        let label = '';
+        const labelMatch = clone.textContent?.match(/^[\s]*([a-z]|[0-9]+)[\.\)]/i);
+        if (labelMatch) {
+            label = labelMatch[1].toUpperCase();
+        }
+        
+        // Trích xuất correct answer từ các input có giá trị đúng
+        // Lưu theo thứ tự để format answer với số thứ tự
+        const correctAnswers = [];
+        
+        inputs.forEach((input, idx) => {
+            let value = '';
+            
+            // Handle SELECT elements
+            if (input.tagName === 'SELECT') {
+                const selectedOption = input.options[input.selectedIndex];
+                value = selectedOption?.text?.trim() || selectedOption?.value?.trim() || '';
+            } else {
+                value = input.value?.trim() || '';
+            }
+            
+            if (!value) return;
+            
+            // Kiểm tra input này có đúng không
+            const isCorrect = isInputCorrect(input);
+            
+            console.log('[Scanner FillBlank] Input #' + idx + ':', value, '| isCorrect:', isCorrect);
+            
+            if (isCorrect && value) {
+                correctAnswers.push({
+                    index: idx + 1,
+                    value: value
+                });
+            }
+        });
+        
+        // Nếu không có correct inputs, skip
+        if (correctAnswers.length === 0) {
+            console.log('[Scanner FillBlank] No correct answers found in row');
+            return null;
+        }
+        
+        // Format answer:
+        // - Nếu chỉ có 1 input: chỉ lấy giá trị (ví dụ: "I")
+        // - Nếu nhiều input: format "1.a, 2.i"
+        let correctAnswer = '';
+        if (correctAnswers.length === 1) {
+            correctAnswer = correctAnswers[0].value;
+        } else {
+            correctAnswer = correctAnswers.map(a => `${a.index}.${a.value}`).join(', ');
+        }
+        
+        // Tạo question text: thay MỖI input/select bằng "..." RIÊNG BIỆT
+        const cloneInputs = clone.querySelectorAll('input[type="text"], input:not([type]), select');
+        cloneInputs.forEach((input) => {
+            // Mỗi input được thay bằng "..." riêng
+            const marker = document.createTextNode('...');
+            if (input.parentNode) {
+                input.parentNode.replaceChild(marker, input);
+            }
+        });
+        
+        // Clean up question text
+        let questionText = clone.textContent || '';
+        questionText = questionText
+            .replace(/[✓✗×✕✔❌]/g, '')  // Remove check/cross marks
+            .replace(/\s+/g, ' ')
+            .replace(/^\s*[a-z0-9][\.\)]\s*/i, '')  // Remove label prefix
+            .trim();
+        
+        // Validate: question should have at least some text besides "..."
+        const textWithoutDots = questionText.replace(/\.{3,}/g, '').trim();
+        if (textWithoutDots.length < 1) return null;
+        
+        console.log('[Scanner FillBlank] Extracted:', label, '|', questionText, '| Answer:', correctAnswer);
+        
+        return {
+            label: label,
+            questionText: questionText,
+            correctAnswer: correctAnswer,
+            element: element
+        };
+    }
+    
+    /**
+     * Kiểm tra một input có phải là correct (đúng) không
+     * Dựa vào class, parent class, màu nền, icons gần đó
+     */
+    function isInputCorrect(input) {
+        if (!input) return false;
+        
+        try {
+            // Check 1: Input hoặc parent có class correct
+            const inputClass = input.className || '';
+            if (/\b(correct|right|ok)\b/i.test(inputClass)) {
+                console.log('[Scanner isInputCorrect] CORRECT via input class');
+                return true;
+            }
+            
+            // Check for incorrect in input class first
+            if (/\b(incorrect|wrong)\b/i.test(inputClass)) {
+                console.log('[Scanner isInputCorrect] INCORRECT via input class');
+                return false;
+            }
+            
+            // Check 2: Parent elements có class correct/incorrect
+            let parent = input.parentElement;
+            let depth = 0;
+            while (parent && depth < 5) {
+                const parentClass = parent.className || '';
+                
+                // Check for incorrect first (more specific)
+                if (/\b(incorrect|wrong)\b/i.test(parentClass)) {
+                    console.log('[Scanner isInputCorrect] INCORRECT via parent class:', parentClass);
+                    return false;
+                }
+                
+                if (/\b(correct)\b/i.test(parentClass)) {
+                    console.log('[Scanner isInputCorrect] CORRECT via parent class:', parentClass);
+                    return true;
+                }
+                
+                parent = parent.parentElement;
+                depth++;
+            }
+            
+            // Check 3: Sibling hoặc adjacent có icon ✓ hoặc ✗
+            const parentEl = input.parentElement;
+            if (parentEl) {
+                // Check all children and siblings
+                const checkElements = [...(parentEl.children || []), ...(parentEl.parentElement?.children || [])];
+                
+                for (const el of checkElements) {
+                    if (el === input) continue;
+                    const elText = el.textContent || '';
+                    const elClass = el.className || '';
+                    
+                    // Có dấu X -> incorrect (check này TRƯỚC)
+                    if (/[✗×❌]/.test(elText) && !/[✓✔✅]/.test(elText)) {
+                        console.log('[Scanner isInputCorrect] INCORRECT via sibling X mark');
+                        return false;
+                    }
+                    if (/\b(incorrect|wrong|error)\b/i.test(elClass)) {
+                        console.log('[Scanner isInputCorrect] INCORRECT via sibling class');
+                        return false;
+                    }
+                    
+                    // Có dấu tick
+                    if (/[✓✔✅]/.test(elText)) {
+                        console.log('[Scanner isInputCorrect] CORRECT via sibling check mark');
+                        return true;
+                    }
+                    if (/\b(correct|check|tick|ok)\b/i.test(elClass)) {
+                        console.log('[Scanner isInputCorrect] CORRECT via sibling class');
+                        return true;
+                    }
+                }
+            }
+            
+            // Check 4: Computed style - background color
+            const style = window.getComputedStyle(input);
+            const bgColor = style.backgroundColor || '';
+            
+            if (/rgb\((\d+),\s*(\d+),\s*(\d+)\)/.test(bgColor)) {
+                const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                if (match) {
+                    const r = parseInt(match[1]);
+                    const g = parseInt(match[2]);
+                    const b = parseInt(match[3]);
+                    
+                    // Red/pink (incorrect): r > g && r > 180
+                    if (r > g + 50 && r > 180) {
+                        console.log('[Scanner isInputCorrect] INCORRECT via red background:', bgColor);
+                        return false;
+                    }
+                    
+                    // Green: g > r && g > b && g > 150
+                    if (g > r + 30 && g > b && g > 150) {
+                        console.log('[Scanner isInputCorrect] CORRECT via green background:', bgColor);
+                        return true;
+                    }
+                }
+            }
+            
+            // Check 5: Border color
+            const borderColor = style.borderColor || '';
+            if (/green|#4caf50|#8bc34a|#2e7d32|rgb\(76,\s*175,\s*80\)/i.test(borderColor)) {
+                console.log('[Scanner isInputCorrect] CORRECT via green border');
+                return true;
+            }
+            if (/red|#f44336|#e53935|#d32f2f/i.test(borderColor)) {
+                console.log('[Scanner isInputCorrect] INCORRECT via red border');
+                return false;
+            }
+            
+            // Default: KHÔNG tự động coi là đúng nữa - phải có indicator rõ ràng
+            console.log('[Scanner isInputCorrect] No clear indicator found, returning false');
+            return false;
+            
+        } catch (e) {
+            console.warn('[Scanner] Error checking input correct status:', e);
+            return false;
+        }
     }
 
     // ==================== HELPER FUNCTIONS ====================
