@@ -1544,7 +1544,7 @@ function findValidAnswersOnPage(questionText, questionElement) {
 function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
     const element = pageQuestion.element;
     const container = pageQuestion.container || element.closest('.que');
-    const answerContainer = pageQuestion.answerContainer || container?.querySelector('.answer');
+    let answerContainer = pageQuestion.answerContainer || container?.querySelector('.answer');
     
     if (!element.classList.contains('tailieu-highlighted-question')) {
         // Mark question as highlighted
@@ -1562,6 +1562,10 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         // Use the array of all answers instead of just one
         const correctAnswer = allCorrectAnswers; // This will be an array
         const normalizedAnswer = normalizeTextForMatching(allCorrectAnswers[0].toString());
+        
+        // Track total highlighted count for this question
+        let totalHighlightedCount = 0;
+        
         // If we don't have an explicit answerContainer, try heuristic
         if (!answerContainer) {
             const found = findAnswerContainerForQuestion(element);
@@ -1577,7 +1581,8 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
             const flexFillOptions = answerContainer.querySelectorAll('.flex-fill');
             if (flexFillOptions.length > 0) {
                 console.log('[Tailieu Extension] Tìm thấy', flexFillOptions.length, 'options dạng .flex-fill');
-                highlightMatchingOptions(flexFillOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                totalHighlightedCount = highlightMatchingOptions(flexFillOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                showMultipleAnswersWarning(element, totalHighlightedCount);
                 return;
             }
             
@@ -1585,7 +1590,8 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
             const labelOptions = answerContainer.querySelectorAll('label');
             if (labelOptions.length > 0) {
                 console.log('[Tailieu Extension] Tìm thấy', labelOptions.length, 'options dạng label');
-                highlightMatchingOptions(labelOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                totalHighlightedCount = highlightMatchingOptions(labelOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                showMultipleAnswersWarning(element, totalHighlightedCount);
                 return;
             }
             
@@ -1593,7 +1599,8 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
             const allTextElements = answerContainer.querySelectorAll('div, span, p');
             if (allTextElements.length > 0) {
                 console.log('[Tailieu Extension] Tìm thấy', allTextElements.length, 'text elements');
-                highlightMatchingOptions(allTextElements, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                totalHighlightedCount = highlightMatchingOptions(allTextElements, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                showMultipleAnswersWarning(element, totalHighlightedCount);
                 return;
             }
 
@@ -1603,7 +1610,8 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
                 console.log('[Tailieu Extension] Tìm thấy', imgOptions.length, 'image options');
                 // Wrap images into synthetic option wrappers for matching
                 const imgWrappers = Array.from(imgOptions).map(img => img.closest('label') || img.parentElement || img);
-                highlightMatchingOptions(imgWrappers, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                totalHighlightedCount = highlightMatchingOptions(imgWrappers, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+                showMultipleAnswersWarning(element, totalHighlightedCount);
                 return;
             }
         }
@@ -1612,23 +1620,67 @@ function highlightMatchedQuestion(pageQuestion, extensionQuestion) {
         if (container) {
             const allOptions = container.querySelectorAll('.flex-fill, label, .answer div, .answer span');
             console.log('[Tailieu Extension] Fallback - Tìm trong container:', allOptions.length, 'options');
-            highlightMatchingOptions(allOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+            totalHighlightedCount = highlightMatchingOptions(allOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
+            showMultipleAnswersWarning(element, totalHighlightedCount);
         }
 
         // Final fallback: try to find any instances on the page within question context (also consider images)
         const fallbackCount = highlightAllInstancesOfAnswer(correctAnswer, element, pageQuestion);
         if (fallbackCount > 0) {
-            //console.log('[Tailieu Extension] Fallback highlightAllInstancesOfAnswer found', fallbackCount);
+            showMultipleAnswersWarning(element, fallbackCount);
         } else {
             // If still nothing, mark question as highlighted (so user sees matched question) and log
-            //console.log('[Tailieu Extension] Không tìm thấy đáp án trong tất cả các chiến lược - will at least mark the question');
             element.style.backgroundColor = element.style.backgroundColor || '#f6fff6';
             element.style.borderLeft = element.style.borderLeft || '4px solid #2E7D32';
             const qaQuestionOnly = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: correctAnswer, matchType: 'QUESTION_ONLY' };
-            //console.log('[Tailieu Extension] HIGHLIGHTED (question only):', qaQuestionOnly);
             highlightedQA.push(qaQuestionOnly);
         }
     }
+}
+
+// Show warning badge when multiple answers are highlighted for a question
+function showMultipleAnswersWarning(questionElement, highlightedCount) {
+    if (!questionElement || highlightedCount <= 1) return;
+    
+    // Check if warning already exists
+    if (questionElement.querySelector('.tailieu-multiple-answers-warning')) return;
+    
+    // Create warning badge
+    const warningBadge = document.createElement('span');
+    warningBadge.className = 'tailieu-multiple-answers-warning';
+    warningBadge.innerHTML = ` Cần tự xác định đáp án đúng! (${highlightedCount} đáp án)`;
+    warningBadge.style.cssText = `
+        display: inline-block;
+        margin-left: 10px;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #ff9800, #f57c00);
+        color: black;
+        font-size: 12px;
+        font-weight: bold;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(255, 152, 0, 0.4);
+        animation: warningPulse 2s ease-in-out infinite;
+        vertical-align: middle;
+    `;
+    
+    // Add animation style if not exists
+    if (!document.getElementById('tailieu-warning-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'tailieu-warning-styles';
+        styles.textContent = `
+            @keyframes warningPulse {
+                0% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.8; transform: scale(1.02); }
+                100% { opacity: 1; transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+    
+    // Append warning to question element
+    questionElement.appendChild(warningBadge);
+    
+    console.log('[Tailieu Extension] ⚠️ Cảnh báo: Câu hỏi có', highlightedCount, 'đáp án được highlight - cần tự xác định!');
 }
 
 // Create and show an answer tooltip next to a question element
@@ -1943,7 +1995,8 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
         console.log('[Tailieu Extension] ✅ Đã highlight', highlightedCount, 'đáp án khớp cho câu hỏi này');
     }
     
-    return highlightedCount > 0;
+    // Return the count so caller can show warning if multiple answers highlighted
+    return highlightedCount;
 }
 
 // Calculate text similarity (Levenshtein-based)
