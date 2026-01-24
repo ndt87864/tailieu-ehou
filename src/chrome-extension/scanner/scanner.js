@@ -783,6 +783,32 @@
 
         let processedText = text;
 
+        // 0. Remove audio player scripts / CDATA
+        if (processedText.includes('//]]>')) {
+            const parts = processedText.split('//]]>');
+            if (parts.length > 1) {
+                const afterScript = parts[parts.length - 1].trim();
+                if (afterScript.length > 5) {
+                    processedText = afterScript;
+                }
+            }
+        }
+
+        // Remove .mp3 or similar audio references if they appear at the start (or before question)
+        // Check for common audio pattern if no CDATA marker found or still present
+        const audioExtensions = ['.mp3', '.wav', '.ogg'];
+        for (const ext of audioExtensions) {
+            const idx = processedText.lastIndexOf(ext);
+            if (idx !== -1) { // Audio likely in first half
+                // Try to split by whitespace after extension
+                const afterAudio = processedText.substring(idx + ext.length).trim();
+                // If clearly separated or just weird text, take valid part
+                if (afterAudio.length > 5) {
+                    processedText = afterAudio;
+                }
+            }
+        }
+
         // Tìm marker xuất hiện cuối cùng (gần câu hỏi nhất)
         for (const marker of markers) {
             // Sử dụng regex để match case-insensitive

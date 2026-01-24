@@ -85,6 +85,30 @@ if (window.tailieuExtensionLoaded) {
 
         let processedText = text;
 
+        // 0. Remove audio player scripts / CDATA
+        if (processedText.includes('//]]>')) {
+            const parts = processedText.split('//]]>');
+            if (parts.length > 1) {
+                const afterScript = parts[parts.length - 1].trim();
+                // If the part after script seems valid (has content)
+                if (afterScript.length > 5) {
+                    processedText = afterScript;
+                }
+            }
+        }
+
+        // Remove .mp3 or similar audio references if they appear at the start (or before question)
+        const audioExtensions = ['.mp3', '.wav', '.ogg'];
+        for (const ext of audioExtensions) {
+            const idx = processedText.lastIndexOf(ext);
+            if (idx !== -1) {
+                const afterAudio = processedText.substring(idx + ext.length).trim();
+                if (afterAudio.length > 5) {
+                    processedText = afterAudio;
+                }
+            }
+        }
+
         for (const marker of markers) {
             const regex = new RegExp(marker, 'gi');
             const matches = [...processedText.matchAll(regex)];
@@ -4414,4 +4438,4 @@ if (window.tailieuExtensionLoaded) {
     };
 
 
-} 
+}
