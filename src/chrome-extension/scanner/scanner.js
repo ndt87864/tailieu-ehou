@@ -73,6 +73,29 @@
     async function handleScanClick() {
         if (isScanning) return;
 
+        // KIỂM TRA HIGHLIGHT CỦA "SO SÁNH NGAY"
+        // Nếu đã có highlight, thực hiện reload trang trước khi quét để tránh nhiễu
+        const highlightSelectors = [
+            '.tailieu-answer-highlight',
+            '.tailieu-highlighted-question',
+            '.tailieu-text-highlight',
+            '.tailieu-fillblank-highlighted',
+            '.tailieu-blank-marker',
+            '.tailieu-multiple-answers-warning'
+        ];
+        const hasHighlights = document.querySelector(highlightSelectors.join(','));
+
+        if (hasHighlights) {
+            console.log('[Tailieu Scanner] Đã phát hiện highlight từ chức năng "So sánh ngay". Đang reload trang...');
+            try {
+                sessionStorage.setItem('tailieu_auto_scan_trigger', 'true');
+                window.location.reload();
+                return;
+            } catch (e) {
+                console.error('[Tailieu Scanner] Lỗi khi lưu state và reload:', e);
+            }
+        }
+
         isScanning = true;
         updateButtonState('scanning');
 
@@ -2253,9 +2276,29 @@
     function init() {
         // Đợi DOM ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', createScannerButton);
+            document.addEventListener('DOMContentLoaded', () => {
+                createScannerButton();
+                checkAutoScanTrigger();
+            });
         } else {
             createScannerButton();
+            checkAutoScanTrigger();
+        }
+    }
+
+    // Kiểm tra và tự động kích hoạt quét nếu có yêu cầu (sau khi reload)
+    function checkAutoScanTrigger() {
+        try {
+            if (sessionStorage.getItem('tailieu_auto_scan_trigger') === 'true') {
+                sessionStorage.removeItem('tailieu_auto_scan_trigger');
+                console.log('[Tailieu Scanner] Tự động kích hoạt quét sau khi reload...');
+                // Đợi một lát cho trang ổn định
+                setTimeout(() => {
+                    handleScanClick();
+                }, 1500);
+            }
+        } catch (e) {
+            console.warn('[Tailieu Scanner] Không thể kiểm tra auto scan trigger:', e);
         }
     }
 
