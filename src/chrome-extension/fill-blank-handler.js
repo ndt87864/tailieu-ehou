@@ -933,16 +933,9 @@
         }
         // ==================== END AUTO-FILL LOGIC ====================
 
-        // Create answer tooltip/suggestion box (luôn hiển thị để user có thể xem/copy)
-        const tooltip = createAnswerTooltip(answers, inputElements);
-
-        // Position tooltip near the element
-        element.style.position = 'relative';
-        element.appendChild(tooltip);
-
-        // If there are input fields, add helper buttons (chỉ khi không auto-fill)
-        if (inputElements && inputElements.length > 0 && !autoSelectEnabled) {
-            addInputHelpers(inputElements, answers);
+        // Create answer badges for each input (instead of one big tooltip)
+        if (inputElements && inputElements.length > 0) {
+            displayAnswerBadges(inputElements, answers);
         }
 
         console.log('[Tailieu FillBlank] Highlighted:', sentenceText.substring(0, 50), 'with', answers.length, 'answers', autoSelectEnabled ? '(auto-filled)' : '(manual)');
@@ -1066,48 +1059,68 @@
     }
 
     /**
-     * Thêm helper buttons cho các input fields
-     * @param {Array} inputElements 
-     * @param {Array} answers 
+     * Hiển thị các badge đáp án trực tiếp bên cạnh input
      */
-    function addInputHelpers(inputElements, answers) {
+    function displayAnswerBadges(inputElements, answers) {
         inputElements.forEach((input, idx) => {
-            if (input.dataset.tailieuHelperAdded) return;
-            input.dataset.tailieuHelperAdded = 'true';
+            if (input.dataset.tailieuBadgeAdded) return;
+            input.dataset.tailieuBadgeAdded = 'true';
 
-            // Style the input
-            input.style.cssText += `
-                border: 2px solid #ff9800 !important;
-                background-color: #fff8e1 !important;
-            `;
-
-            // Add a small fill button next to input
             if (answers[idx]) {
-                const fillBtn = document.createElement('button');
-                fillBtn.textContent = '📝';
-                fillBtn.title = `Điền: ${answers[idx].answer}`;
-                fillBtn.style.cssText = `
-                    margin-left: 4px;
-                    padding: 2px 6px;
-                    font-size: 12px;
-                    cursor: pointer;
-                    border: 1px solid #ff9800;
-                    background: #fff3e0;
+                const badge = document.createElement('span');
+                badge.className = 'tailieu-answer-badge';
+                badge.textContent = answers[idx].answer;
+                badge.style.cssText = `
+                    display: inline-block;
+                    margin-left: 8px;
+                    padding: 2px 8px;
+                    background: #4CAF50;
+                    color: white;
                     border-radius: 4px;
+                    font-size: 13px;
+                    font-weight: bold;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    z-index: 1000;
+                    vertical-align: middle;
+                    white-space: nowrap;
                 `;
 
-                fillBtn.addEventListener('click', (e) => {
+                badge.title = 'Nhấn để điền đáp án';
+
+                badge.addEventListener('click', (e) => {
                     e.preventDefault();
                     input.value = answers[idx].answer;
                     input.style.backgroundColor = '#e8f5e9';
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                     input.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    // Visual feedback
+                    badge.style.transform = 'scale(0.9)';
+                    setTimeout(() => badge.style.transform = 'scale(1)', 100);
                 });
 
-                // Insert after input
-                input.parentNode.insertBefore(fillBtn, input.nextSibling);
+                // Insert after input or sibling button
+                const target = input.nextSibling || input;
+                input.parentNode.insertBefore(badge, target);
+
+                // Style the input too
+                input.style.border = '2px solid #4CAF50';
+                input.style.backgroundColor = '#f1f8e9';
             }
         });
+    }
+
+    /**
+     * Thêm helper buttons cho các input fields
+     * @param {Array} inputElements 
+     * @param {Array} answers 
+     */
+    function addInputHelpers(inputElements, answers) {
+        // This function is now mostly superseded by displayAnswerBadges
+        // but we keep it and just call displayAnswerBadges or leave as is.
+        displayAnswerBadges(inputElements, answers);
     }
 
     /**

@@ -1817,8 +1817,7 @@ if (window.tailieuExtensionLoaded) {
         line-height: 1.3;
     `;
 
-        let inner = '<div style="font-weight:600;margin-bottom:6px">Đáp án (DB)</div>';
-        inner += '<div style="display:flex;flex-direction:column;gap:6px">';
+        let inner = '<div style="display:flex;flex-direction:column;gap:6px; margin-bottom: 2px;">';
         answers.forEach((ans, i) => {
             if (isImageString(ans)) {
                 const src = extractImageSrcFromString(ans) || '';
@@ -1826,7 +1825,7 @@ if (window.tailieuExtensionLoaded) {
             } else {
                 // escape minimal HTML
                 const safe = String(ans).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                inner += `<div style="padding:6px 8px;background:rgba(255,255,255,0.06);border-radius:6px">` + `<strong style="margin-right:6px">${i + 1}.</strong> ${safe}` + '</div>';
+                inner += `<div style="padding:4px 0; border-bottom: 1px solid rgba(255,255,255,0.1)">` + `<span style="font-weight: 500">${safe}</span>` + '</div>';
             }
         });
         inner += '</div>';
