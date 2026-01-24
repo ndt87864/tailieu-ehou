@@ -1697,8 +1697,9 @@ function hideAnswerTooltip(questionElement) {
 }
 
 // Helper function to highlight matching options - IMPROVED FOR MULTIPLE DB ANSWERS
+// Now highlights ALL matching options instead of just the first one
 function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pageQuestion = null, extensionQuestion = null) {
-    let highlighted = false;
+    let highlightedCount = 0; // Track number of highlighted options
     
     // Handle array answers (multiple correct)
     const answersToMatch = Array.isArray(originalAnswer) ? originalAnswer : [originalAnswer];
@@ -1761,14 +1762,17 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
     
     //console.log('[Tailieu Extension] Extracted', webOptions.length, 'valid web options');
     
-    // LOGIC: Xử lý theo số lượng đáp án trong DB
+    // Track which web options have been highlighted to avoid duplicate processing
+    const highlightedWebIndices = new Set();
+    
+    // LOGIC: Highlight TẤT CẢ các đáp án khớp (không dừng ở match đầu tiên)
+    // Nếu số đáp án trong DB > 4: Lấy từng đáp án a,b,c,d từ web so sánh với DB
     if (normalizedAnswers.length > 4) {
-        // Nếu số đáp án trong DB > 4: Lấy từng đáp án a,b,c,d từ web so sánh với DB
         //console.log('[Tailieu Extension] ⚙️ Strategy: DB answers > 4, comparing WEB options against DB answers');
         
         webOptions.forEach((webOpt) => {
-            // Nếu đã highlight rồi thì bỏ qua (chỉ highlight 1 đáp án duy nhất)
-            if (highlighted) return;
+            // Bỏ qua nếu option này đã được highlight
+            if (highlightedWebIndices.has(webOpt.index)) return;
             
             //console.log('[Tailieu Extension] Checking web option', webOpt.index, ':', webOpt.normalizedText.substring(0, 80));
             
@@ -1786,71 +1790,77 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                         applyHighlightStyle(webOpt.element);
                         const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
                         highlightedQA.push(qaExact);
-                        highlighted = true;
-                        return; // stop at first exact match
+                        highlightedCount++;
+                        highlightedWebIndices.add(webOpt.index);
+                        break; // Thoát khỏi vòng lặp DB answers, tiếp tục với web option tiếp theo
                     }
                     // Debug logging for strict mode mismatch (lightweight)
-                    if (debugMode) {
-                        console.log('[Tailieu Extension][STRICT_MATCH] No exact match for:', {
-                            pageQuestion: pageQuestion?.text || pageQuestion?.originalText || 'unknown',
-                            webExact,
-                            dbExact
-                        });
+                    if (debugMode && normalizedAnswers.indexOf(normalizedAns) === 0) {
+                        console.log('[Tailieu Extension][STRICT_MATCH] Checking web option:', webOpt.index, webExact.substring(0, 50));
                     }
                     // If strict mode and not exact, do not fallback to fuzzy matches
                     continue;
                 }
 
                 // NON-STRICT: preserve existing heuristics (contains/reverse/similarity)
+                let matched = false;
+                
                 // EXACT MATCH
                 if (webOpt.normalizedText === normalizedAns) {
                     applyHighlightStyle(webOpt.element);
                     const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
                     highlightedQA.push(qaExact);
-                    highlighted = true;
-                    return; // Dừng ngay khi tìm thấy match đầu tiên
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
 
                 // CONTAINS MATCH
-                if (webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
+                if (!matched && webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
                     applyHighlightStyle(webOpt.element);
                     const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'CONTAINS_WEB_TO_DB' };
                     highlightedQA.push(qaContains);
-                    highlighted = true;
-                    return;
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
 
                 // REVERSE CONTAINS
-                if (normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
+                if (!matched && normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
                     applyHighlightStyle(webOpt.element);
                     const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'REVERSE_CONTAINS_WEB_TO_DB' };
                     highlightedQA.push(qaReverse);
-                    highlighted = true;
-                    return;
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
 
                 // SIMILARITY CHECK
-                if (webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
+                if (!matched && webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
                     const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
                     if (similarity > 0.90) {
                         applyHighlightStyle(webOpt.element);
                         const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'SIMILARITY_WEB_TO_DB', similarity: similarity };
                         highlightedQA.push(qaSim);
-                        highlighted = true;
-                        return;
+                        highlightedCount++;
+                        highlightedWebIndices.add(webOpt.index);
+                        matched = true;
                     }
                 }
+                
+                if (matched) break; // Tìm thấy match cho web option này, chuyển sang web option tiếp theo
             }
         });
     } else {
-        
+        // Số đáp án trong DB <= 4: Lấy từng đáp án từ DB so sánh với web options
         normalizedAnswers.forEach((normalizedAns, ansIndex) => {
-            // Nếu đã highlight rồi thì bỏ qua (chỉ highlight 1 đáp án duy nhất)
-            if (highlighted) return;
-            
             if (normalizedAns.length < 2) return;
-            // So sánh đáp án này với TẤT CẢ các options trên web
+            
+            // So sánh đáp án DB này với TẤT CẢ các options trên web
             for (const webOpt of webOptions) {
+                // Bỏ qua nếu option này đã được highlight
+                if (highlightedWebIndices.has(webOpt.index)) continue;
+                
                 // Prepare strict-normalized forms for exact comparison (ignore punctuation)
                 const webExact = normalizeForExactMatch(webOpt.normalizedText || webOpt.originalText || '');
                 const dbExact = normalizeForExactMatch(normalizedAns || '');
@@ -1861,66 +1871,79 @@ function highlightMatchingOptions(options, normalizedAnswer, originalAnswer, pag
                         applyHighlightStyle(webOpt.element);
                         const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
                         highlightedQA.push(qaExact);
-                        highlighted = true;
-                        return; // stop at first exact match
+                        highlightedCount++;
+                        highlightedWebIndices.add(webOpt.index);
+                        // KHÔNG return, tiếp tục tìm thêm match khác trong web options
                     }
                     // If strict mode and not exact, do not fallback to fuzzy matches
                     continue;
                 }
 
                 // NON-STRICT: preserve existing heuristics (contains/reverse/similarity)
+                let matched = false;
+                
                 // EXACT MATCH
                 if (webOpt.normalizedText === normalizedAns) {
                     applyHighlightStyle(webOpt.element);
                     const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
                     highlightedQA.push(qaExact);
-                    highlighted = true;
-                    return; // Dừng ngay khi tìm thấy match đầu tiên
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
                 
                 // CONTAINS MATCH
-                if (webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
+                if (!matched && webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
                     applyHighlightStyle(webOpt.element);
                     const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'CONTAINS_DB_TO_WEB' };
                     highlightedQA.push(qaContains);
-                    highlighted = true;
-                    return;
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
                 
                 // REVERSE CONTAINS
-                if (normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
+                if (!matched && normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
                     applyHighlightStyle(webOpt.element);
                     const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'REVERSE_CONTAINS_DB_TO_WEB' };
                     highlightedQA.push(qaReverse);
-                    highlighted = true;
-                    return;
+                    highlightedCount++;
+                    highlightedWebIndices.add(webOpt.index);
+                    matched = true;
                 }
                 
                 // SIMILARITY CHECK
-                if (webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
+                if (!matched && webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
                     const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
                     if (similarity > 0.90) {
                         applyHighlightStyle(webOpt.element);
                         const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'SIMILARITY_DB_TO_WEB', similarity: similarity };
                         highlightedQA.push(qaSim);
-                        highlighted = true;
-                        return;
+                        highlightedCount++;
+                        highlightedWebIndices.add(webOpt.index);
+                        matched = true;
                     }
                 }
+                // Tiếp tục vòng lặp để tìm thêm match khác (không dừng lại)
             }
         });
     }
     
-    if (!highlighted) {
+    // Log debug info nếu không tìm được match nào
+    if (highlightedCount === 0) {
+        console.log('[Tailieu Extension] Không tìm thấy match - Web options:');
         webOptions.forEach((opt, i) => {
             console.log('  ', i, ':', opt.normalizedText.substring(0, 100));
         });
+        console.log('[Tailieu Extension] DB answers:');
         normalizedAnswers.forEach((ans, i) => {
             console.log('  ', i, ':', ans.substring(0, 100));
         });
+    } else {
+        console.log('[Tailieu Extension] ✅ Đã highlight', highlightedCount, 'đáp án khớp cho câu hỏi này');
     }
     
-    return highlighted;
+    return highlightedCount > 0;
 }
 
 // Calculate text similarity (Levenshtein-based)
@@ -2291,7 +2314,18 @@ function fingerprintImagePath(src) {
 
 // NEW: Function to highlight ALL instances of an answer on the page (not just the first one)
 function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion = null) {
-    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
+    // Handle array of answers - highlight all of them
+    if (Array.isArray(answerText)) {
+        let totalHighlighted = 0;
+        for (const singleAnswer of answerText) {
+            if (singleAnswer && typeof singleAnswer === 'string' && singleAnswer.trim()) {
+                totalHighlighted += highlightAllInstancesOfAnswer(singleAnswer, questionElement, pageQuestion);
+            }
+        }
+        return totalHighlighted;
+    }
+    
+    if (!answerText || (typeof answerText === 'string' && answerText.trim() === '') || !answerHighlightingEnabled) {
         return 0;
     }
     
@@ -2478,7 +2512,20 @@ function highlightAllInstancesOfAnswer(answerText, questionElement, pageQuestion
 
 // Function to highlight answer text on the page (kept for backward compatibility, but now only highlights first instance)
 function highlightAnswerOnPage(answerText, questionElement, pageQuestion = null) {
-    if (!answerText || answerText.trim() === '' || !answerHighlightingEnabled) {
+    // Handle array of answers - highlight all of them
+    if (Array.isArray(answerText)) {
+        let anyHighlighted = false;
+        for (const singleAnswer of answerText) {
+            if (singleAnswer && typeof singleAnswer === 'string' && singleAnswer.trim()) {
+                if (highlightAnswerOnPage(singleAnswer, questionElement, pageQuestion)) {
+                    anyHighlighted = true;
+                }
+            }
+        }
+        return anyHighlighted;
+    }
+    
+    if (!answerText || (typeof answerText === 'string' && answerText.trim() === '') || !answerHighlightingEnabled) {
 
         return false;
     }
