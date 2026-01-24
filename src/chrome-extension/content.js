@@ -1000,7 +1000,15 @@ async function compareAndHighlightQuestions(isManual = false) {
     try {
         if (window.TailieuFillBlank && typeof window.TailieuFillBlank.processFillBlankQuestions === 'function') {
             console.log('[Tailieu Extension] Processing fill-in-the-blank questions...');
-            fillBlankMatches = window.TailieuFillBlank.processFillBlankQuestions(extensionQuestions);
+            console.log('[Tailieu Extension] autoSelectEnabled for fill-blank:', autoSelectEnabled);
+            
+            // Truyền autoSelectEnabled vào fill-blank handler
+            // Khi bật: tự động điền đáp án vào input fields
+            // Khi tắt: chỉ hiển thị gợi ý
+            fillBlankMatches = window.TailieuFillBlank.processFillBlankQuestions(extensionQuestions, {
+                autoSelectEnabled: autoSelectEnabled
+            });
+            
             console.log('[Tailieu Extension] Fill-blank matches found:', fillBlankMatches.length);
             
             // Add fill-blank matches to overall matched count
@@ -1011,7 +1019,8 @@ async function compareAndHighlightQuestions(isManual = false) {
                     answer: fb.answers.map(a => `${a.index}. ${a.answer}`).join(', '),
                     similarity: 1.0,
                     confidence: 1.0,
-                    type: 'fill-blank'
+                    type: 'fill-blank',
+                    autoFilled: fb.autoFilled || false
                 });
             });
         }

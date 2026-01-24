@@ -290,10 +290,15 @@
     /**
      * Tìm và xử lý tất cả câu hỏi điền từ trên trang
      * @param {Array} extensionQuestions - Danh sách câu hỏi từ extension
+     * @param {Object} options - Các tùy chọn
+     * @param {boolean} options.autoSelectEnabled - Tự động điền đáp án nếu true
      * @returns {Array} - Danh sách kết quả match
      */
-    function processFillBlankQuestions(extensionQuestions) {
+    function processFillBlankQuestions(extensionQuestions, options = {}) {
         const results = [];
+        const autoSelectEnabled = options.autoSelectEnabled || false;
+        
+        console.log('[Tailieu FillBlank] Processing with autoSelectEnabled:', autoSelectEnabled);
         
         if (!extensionQuestions || extensionQuestions.length === 0) {
             console.log('[Tailieu FillBlank] Không có câu hỏi extension để so sánh');
@@ -325,8 +330,8 @@
                     const answers = parseNumberedAnswers(matchedQuestion.answer);
                     const blankCount = countBlanks(sentenceText) || inputElements.length;
                     
-                    // Highlight câu và đề xuất đáp án
-                    highlightFillBlankQuestion(element, sentenceText, answers, inputElements);
+                    // Highlight câu và đề xuất đáp án (truyền autoSelectEnabled)
+                    highlightFillBlankQuestion(element, sentenceText, answers, inputElements, autoSelectEnabled);
                     
                     results.push({
                         sentence: sentenceText,
@@ -334,7 +339,8 @@
                         answers: answers,
                         blankCount: blankCount,
                         element: element,
-                        inputElements: inputElements
+                        inputElements: inputElements,
+                        autoFilled: autoSelectEnabled
                     });
                 } else {
                     console.log('[Tailieu FillBlank] ✗ No match for:', sentenceText.substring(0, 50));
@@ -343,6 +349,13 @@
         });
         
         console.log('[Tailieu FillBlank] Tổng cộng', results.length, 'câu được match');
+        
+        // Nếu autoSelectEnabled và có kết quả, log số input đã được tự động điền
+        if (autoSelectEnabled && results.length > 0) {
+            const totalAutoFilled = results.reduce((sum, r) => sum + (r.inputElements?.length || 0), 0);
+            console.log('[Tailieu FillBlank] Đã tự động điền', totalAutoFilled, 'input fields');
+        }
+        
         return results;
     }
 
@@ -764,8 +777,9 @@
      * @param {string} sentenceText - Text của câu
      * @param {Array} answers - Danh sách đáp án parsed
      * @param {Array} inputElements - Các input field trong câu
+     * @param {boolean} autoSelectEnabled - Tự động điền đáp án nếu true
      */
-    function highlightFillBlankQuestion(element, sentenceText, answers, inputElements) {
+    function highlightFillBlankQuestion(element, sentenceText, answers, inputElements, autoSelectEnabled = false) {
         if (!element) return;
         
         // Mark as processed
@@ -784,19 +798,67 @@
             position: relative !important;
         `;
         
-        // Create answer tooltip/suggestion box
+        // ==================== AUTO-FILL LOGIC ====================
+        // Nếu autoSelectEnabled = true, tự động điền đáp án vào input fields
+        if (autoSelectEnabled && inputElements && inputElements.length > 0 && answers && answers.length > 0) {
+            console.log('[Tailieu FillBlank] AUTO-FILL: Đang tự động điền', answers.length, 'đáp án vào', inputElements.length, 'input fields');
+            
+            inputElements.forEach((input, idx) => {
+                if (answers[idx] && answers[idx].answer) {
+                    // Chỉ điền nếu input chưa có giá trị
+                    if (!input.value || input.value.trim() === '') {
+                        input.value = answers[idx].answer;
+                        input.style.backgroundColor = '#c8e6c9'; // Green tint for auto-filled
+                        input.style.borderColor = '#4CAF50';
+                        
+                        // Trigger events để Moodle nhận biết thay đổi
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        input.dispatchEvent(new Event('blur', { bubbles: true }));
+                        
+                        // Mark as auto-filled
+                        input.dataset.tailieuAutoFilled = 'true';
+                        
+                        console.log('[Tailieu FillBlank] AUTO-FILL: Input #' + (idx + 1) + ' = "' + answers[idx].answer + '"');
+                    } else {
+                        console.log('[Tailieu FillBlank] AUTO-FILL: Input #' + (idx + 1) + ' đã có giá trị, bỏ qua');
+                    }
+                }
+            });
+            
+            // Thêm indicator cho user biết đã tự động điền
+            const autoFilledBadge = document.createElement('span');
+            autoFilledBadge.className = 'tailieu-autofilled-badge';
+            autoFilledBadge.innerHTML = '✓ Đã tự động điền';
+            autoFilledBadge.style.cssText = `
+                position: absolute;
+                top: -10px;
+                right: 10px;
+                background: #4CAF50;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 10px;
+                font-size: 11px;
+                font-weight: bold;
+                z-index: 10002;
+            `;
+            element.appendChild(autoFilledBadge);
+        }
+        // ==================== END AUTO-FILL LOGIC ====================
+        
+        // Create answer tooltip/suggestion box (luôn hiển thị để user có thể xem/copy)
         const tooltip = createAnswerTooltip(answers, inputElements);
         
         // Position tooltip near the element
         element.style.position = 'relative';
         element.appendChild(tooltip);
         
-        // If there are input fields, add helper buttons
-        if (inputElements && inputElements.length > 0) {
+        // If there are input fields, add helper buttons (chỉ khi không auto-fill)
+        if (inputElements && inputElements.length > 0 && !autoSelectEnabled) {
             addInputHelpers(inputElements, answers);
         }
         
-        console.log('[Tailieu FillBlank] Highlighted:', sentenceText.substring(0, 50), 'with', answers.length, 'answers');
+        console.log('[Tailieu FillBlank] Highlighted:', sentenceText.substring(0, 50), 'with', answers.length, 'answers', autoSelectEnabled ? '(auto-filled)' : '(manual)');
     }
 
     /**
