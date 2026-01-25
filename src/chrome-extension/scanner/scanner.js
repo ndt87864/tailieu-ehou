@@ -147,6 +147,14 @@
         // as separate items.
         const seenSignatures = new Set();
 
+        // Check if image-handler module is loaded
+        const hasImageHandler = typeof window.tailieuImageHandler !== 'undefined';
+        if (hasImageHandler) {
+            console.log('[Scanner] Image Handler module detected - sẽ xử lý hình ảnh trong câu hỏi');
+        } else {
+            console.log('[Scanner] Image Handler module not found - bỏ qua xử lý hình ảnh');
+        }
+
         // ===== FILL-BLANK WITH INPUT FIELDS (e.g., "Br" + [a][z][i][l] = Brazil) =====
         // Xử lý dạng câu hỏi điền từ với chữ cái + input liên tiếp
         const fillBlankQuestions = scanFillBlankWithInputs();
@@ -176,8 +184,9 @@
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
 
-                // Use visible text extraction to avoid script/audio fragments
-                const questionText = getElementVisibleText(qtextElement) || qtextElement.textContent?.trim() || '';
+                // XỬ LÝ HÌNH ẢNH TRƯỚC KHI EXTRACT TEXT
+                // Sử dụng getElementVisibleText đã được cập nhật để xử lý cả text và image URLs
+                const questionText = getElementVisibleText(qtextElement);
                 if (questionText.length < 5) return;
 
                 // Tìm các đáp án (do dedupe phải bao gồm đáp án)
@@ -222,7 +231,8 @@
         elements.forEach((element, idx) => {
             if (isExtensionElement(element)) return;
 
-            const text = getElementVisibleText(element) || element.textContent?.trim() || '';
+            // Sử dụng getElementVisibleText đã được cập nhật để xử lý cả text và image URLs
+            const text = getElementVisibleText(element);
             if (text.length < 10 || text.length > 1000) return;
 
             // Kiểm tra có phải câu hỏi không
@@ -669,7 +679,7 @@
                     const elClass = el.className || '';
 
                     // Có dấu X -> incorrect (check này TRƯỚC)
-                    if (/[✗×❌]/.test(elText) && !/[✓✔✅]/.test(elText)) {
+                    if (/[✗×❌]/.test(elText) && !/[✓✔]/.test(elText)) {
                         console.log('[Scanner isInputCorrect] INCORRECT via sibling X mark');
                         return false;
                     }
@@ -764,6 +774,9 @@
 
     function cleanQuestionText(text, element = null) {
         if (!text) return '';
+
+        // Note: Hình ảnh đã được xử lý ở scanQuestionsFromPage() trước khi gọi hàm này
+        // Text đã chứa URL hình ảnh dạng "https://..." nếu có
 
         // 1. Loại bỏ đoạn văn đọc hiểu nếu có marker "Choose the best answer"
         const markers = [
@@ -883,17 +896,68 @@
 
                 // If meaningful content exists BEFORE audio (audio at end), prefer content before it
                 if (beforeAudio.length > 5) {
-                    processedText = beforeAudio.replace(/https?:\/\/\S+/gi, '').replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g, '').trim();
+                    // Bảo vệ URLs hình ảnh trước khi xóa URLs trần
+                    const imageUrls = [];
+                    beforeAudio = beforeAudio.replace(/"(https?:\/\/[^"]+)"/g, (match, url) => {
+                        const placeholder = `__IMG_${imageUrls.length}__`;
+                        imageUrls.push(url);
+                        return `"${placeholder}"`;
+                    });
+
+                    processedText = beforeAudio
+                        .replace(/https?:\/\/\S+/gi, '') // Xóa URLs trần
+                        .replace(/track\s*[\d\.%-]*/ig, '')
+                        .replace(/(?:\/\/|-{2,}).*/g, '')
+                        .trim();
+
+                    // Khôi phục URLs hình ảnh
+                    imageUrls.forEach((url, i) => {
+                        processedText = processedText.replace(`__IMG_${i}__`, url);
+                    });
                     break;
                 }
 
                 // Otherwise, remove the audio token and continue
-                processedText = (beforeAudio + ' ' + afterAudio).replace(/https?:\/\/\S+/gi, '').trim();
+                const imageUrls = [];
+                let combined = (beforeAudio + ' ' + afterAudio)
+                    .replace(/"(https?:\/\/[^"]+)"/g, (match, url) => {
+                        const placeholder = `__IMG_${imageUrls.length}__`;
+                        imageUrls.push(url);
+                        return `"${placeholder}"`;
+                    });
+
+                processedText = combined.replace(/https?:\/\/\S+/gi, '').trim();
+
+                // Khôi phục URLs hình ảnh
+                imageUrls.forEach((url, i) => {
+                    processedText = processedText.replace(`__IMG_${i}__`, url);
+                });
             }
         }
 
         // Also remove bare URLs that might remain (e.g., audio links) to avoid capturing them as question text
-        processedText = processedText.replace(/https?:\/\/\S+/gi, '').trim();
+        // NHƯNG GIỮ LẠI URLs hình ảnh (trong dấu ngoặc kép "https://...")
+        // Strategy: Tạm thời thay URLs hình ảnh → xóa URLs trần → khôi phục URLs hình ảnh
+        const imageUrlPlaceholders = [];
+        const imageUrlPattern = /"(https?:\/\/[^"]+)"/g;
+
+        // Bước 1: Lưu và thay thế URLs hình ảnh bằng placeholder
+        processedText = processedText.replace(imageUrlPattern, (match, url) => {
+            const placeholder = `__IMAGE_URL_${imageUrlPlaceholders.length}__`;
+            imageUrlPlaceholders.push(url);
+            return `"${placeholder}"`;
+        });
+
+        // Bước 2: Xóa tất cả URLs trần (không có dấu ngoặc kép)
+        processedText = processedText.replace(/https?:\/\/\S+/gi, '');
+
+        // Bước 3: Khôi phục lại URLs hình ảnh
+        imageUrlPlaceholders.forEach((url, index) => {
+            const placeholder = `__IMAGE_URL_${index}__`;
+            processedText = processedText.replace(placeholder, url);
+        });
+
+        processedText = processedText.trim();
 
         // Handle Case: Passage + Question with blank at end (e.g. "The purpose is to ...")
         if (processedText.length > 300) {
@@ -987,15 +1051,51 @@
 
     function getElementVisibleText(el) {
         if (!el) return '';
+
+        const hasImageHandler = typeof window.tailieuImageHandler !== 'undefined';
+
         // Clone to avoid modifying original DOM and remove irrelevant nodes
         try {
             const clone = el.cloneNode(true);
-            // remove inputs, svgs, icons, scripts, styles, audio elements and numbering helper nodes
-            clone.querySelectorAll('input, svg, button, img, script, style, audio, source, iframe, noscript, .answernumber, .bullet, .icon, .audioplayer, .audio').forEach(n => n.remove());
+
+            // NẾU CÓ IMAGE HANDLER: Xử lý thay thế <img> bằng URL trước khi remove
+            if (hasImageHandler) {
+                const images = clone.querySelectorAll('img');
+                images.forEach(img => {
+                    const src = img.getAttribute('src') ||
+                        img.getAttribute('data-src') ||
+                        img.getAttribute('data-original') ||
+                        img.getAttribute('data-lazy-src');
+
+                    if (src && src.trim() !== '') {
+                        const fullUrl = window.tailieuImageHandler.makeAbsoluteUrl(src);
+                        const urlText = `${window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX}${fullUrl}${window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX}`;
+                        const textNode = document.createTextNode(urlText);
+                        if (img.parentNode) {
+                            img.parentNode.replaceChild(textNode, img);
+                        }
+                    } else {
+                        img.remove();
+                    }
+                });
+            }
+
+            // remove các element không cần thiết khác
+            // Lưu ý: Đã bỏ 'img' khỏi danh sách remove nếu có image handler đã xử lý ở trên
+            const toRemove = 'input, svg, button, script, style, audio, source, iframe, noscript, .answernumber, .bullet, .icon, .audioplayer, .audio';
+            const selectors = hasImageHandler ? toRemove : toRemove + ', img';
+
+            clone.querySelectorAll(selectors).forEach(n => n.remove());
+
             // Also remove common inline tokens that sometimes include links or JS fragments
-            clone.querySelectorAll('[data-src], [data-audio], [data-track]').forEach(n => n.remove());
+            clone.querySelectorAll('[data-src], [data-audio], [data-track]').forEach(n => {
+                // Chỉ xóa nếu không phải là <img> (vì data-src có thể đã được dùng ở trên)
+                if (n.tagName !== 'IMG') n.remove();
+            });
+
             return normalizeText(clone.textContent || '');
         } catch (e) {
+            console.warn('[Scanner] Error in getElementVisibleText:', e);
             return normalizeText(el.textContent || '');
         }
     }
@@ -1022,7 +1122,9 @@
         answerElements.forEach(el => {
             if (!el || isExtensionElement(el)) return;
 
-            const text = getElementVisibleText(el);
+            // Sử dụng getElementVisibleText đã được cập nhật (hỗ trợ bảo toàn URL ảnh)
+            let text = getElementVisibleText(el);
+
             if (!text || text.length > 500) return;
 
             // Detect label inside (e.g., A., B.)
@@ -1144,7 +1246,7 @@
             inputs.forEach((input, idx) => {
                 if (!input) return;
                 const labelEl = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
-                const text = normalizeText(labelEl?.textContent || input.nextSibling?.textContent || input.value || '');
+                const text = labelEl ? getElementVisibleText(labelEl) : normalizeText(input.nextSibling?.textContent || input.value || '');
                 if (!text || seenFallback.has(text)) return;
                 seenFallback.add(text);
                 answers.push({
@@ -1311,16 +1413,28 @@
                 if (seen.has(answerText)) return;
                 seen.add(answerText);
 
+                // Try to find input state if exists
                 const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
                 const isSelected = !!(input?.checked || el.classList.contains('checked') || el.querySelector('input:checked'));
                 const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+                const isTicked = (() => {
+                    try {
+                        if (isSelected) return true;
+                        if (el.querySelector('[aria-checked="true"]')) return true;
+                        if (/check|tick|ok|selected|checked/i.test(el.className || '')) return true;
+                        if (/[✓✔]/.test(el.textContent || '')) return true;
+                        if (el.querySelector('.fa-check, .glyphicon-ok, .icon-checked, .tick-icon')) return true;
+                    } catch (e) { }
+                    return false;
+                })();
 
                 answers.push({
-                    label: label || String.fromCharCode(65 + idx),
+                    label: label || '',
                     text: answerText,
                     fullText: text,
                     isSelected: isSelected,
-                    isCorrect: isCorrect
+                    isCorrect: isCorrect,
+                    isTicked: isTicked
                 });
             });
         }
@@ -1559,6 +1673,8 @@
                 }
             });
         });
+
+
 
         // Select all button
         const selectAllBtn = scannerPopup.querySelector('#scanner-select-all');
