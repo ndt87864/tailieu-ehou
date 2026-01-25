@@ -47,15 +47,22 @@ if (window.tailieuExtensionLoaded) {
             if (s.normalize) s = s.normalize('NFC');
             // Convert to lower case
             s = s.toLowerCase();
+
+            // CHUẨN HÓA URL ẢNH: Chuyển các URL về dạng chỉ có tên file và loại bỏ query params (?token=...)
+            // regex này bắt link trong ngoặc kép, lấy phần sau dấu / cuối cùng và trước dấu ? hoặc "
+            s = s.replace(/"(?:https?:\/\/[^"]+\/|(?:\.){3,}\/)([^"?]+)(?:\?[^"]*)?"/gi, (match, filename) => {
+                return ' ' + filename + ' ';
+            });
+
             // Replace various invisible / non-breaking spaces with normal space
             s = s.replace(/[\u00A0\u2000-\u200B\uFEFF\u202F]/g, ' ');
-            // Replace apostrophes and similar characters with space FIRST (to handle Kate's -> Kate s consistently)
+            // Replace apostrophes and similar characters with space FIRST
             s = s.replace(/[''`´]/g, ' ');
             // Remove common leading answer labels like "a.", "b)", "c -" etc.
             s = s.replace(/^[a-dA-D]\s*[\.\)\-:\/]\s*/u, '');
             // Remove any characters that are not letters, numbers, whitespace or ESSENTIAL math symbols
-            // We MUST preserve < > ≤ ≥ = ≠ to distinguish between mathematical sets/ranges
-            s = s.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],]/gu, ' ');
+            // Bảo tồn các ký tự toán học và dấu chấm (.) trong tên file ảnh sau khi đã xử lý ở trên
+            s = s.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/gu, ' ');
             // Collapse whitespace
             s = s.replace(/\s+/g, ' ').trim();
             return s;
@@ -2728,8 +2735,13 @@ if (window.tailieuExtensionLoaded) {
         try {
             const s = ('' + str).trim();
             // If contains <img ... src="...">
-            const imgMatch = s.match(/<img[^>]+src=["']?([^"'>\s]+)["']?/i);
+            const imgMatch = s.match(/<img[^>]+src=["']?([^"' >\s]+)["']?/i);
             if (imgMatch && imgMatch[1]) return imgMatch[1];
+
+            // If contains quoted URL (possibly truncated "..../xxx.png")
+            const quotedMatch = s.match(/"((?:https?:\/\/|(?:\.){3,}\/)[^"]+)"/i);
+            if (quotedMatch) return quotedMatch[1];
+
             // If looks like a url
             const urlMatch = s.match(/(https?:)?\/\/[^\s"']+/i);
             if (urlMatch) return urlMatch[0];

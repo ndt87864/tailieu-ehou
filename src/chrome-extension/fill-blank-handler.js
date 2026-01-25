@@ -115,6 +115,11 @@
         // 3. Replace apostrophes with space FIRST (to handle Kate's -> Kate s consistently)
         normalized = normalized.replace(/[''`´]/g, ' ');
 
+        // CHUẨN HÓA URL ẢNH: Chuyển các URL về dạng chỉ có tên file và loại bỏ query params
+        normalized = normalized.replace(/"(?:https?:\/\/[^"]+\/|(?:\.){3,}\/)([^"?]+)(?:\?[^"]*)?"/gi, (match, filename) => {
+            return ' ' + filename + ' ';
+        });
+
         // 4. Remove punctuation and special characters (BUT KEEP MATH SYMBOLS)
         // We strip most punctuation, but MUST keep < > ≤ ≥ = ≠ , - to distinguish math expressions
         normalized = normalized.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],]/gu, ' ');
