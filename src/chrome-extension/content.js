@@ -53,8 +53,9 @@ if (window.tailieuExtensionLoaded) {
             s = s.replace(/[''`´]/g, ' ');
             // Remove common leading answer labels like "a.", "b)", "c -" etc.
             s = s.replace(/^[a-dA-D]\s*[\.\)\-:\/]\s*/u, '');
-            // Remove any characters that are not letters, numbers or whitespace (keep diacritics via \p{L})
-            s = s.replace(/[^\p{L}\p{N}\s]/gu, ' ');
+            // Remove any characters that are not letters, numbers, whitespace or ESSENTIAL math symbols
+            // We MUST preserve < > ≤ ≥ = ≠ to distinguish between mathematical sets/ranges
+            s = s.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],]/gu, ' ');
             // Collapse whitespace
             s = s.replace(/\s+/g, ' ').trim();
             return s;

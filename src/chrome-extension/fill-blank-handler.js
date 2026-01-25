@@ -115,10 +115,9 @@
         // 3. Replace apostrophes with space FIRST (to handle Kate's -> Kate s consistently)
         normalized = normalized.replace(/[''`´]/g, ' ');
 
-        // 4. Remove punctuation and special characters
-        // We strip dots, commas, brackets, etc., but keep alphanumeric and spaces
-        // Important: dashes and underscores might be part of words, but usually safe to remove for sentence matching
-        normalized = normalized.replace(/[\.,;?!:"'()\[\]\{\}\-\_\/]+/g, ' ');
+        // 4. Remove punctuation and special characters (BUT KEEP MATH SYMBOLS)
+        // We strip most punctuation, but MUST keep < > ≤ ≥ = ≠ , - to distinguish math expressions
+        normalized = normalized.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],]/gu, ' ');
 
         // 5. Restore placeholder
         normalized = normalized.split(TEMP_PLACEHOLDER).join('...');
