@@ -27,6 +27,7 @@
       "js": [
         "scanner/image-handler.js",
         "content-image-handler.js",
+        "image-renderer.js",
         "content.js",
         "scanner/scanner.js",
         "fill-blank-handler.js"

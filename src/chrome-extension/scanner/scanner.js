@@ -1897,24 +1897,27 @@
 
     function createQuestionItemHTML(q) {
         // Chỉ hiển thị đáp án có tick thật (không phải X)
-        const visibleAnswers = q.answers.filter(a => a.isTicked === true);
+        const visibleAnswers = (q.answers || []).filter(a => a.isTicked === true);
 
-        // Debug log
-        if (visibleAnswers.length === 0) {
-            console.warn('[Scanner] Câu hỏi không có đáp án ticked:', q.question, q.answers);
-        }
-
-        const answersToRender = visibleAnswers.length > 0 ? visibleAnswers : [];
-        const answersHTML = answersToRender.length > 0
+        const answersHTML = visibleAnswers.length > 0
             ? `<div class="scanner-answers">
-                ${answersToRender.map(a => `
-                    <div class="scanner-answer ${a.isSelected ? 'selected' : ''} ${a.isCorrect ? 'correct' : ''} ${a.isTicked ? 'ticked' : ''}">
-                        <span class="answer-label">${a.label || '•'}</span>
-                        <span class="answer-text">${escapeHTML(a.text)}</span>
-                    </div>
-                `).join('')}
+                ${visibleAnswers.map(a => {
+                const renderedAnswer = (typeof window.tailieuImageRenderer !== 'undefined')
+                    ? window.tailieuImageRenderer.renderImages(a.text)
+                    : escapeHTML(a.text);
+                return `
+                        <div class="scanner-answer ${a.isSelected ? 'selected' : ''} ${a.isCorrect ? 'correct' : ''} ${a.isTicked ? 'ticked' : ''}">
+                            <span class="answer-label">${a.label || '•'}</span>
+                            <span class="answer-text">${renderedAnswer}</span>
+                        </div>
+                    `;
+            }).join('')}
                </div>`
             : '';
+
+        const renderedQuestion = (typeof window.tailieuImageRenderer !== 'undefined')
+            ? window.tailieuImageRenderer.renderImages(q.question)
+            : escapeHTML(q.question);
 
         return `
             <div class="scanner-question-item" data-index="${q.index}">
@@ -1932,20 +1935,21 @@
                             </svg>
                         </button>
                         <button class="scanner-remove-btn" title="Xóa câu hỏi">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 6 6 18"></path>
-                            <path d="m6 6 12 12"></path>
-                        </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6 6 18"></path>
+                                <path d="m6 6 12 12"></path>
+                            </svg>
                         </button>
                     </div>
                 </div>
-                <div class="scanner-question-text">${escapeHTML(q.question)}</div>
+                <div class="scanner-question-text">${renderedQuestion}</div>
                 ${answersHTML}
             </div>
         `;
     }
 
     function escapeHTML(text) {
+        if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
@@ -1980,9 +1984,6 @@
         });
     }
 
-
-
-    // ==================== NOTIFICATION ====================
     function showNotification(message, type = 'info') {
         const existing = document.getElementById('tailieu-scanner-notification');
         if (existing) existing.remove();
@@ -2017,7 +2018,6 @@
         });
 
         document.body.appendChild(notification);
-
         requestAnimationFrame(() => {
             notification.style.transform = 'translateX(0)';
             notification.style.opacity = '1';
@@ -2030,335 +2030,61 @@
         }, 3000);
     }
 
-    // ==================== INJECT STYLES ====================
     function injectScannerStyles() {
         if (document.getElementById('tailieu-scanner-styles')) return;
 
         const styles = document.createElement('style');
         styles.id = 'tailieu-scanner-styles';
         styles.textContent = `
-            @keyframes pulse {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.05); }
-            }
-
-            @keyframes scanner-spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-
-            #tailieu-scanner-btn .scanner-spin {
-                animation: scanner-spin 1s linear infinite;
-            }
-
-            .scanner-popup-header {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 20px 24px;
-                border-bottom: 1px solid #e9ecef;
-                background: linear-gradient(135deg, #42A5F5, #1E88E5);
-                border-radius: 16px 16px 0 0;
-                color: white;
-            }
-
-            .scanner-popup-header h2 {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin: 0;
-                font-size: 18px;
-                font-weight: 600;
-                flex: 1;
-            }
-
-            .scanner-count {
-                background: rgba(255,255,255,0.2);
-                padding: 4px 12px;
-                border-radius: 20px;
-                font-size: 13px;
-            }
-
-            .scanner-close-btn {
-                background: rgba(255,255,255,0.2);
-                border: none;
-                width: 36px;
-                height: 36px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                color: white;
-                transition: all 0.2s;
-            }
-
-            .scanner-close-btn:hover {
-                background: rgba(255,255,255,0.3);
-                transform: rotate(90deg);
-            }
-
-            .scanner-popup-body {
-                flex: 1;
-                overflow-y: auto;
-                padding: 16px;
-                max-height: 50vh;
-            }
-
-            .scanner-questions-list {
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-            }
-
-            .scanner-question-item {
-                background: #f8f9fa;
-                border-radius: 12px;
-                padding: 16px;
-                cursor: pointer;
-                transition: all 0.2s;
-                border: 2px solid transparent;
-            }
-
-            .scanner-question-item:hover {
-                background: #e9ecef;
-                border-color: #667eea;
-                transform: translateX(4px);
-            }
-
-            .scanner-question-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 8px;
-            }
-
-            .question-number {
-                font-weight: 600;
-                color: #667eea;
-                font-size: 13px;
-            }
-
-            .question-type {
-                font-size: 11px;
-                padding: 2px 8px;
-                background: #e9ecef;
-                border-radius: 10px;
-                color: #6c757d;
-                text-transform: uppercase;
-            }
-
-            .scanner-question-text {
-                font-size: 14px;
-                line-height: 1.5;
-                color: #212529;
-                margin-bottom: 12px;
-            }
-
-            .scanner-answers {
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                padding-left: 12px;
-                border-left: 3px solid #dee2e6;
-            }
-
-            .scanner-answer {
-                display: flex;
-                gap: 8px;
-                font-size: 13px;
-                padding: 6px 10px;
-                border-radius: 6px;
-                background: white;
-            }
-
-            .scanner-answer.selected {
-                background: #e3f2fd;
-                border: 1px solid #2196f3;
-            }
-
-            .scanner-answer.correct {
-                background: #e8f5e9;
-                border: 1px solid #4caf50;
-            }
-
-            .answer-label {
-                font-weight: 600;
-                color: #667eea;
-                min-width: 20px;
-            }
-
-            .answer-text {
-                color: #495057;
-            }
-
-            .scanner-empty {
-                text-align: center;
-                padding: 40px;
-                color: #6c757d;
-                font-size: 15px;
-            }
-
-            .scanner-popup-footer {
-                display: flex;
-                gap: 12px;
-                padding: 16px 24px;
-                border-top: 1px solid #e9ecef;
-                background: #f8f9fa;
-                border-radius: 0 0 16px 16px;
-            }
-
-            .scanner-btn {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 500;
-                cursor: pointer;
-                border: none;
-                transition: all 0.2s;
-                flex: 1;
-                justify-content: center;
-            }
-
-            .scanner-btn-primary {
-                background: linear-gradient(135deg, #42A5F5, #1E88E5);
-                color: white;
-            }
-
-            .scanner-btn-primary:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-            }
-
-            .scanner-btn-secondary {
-                background: white;
-                color: #495057;
-                border: 2px solid #dee2e6;
-            }
-
-            .scanner-btn-secondary:hover {
-                border-color: #667eea;
-                color: #667eea;
-            }
-
-            .scanner-remove-btn {
-                background: transparent;
-                border: none;
-                width: 32px;
-                height: 32px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                color: #6c757d;
-                border-radius: 6px;
-                transition: background 0.15s, color 0.15s, transform 0.12s;
-            }
-
-            .scanner-remove-btn:hover {
-                background: rgba(0,0,0,0.04);
-                color: #dc3545;
-                transform: translateY(-1px);
-            }
-
-            .scanner-edit-btn {
-                background: transparent;
-                border: none;
-                width: 32px;
-                height: 32px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                color: #6c757d;
-                border-radius: 6px;
-                transition: background 0.12s, color 0.12s, transform 0.12s;
-            }
-
-            .scanner-edit-btn:hover {
-                background: rgba(0,0,0,0.04);
-                color: #2b8cff;
-                transform: translateY(-1px);
-            }
-
-            .scanner-edit-form {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                padding: 8px 0;
-                background: #fffaf6;
-                border-radius: 8px;
-                border: 1px dashed #ffecb5;
-                margin-top: 8px;
-            }
-
-            .scanner-edit-form textarea {
-                width: 100%;
-                min-height: 64px;
-                padding: 8px;
-                font-size: 13px;
-            }
-
-            .scanner-edit-form .edit-answers {
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-            }
-
-            .scanner-edit-form .edit-answer-row {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-
-            .scanner-edit-form input[type="text"] {
-                flex: 1;
-                padding: 6px 8px;
-                font-size: 13px;
-            }
-
-            .scanner-edit-actions {
-                display: flex;
-                gap: 8px;
-                justify-content: flex-end;
-                margin-top: 6px;
-            }
-
-            .scanner-remove-checkbox {
-                width: 16px;
-                height: 16px;
-                cursor: pointer;
-            }
-
-            .scanner-question-item.marked-for-delete {
-                background: #fff5f5;
-                border-color: #f5c6cb;
-                box-shadow: 0 0 0 3px rgba(220,53,69,0.06);
-            }
-
-            .status-badge {
-                display: inline-block;
-                padding: 4px 8px;
-                border-radius: 4px;
-                font-size: 11px;
-                font-weight: 600;
-                margin-left: 8px;
-            }
+            @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+            @keyframes scanner-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            .scanner-spin { animation: scanner-spin 1s linear infinite; display: inline-block; }
+            .scanner-popup-header { display: flex; align-items: center; gap: 12px; padding: 20px 24px; border-bottom: 1px solid #e9ecef; background: linear-gradient(135deg, #42A5F5, #1E88E5); border-radius: 16px 16px 0 0; color: white; }
+            .scanner-popup-header h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 18px; font-weight: 600; flex: 1; }
+            .scanner-count { background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 13px; }
+            .scanner-close-btn { background: rgba(255, 255, 255, 0.2); border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: all 0.2s; }
+            .scanner-close-btn:hover { background: rgba(255, 255, 255, 0.3); transform: rotate(90deg); }
+            .scanner-popup-body { flex: 1; overflow-y: auto; padding: 16px; max-height: 50vh; }
+            .scanner-questions-list { display: flex; flex-direction: column; gap: 12px; }
+            .scanner-question-item { background: #f8f9fa; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+            .scanner-question-item:hover { background: #e9ecef; border-color: #667eea; transform: translateX(4px); }
+            .scanner-question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+            .question-number { font-weight: 600; color: #667eea; font-size: 13px; }
+            .question-type { font-size: 11px; padding: 2px 8px; background: #e9ecef; border-radius: 10px; color: #6c757d; text-transform: uppercase; }
+            .scanner-question-text { font-size: 14px; line-height: 1.5; color: #212529; margin-bottom: 12px; }
+            .scanner-answers { display: flex; flex-direction: column; gap: 6px; padding-left: 12px; border-left: 3px solid #dee2e6; }
+            .scanner-answer { display: flex; gap: 8px; font-size: 13px; padding: 6px 10px; border-radius: 6px; background: white; }
+            .scanner-answer.selected { background: #e3f2fd; border: 1px solid #2196f3; }
+            .scanner-answer.correct { background: #e8f5e9; border: 1px solid #4caf50; }
+            .answer-label { font-weight: 600; color: #667eea; min-width: 20px; }
+            .answer-text { color: #495057; }
+            .scanner-empty { text-align: center; padding: 40px; color: #6c757d; font-size: 15px; }
+            .scanner-popup-footer { display: flex; gap: 12px; padding: 16px 24px; border-top: 1px solid #e9ecef; background: #f8f9fa; border-radius: 0 0 16px 16px; }
+            .scanner-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; flex: 1; justify-content: center; }
+            .scanner-btn-primary { background: linear-gradient(135deg, #42A5F5, #1E88E5); color: white; }
+            .scanner-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+            .scanner-btn-secondary { background: white; color: #495057; border: 2px solid #dee2e6; }
+            .scanner-btn-secondary:hover { border-color: #667eea; color: #667eea; }
+            .scanner-remove-btn, .scanner-edit-btn { background: transparent; border: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #6c757d; border-radius: 6px; transition: all 0.15s; }
+            .scanner-remove-btn:hover { background: rgba(0,0,0,0.04); color: #dc3545; }
+            .scanner-edit-btn:hover { background: rgba(0,0,0,0.04); color: #2b8cff; }
+            .scanner-edit-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fffaf6; border-radius: 8px; border: 1px dashed #ffecb5; margin-top: 8px; }
+            .scanner-edit-form textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+            .edit-answers { display: flex; flex-direction: column; gap: 8px; }
+            .edit-answer-row { display: flex; gap: 10px; align-items: center; }
+            .edit-answer-row input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+            .scanner-edit-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px; }
+            .marked-for-delete { background: #fff5f5 !important; border-color: #f5c6cb !important; }
+            .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 8px; text-transform: uppercase; }
             .status-badge.processing { background: #e3f2fd; color: #2196f3; }
             .status-badge.exists { background: #fff3cd; color: #856404; }
             .status-badge.success { background: #d4edda; color: #155724; }
             .status-badge.error { background: #f8d7da; color: #721c24; }
+            .tailieu-rendered-img { pointer-events: none; }
         `;
-
         document.head.appendChild(styles);
     }
 
-
-    // ==================== DB INTEGRATION LOGIC ====================
-    // Helper: send runtime message with retries when port closes unexpectedly
     function sendMessageWithRetries(message, maxRetries = 3, delay = 500) {
         let attempt = 0;
         return new Promise((resolve, reject) => {
@@ -2368,9 +2094,7 @@
                     chrome.runtime.sendMessage(message, (res) => {
                         if (chrome.runtime.lastError) {
                             const errMsg = String(chrome.runtime.lastError.message || chrome.runtime.lastError);
-                            // If port closed, we can retry a few times
-                            if (errMsg.includes('The message port closed before a response was received') && attempt <= maxRetries) {
-                                console.warn('[Scanner] Message port closed, retrying', attempt, 'of', maxRetries);
+                            if (errMsg.includes('closed') && attempt <= maxRetries) {
                                 setTimeout(trySend, delay * attempt);
                                 return;
                             }
@@ -2379,11 +2103,8 @@
                         resolve(res);
                     });
                 } catch (e) {
-                    if (attempt <= maxRetries) {
-                        setTimeout(trySend, delay * attempt);
-                    } else {
-                        reject(e);
-                    }
+                    if (attempt <= maxRetries) setTimeout(trySend, delay * attempt);
+                    else reject(e);
                 }
             }
             trySend();
@@ -2394,101 +2115,43 @@
         const btn = document.getElementById('scanner-add-db');
         if (!btn) return;
 
-        // Disable button
-        const originalText = btn.innerHTML;
+        const originalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = `<span class="scanner-spin">⟳</span> Đang xử lý...`;
 
-        // Reset status badges
-        questions.forEach(q => {
-            const item = scannerPopup.querySelector(`.scanner-question-item[data-index="${q.index}"]`);
-            if (item) {
-                const oldBadge = item.querySelector('.status-badge');
-                if (oldBadge) oldBadge.remove();
-            }
-        });
-
         try {
-            // Get currently selected document(s) from extension storage (popup saves selected documents under this key)
             const selectedDocId = await new Promise((resolve) => {
-                try {
-                    chrome.storage.local.get(['tailieu_selected_documents'], (res) => {
-                        const val = res && res.tailieu_selected_documents;
-                        if (Array.isArray(val) && val.length) resolve(val[0]);
-                        else resolve(val || null);
-                    });
-                } catch (e) {
-                    resolve(null);
-                }
+                chrome.storage.local.get(['tailieu_selected_documents'], (res) => {
+                    const val = res && res.tailieu_selected_documents;
+                    resolve(Array.isArray(val) ? val[0] : (val || null));
+                });
             });
 
-            // Attach documentId and filter answers to only include ticked/selected ones
-            const payloadQuestions = (questions || []).map(q => {
-                const filteredAnswers = (q.answers || []).filter(a => !!a.isTicked || !!a.isSelected);
-                if (!filteredAnswers || filteredAnswers.length === 0) {
-                    console.warn('[Scanner] No ticked answers found for question index', q.index, '— payload will include empty answer list');
-                }
-                return { ...q, answers: filteredAnswers, documentId: selectedDocId };
-            });
+            const payloadQuestions = questions.map(q => ({
+                ...q,
+                answers: (q.answers || []).filter(a => a.isTicked || a.isSelected),
+                documentId: selectedDocId
+            }));
 
-            // Send to background script
-            console.log('[Scanner] Sending batchAddQuestionsToDB message, documentId=', selectedDocId);
-            const response = await sendMessageWithRetries({ action: 'batchAddQuestionsToDB', questions: payloadQuestions }, 3, 600);
-
-            if (!response || !response.success) {
-                throw new Error(response?.error || 'Unknown error');
-            }
+            const response = await sendMessageWithRetries({ action: 'batchAddQuestionsToDB', questions: payloadQuestions });
+            if (!response || !response.success) throw new Error(response?.error || 'Lỗi server');
 
             const results = response.results || [];
-            let addedCount = 0;
-            let existsCount = 0;
-            let errorCount = 0;
-
-            // Update UI based on results
-            // We assume results are ordered or we can match by index if preserved
-            // The background script should return results for each question
-
-            // If background script blindly processes, we map results to questions.
-            // Let's assume the background script returns an array of { index, status, message }
+            let added = 0, exists = 0, errors = 0;
 
             results.forEach(res => {
-                const qIndex = res.index;
-                const status = res.status;
-                const msg = res.message;
-
-                if (status === 'success') addedCount++;
-                else if (status === 'exists') existsCount++;
-                else errorCount++;
-
-                updateItemStatus(qIndex, status, msg);
+                if (res.status === 'success') added++;
+                else if (res.status === 'exists') exists++;
+                else errors++;
+                updateItemStatus(res.index, res.status, res.message);
             });
-            // Include document/category info in overall notification when available
-            let extraInfo = '';
-            if (results && results.length) {
-                const anyWithDoc = results.find(r => r.documentTitle || r.categoryTitle || r.documentId);
-                if (anyWithDoc) {
-                    const d = anyWithDoc.documentTitle || anyWithDoc.documentId || '';
-                    const c = anyWithDoc.categoryTitle || '';
-                    extraInfo = d ? ` trong tài liệu: ${d}` : '';
-                    if (c) extraInfo += ` (danh mục: ${c})`;
-                }
-            }
 
-            showNotification(`Hoàn tất! Thêm mới: ${addedCount}, Đã có: ${existsCount}, Lỗi: ${errorCount}${extraInfo}`, 'success');
-
+            showNotification(`Hoàn tất! Thêm mới: ${added}, Đã có: ${exists}, Lỗi: ${errors}`, 'success');
         } catch (error) {
-            console.error('Batch error:', error);
             showNotification('Lỗi: ' + error.message, 'error');
-
-            // Mark all as error if batch failed completely
-            questions.forEach(q => updateItemStatus(q.index, 'error', 'Lỗi kết nối'));
         } finally {
-            // Restore button
-            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg> Đã xong`;
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }, 3000);
+            btn.innerHTML = `Xong!`;
+            setTimeout(() => { btn.disabled = false; btn.innerHTML = originalHTML; }, 2000);
         }
     }
 
@@ -2501,54 +2164,38 @@
         if (!badge) {
             badge = document.createElement('span');
             badge.className = 'status-badge';
-            // Insert before edit button or in header
             const header = item.querySelector('.scanner-question-header > div:first-child');
             if (header) header.appendChild(badge);
         }
-
         badge.className = `status-badge ${status}`;
         badge.textContent = message;
     }
 
-    // ==================== INITIALIZE ====================
     function init() {
-        // Đợi DOM ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                createScannerButton();
-                checkAutoScanTrigger();
-            });
+            document.addEventListener('DOMContentLoaded', () => { createScannerButton(); checkAutoScanTrigger(); });
         } else {
             createScannerButton();
             checkAutoScanTrigger();
         }
     }
 
-    // Kiểm tra và tự động kích hoạt quét nếu có yêu cầu (sau khi reload)
     function checkAutoScanTrigger() {
         try {
             if (sessionStorage.getItem('tailieu_auto_scan_trigger') === 'true') {
                 sessionStorage.removeItem('tailieu_auto_scan_trigger');
-                console.log('[Tailieu Scanner] Tự động kích hoạt quét sau khi reload...');
-                // Đợi một lát cho trang ổn định
-                setTimeout(() => {
-                    handleScanClick();
-                }, 1500);
+                setTimeout(() => handleScanClick(), 1500);
             }
-        } catch (e) {
-            console.warn('[Tailieu Scanner] Không thể kiểm tra auto scan trigger:', e);
-        }
+        } catch (e) { }
     }
 
-    // Start
     init();
 
-    // Export để có thể sử dụng từ bên ngoài
     window.tailieuScanner = {
         scan: () => handleScanClick(),
         getScannedQuestions: () => scannedQuestions,
         showPopup: () => showScannerPopup(scannedQuestions)
     };
 
-    console.log('[Tailieu Scanner] Module đã được khởi tạo');
+    console.log('[Tailieu Scanner] Module initialized');
 })();
