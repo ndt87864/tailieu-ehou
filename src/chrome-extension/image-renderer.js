@@ -31,15 +31,18 @@
 
         // 2. Regex để bắt các link ảnh (bao gồm cả rút gọn)
         // Nhóm 1: Link đầy đủ (bắt đầu bằng http) hoặc rút gọn (bắt đầu bằng ..../)
-        const imgRegex = /"((?:https?:\/\/|(?:\.){3,}\/)([^"]+\.[a-z0-9]+)(?:\?[^"]*)?)"/gi;
+        const imgRegex = /"((?:https?:\/\/|(?:\.){3,}\/)[^"]+)"/gi;
 
-        result = result.replace(imgRegex, (match, url, filename) => {
+        result = result.replace(imgRegex, (match, url) => {
             let actualSrc = url;
 
             // Nếu là link rút gọn, khôi phục lại từ contextFullUrl
             if (url.startsWith('..../') || url.startsWith('.../')) {
                 if (contextFullUrl) {
                     try {
+                        const parts = url.split('/');
+                        const filename = parts[parts.length - 1];
+
                         const baseUrlParts = contextFullUrl.split('/');
                         baseUrlParts[baseUrlParts.length - 1] = filename;
                         actualSrc = baseUrlParts.join('/');

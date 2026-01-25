@@ -661,15 +661,11 @@
         result = result
             .replace(/[✓✗×✕✔❌]/g, '')  // Remove check/cross marks
             .replace(/\s+/g, ' ')         // Collapse whitespace
-            .replace(/^\s*[a-z0-9][\.\)]\s*/i, '')  // Remove label prefix like "a." or "1."
-            .trim();
+            .replace(/^\s*[a-z0-9][\.\)]\s*/i, ''); // Remove label prefix like "a." or "1."
 
         // ===== GIỮ NGUYÊN "..." CHO Ô TRỐNG =====
         // "..." đại diện cho input field (ô trống) trong câu hỏi điền từ
-        // VÍ DỤ: "German ..." hoặc "Br...z...l" hoặc "I ... a student"
-        // Không được xóa "..." vì đây là phần quan trọng của câu hỏi
-
-        return result;
+        return result.trim();
     }
 
 
@@ -987,7 +983,8 @@
         // NHƯNG GIỮ LẠI URLs hình ảnh (trong dấu ngoặc kép "https://...")
         // Strategy: Tạm thời thay URLs hình ảnh → xóa URLs trần → khôi phục URLs hình ảnh
         const imageUrlPlaceholders = [];
-        const imageUrlPattern = /"(https?:\/\/[^"]+)"/g;
+        // Pattern này khớp với cả link đầy đủ (http) và link rút gọn (..../) trong dấu nháy kép
+        const imageUrlPattern = /"((?:https?:\/\/|(?:\.){3,}\/)[^"]+)"/g;
 
         // Bước 1: Lưu và thay thế URLs hình ảnh bằng placeholder
         processedText = processedText.replace(imageUrlPattern, (match, url) => {
@@ -996,13 +993,14 @@
             return `"${placeholder}"`;
         });
 
-        // Bước 2: Xóa tất cả URLs trần (không có dấu ngoặc kép)
+        // Bước 2: Xóa tất cả URLs trần (không có dấu ngoặc kép) - Thường là link audio dư thừa
         processedText = processedText.replace(/https?:\/\/\S+/gi, '');
 
         // Bước 3: Khôi phục lại URLs hình ảnh
         imageUrlPlaceholders.forEach((url, index) => {
             const placeholder = `__IMAGE_URL_${index}__`;
-            processedText = processedText.replace(placeholder, url);
+            // Sử dụng Regex với flag g để thay thế toàn bộ (dù placeholder thường là duy nhất)
+            processedText = processedText.replace(new RegExp(placeholder, 'g'), url);
         });
 
         processedText = processedText.trim();
@@ -1081,10 +1079,12 @@
         processedText = processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
 
         // Final sanitization: remove leading/trailing code-like fragments and stray punctuation
-        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF]+/, '').trim();
-        // Preserve potential blanks (dots, underscores, ellipsis)
+        // Thêm " vào danh sách bảo vệ để tránh mất dấu nháy của link ảnh
+        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF"]+/, '').trim();
+
+        // Preserve potential blanks (dots, underscores, ellipsis) AND quotes
         if (!/[\._\u2026]{2,}\s*$/.test(processedText)) {
-            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s]+\s*$/, '').trim();
+            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s"]+\s*$/, '').trim();
         }
 
         return processedText;
