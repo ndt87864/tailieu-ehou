@@ -49,6 +49,8 @@ if (window.tailieuExtensionLoaded) {
             s = s.toLowerCase();
             // Replace various invisible / non-breaking spaces with normal space
             s = s.replace(/[\u00A0\u2000-\u200B\uFEFF\u202F]/g, ' ');
+            // Replace apostrophes and similar characters with space FIRST (to handle Kate's -> Kate s consistently)
+            s = s.replace(/[''`´]/g, ' ');
             // Remove common leading answer labels like "a.", "b)", "c -" etc.
             s = s.replace(/^[a-dA-D]\s*[\.\)\-:\/]\s*/u, '');
             // Remove any characters that are not letters, numbers or whitespace (keep diacritics via \p{L})

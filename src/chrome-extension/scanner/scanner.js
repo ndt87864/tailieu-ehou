@@ -601,38 +601,10 @@
             .replace(/^\s*[a-z0-9][\.\)]\s*/i, '')  // Remove label prefix like "a." or "1."
             .trim();
 
-        // ===== XỬ LÝ DẠNG "TEXT + Ô TRỐNG" (trailing blank) =====
-        // Nếu "..." chỉ xuất hiện ở cuối (dạng: "German ..." hoặc "German..."), 
-        // thì bỏ "..." đi vì đây là dạng text + ô trống đơn giản
-        // Chỉ giữ "..." khi nó nằm XEN KẼ trong text (như "Br...z...l")
-
-        // Đếm số lần xuất hiện của "..."
-        const dotsMatches = result.match(/\.{3}/g);
-        const dotsCount = dotsMatches ? dotsMatches.length : 0;
-
-        // Nếu chỉ có 1 "..." và nó ở cuối -> bỏ đi
-        if (dotsCount === 1 && result.endsWith('...')) {
-            result = result.slice(0, -3).trim();
-        }
-        // Nếu có nhiều "..." nhưng tất cả đều ở cuối (dạng: "German ... ... ...") -> bỏ hết
-        else if (dotsCount > 0) {
-            // Check if all "..." are trailing (no text after last "...")
-            const lastDotsIndex = result.lastIndexOf('...');
-            const textAfterDots = result.slice(lastDotsIndex + 3).trim();
-
-            // Nếu không có text sau "..." cuối cùng, kiểm tra xem có text xen kẽ không
-            if (textAfterDots.length === 0) {
-                // Tìm vị trí "..." đầu tiên
-                const firstDotsIndex = result.indexOf('...');
-                const textBeforeDots = result.slice(0, firstDotsIndex).trim();
-                const textBetween = result.slice(firstDotsIndex).replace(/\.{3}/g, '').trim();
-
-                // Nếu không có text xen kẽ giữa các "...", chỉ có text trước -> bỏ tất cả "..."
-                if (textBetween.length === 0 && textBeforeDots.length > 0) {
-                    result = textBeforeDots;
-                }
-            }
-        }
+        // ===== GIỮ NGUYÊN "..." CHO Ô TRỐNG =====
+        // "..." đại diện cho input field (ô trống) trong câu hỏi điền từ
+        // VÍ DỤ: "German ..." hoặc "Br...z...l" hoặc "I ... a student"
+        // Không được xóa "..." vì đây là phần quan trọng của câu hỏi
 
         return result;
     }
