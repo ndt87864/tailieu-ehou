@@ -73,6 +73,9 @@ if (window.tailieuExtensionLoaded) {
             'Select the correct answer',
             'Chọn câu trả lời đúng nhất',
             'Chọn đáp án đúng nhất',
+            'Chọn một câu trả lời',
+            'Chọn câu trả lời',
+            'Choose one answer',
             'Trả lời câu hỏi',
             'Answer the question',
             'Are these following sentences true \\(T\\) or false \\(F\\)',
@@ -202,6 +205,37 @@ if (window.tailieuExtensionLoaded) {
             }
         }
 
+        // Handle Case: Passage + Question with blank at end (e.g. "The purpose is to ...")
+        if (processedText.length > 300) {
+            const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
+            // Count total blanks in the whole text
+            const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
+            const totalBlanks = matches ? matches.length : 0;
+
+            // If only 1-2 blanks and one is near the end, isolate the trailing question segment
+            const lastPart = processedText.substring(Math.max(0, processedText.length - 200));
+            if (totalBlanks > 0 && totalBlanks <= 2 && blankRegex.test(lastPart)) {
+                // Try to take the last line if it exists and contains the blank
+                const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length >= 2) {
+                    const lastLine = lines[lines.length - 1];
+                    if (blankRegex.test(lastLine) && lastLine.length < 500) {
+                        processedText = lastLine;
+                    }
+                } else {
+                    // Otherwise try splitting by sentence-like punctuation
+                    // Improved regex to handle quotes after punctuation
+                    const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
+                    if (segments.length >= 2) {
+                        const lastSegment = segments[segments.length - 1];
+                        if (blankRegex.test(lastSegment) && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.5) {
+                            processedText = lastSegment;
+                        }
+                    }
+                }
+            }
+        }
+
         for (const marker of markers) {
             const regex = new RegExp(marker, 'gi');
             const matches = [...processedText.matchAll(regex)];
@@ -210,6 +244,23 @@ if (window.tailieuExtensionLoaded) {
                 const lastMatch = matches[matches.length - 1];
                 const lastIndex = lastMatch.index;
                 const contentAfter = processedText.substring(lastIndex + lastMatch[0].length).trim();
+                const contentBefore = processedText.substring(0, lastIndex).trim();
+
+                // Detect if contentAfter looks like an answer list or instruction for answers
+                const looksLikeAnswerList = /(^|\n)\s*([A-Da-d]|\d+)[\.\)]\s+/m.test(contentAfter)
+                    || /(^|\n)\s*a\.\s+/im.test(contentAfter)
+                    || /\b(chọn|choose|select|circle|tick|đáp án)\b/i.test(contentAfter);
+
+                if (looksLikeAnswerList && contentBefore.length > 5) {
+                    // Result is the last meaningful segment of contentBefore (stripping reading passage)
+                    // Improved regex to handle quotes after punctuation
+                    const segments = contentBefore.split(/\r?\n|(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
+                    const lastSegment = segments[segments.length - 1].trim();
+                    if (lastSegment.length > 5) {
+                        processedText = lastSegment;
+                        break;
+                    }
+                }
 
                 if (contentAfter.length > 5 && /[a-zA-Z0-9]/.test(contentAfter)) {
                     processedText = contentAfter;
@@ -219,7 +270,17 @@ if (window.tailieuExtensionLoaded) {
         }
 
         // 2. Remove Prefix
-        return processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+        processedText = processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+
+        // Final sanitization: remove leading codes but PRESERVE trailing blanks (dots, underscores, ellipsis)
+        // We only strip trailing punctuation that is NOT part of a potential blank.
+        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF]+/, '').trim();
+        // Only strip trailing junk if it doesn't end with 2+ dots or underscores
+        if (!/[\._\u2026]{2,}\s*$/.test(processedText)) {
+            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s]+\s*$/, '').trim();
+        }
+
+        return processedText;
     }
 
     // Generate candidate question variants (handles audio prompts like Track*.mp3 and 'Listen' instructions)

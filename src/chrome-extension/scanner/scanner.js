@@ -804,6 +804,9 @@
             'Are the following sentences true or false',
             'True or False',
             'True \\(T\\) or false \\(F\\)',
+            'Chọn một câu trả lời',
+            'Chọn câu trả lời',
+            'Choose one answer',
             'Read the text and do the activities that follow'
         ];
 
@@ -914,6 +917,36 @@
         // Also remove bare URLs that might remain (e.g., audio links) to avoid capturing them as question text
         processedText = processedText.replace(/https?:\/\/\S+/gi, '').trim();
 
+        // Handle Case: Passage + Question with blank at end (e.g. "The purpose is to ...")
+        if (processedText.length > 300) {
+            const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
+            // Count total blanks in the whole text
+            const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
+            const totalBlanks = matches ? matches.length : 0;
+
+            // If only 1-2 blanks and one is near the end, isolate the trailing question segment
+            const lastPart = processedText.substring(Math.max(0, processedText.length - 200));
+            if (totalBlanks > 0 && totalBlanks <= 2 && blankRegex.test(lastPart)) {
+                // Try to take the last line if it exists and contains the blank
+                const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                if (lines.length >= 2) {
+                    const lastLine = lines[lines.length - 1];
+                    if (blankRegex.test(lastLine) && lastLine.length < 500) {
+                        processedText = lastLine;
+                    }
+                } else {
+                    // Otherwise try splitting by sentence-like punctuation
+                    const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+/);
+                    if (segments.length >= 2) {
+                        const lastSegment = segments[segments.length - 1];
+                        if (blankRegex.test(lastSegment) && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.5) {
+                            processedText = lastSegment;
+                        }
+                    }
+                }
+            }
+        }
+
         // Tìm marker xuất hiện cuối cùng (gần câu hỏi nhất)
         for (const marker of markers) {
             // Sử dụng regex để match case-insensitive
@@ -934,9 +967,15 @@
                     || /(^|\n)\s*a\.\s+/im.test(contentAfter)
                     || /\b(chọn|choose|select|circle|tick|đáp án)\b/i.test(contentAfter);
 
-                // If contentAfter looks like answers or non-question instructions, prefer contentBefore (the real question/instruction)
+                // If contentAfter looks like answers or non-question instructions, prefer contentBefore (last segment)
                 if ((contentAfter.length === 0 || looksLikeAnswerList) && contentBefore.length > 5) {
-                    processedText = contentBefore;
+                    const segments = contentBefore.split(/\r?\n|(?<=[.!?])\s+(?=[A-Z])/);
+                    const lastSegment = segments[segments.length - 1].trim();
+                    if (lastSegment.length > 5) {
+                        processedText = lastSegment;
+                    } else {
+                        processedText = contentBefore;
+                    }
                     break;
                 }
 
@@ -952,9 +991,11 @@
         processedText = processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
 
         // Final sanitization: remove leading/trailing code-like fragments and stray punctuation
-        // (e.g., things like '", true); //]]>' or leftover separators)
-        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF]+/, '').replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF]+\s*$/, '').trim();
-        processedText = processedText.replace(/["'`]\s*,\s*(true|false)\)\s*;?/i, '').trim();
+        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF]+/, '').trim();
+        // Preserve potential blanks (dots, underscores, ellipsis)
+        if (!/[\._\u2026]{2,}\s*$/.test(processedText)) {
+            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s]+\s*$/, '').trim();
+        }
 
         return processedText;
     }
