@@ -189,13 +189,13 @@
                 if (!hasTickedAnswer) return;
 
                 // Build signature using question text + normalized answer texts
-                const signature = cleanQuestionText(questionText) + '||' + answers.map(a => normalizeText(a.text)).join('||');
+                const signature = cleanQuestionText(questionText, qtextElement) + '||' + answers.map(a => normalizeText(a.text)).join('||');
                 if (seenSignatures.has(signature)) return;
                 seenSignatures.add(signature);
 
                 questions.push({
                     index: questions.length + 1,
-                    question: cleanQuestionText(questionText),
+                    question: cleanQuestionText(questionText, qtextElement),
                     answers: answers,
                     element: qtextElement,
                     type: 'câu hỏi'
@@ -237,13 +237,13 @@
             if (!hasTickedAnswer) return;
 
             // Build signature and dedupe by full signature
-            const signature = cleanQuestionText(text) + '||' + answers.map(a => normalizeText(a.text)).join('||');
+            const signature = cleanQuestionText(text, element) + '||' + answers.map(a => normalizeText(a.text)).join('||');
             if (seenSignatures.has(signature)) return;
             seenSignatures.add(signature);
 
             questions.push({
                 index: questions.length + 1,
-                question: cleanQuestionText(text),
+                question: cleanQuestionText(text, element),
                 answers: answers,
                 element: element,
                 type: 'generic'
@@ -784,7 +784,7 @@
         return false;
     }
 
-    function cleanQuestionText(text) {
+    function cleanQuestionText(text, element = null) {
         if (!text) return '';
 
         // 1. Loại bỏ đoạn văn đọc hiểu nếu có marker "Choose the best answer"
@@ -809,6 +809,63 @@
 
         let processedText = text;
 
+        // Special Case: "Circle the best title for the reading text" dạng Instruction + Title + Passage
+        const titleMarkers = [
+            'Circle the best title for the reading text',
+            'Circle the best title for the text',
+            'Choose the best title',
+            'Choose the most suitable title',
+            'Select the best title',
+            'What is the best title',
+            'Which of the following is the best title',
+            'Which of the following is the most suitable title',
+            'Give a title to the passage',
+            'Chọn tiêu đề đúng nhất',
+            'Chọn tiêu đề phù hợp nhất',
+            'Chọn tiêu đề cho đoạn văn',
+            'Chọn tên đúng cho đoạn văn'
+        ];
+
+        const textLower = processedText.toLowerCase();
+        for (const marker of titleMarkers) {
+            if (textLower.includes(marker.toLowerCase())) {
+                const markerIdx = textLower.indexOf(marker.toLowerCase());
+                const endOfMarker = markerIdx + marker.length;
+
+                // Keep the part until the end of the marker (the instruction)
+                const afterMarker = processedText.substring(endOfMarker);
+                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
+                const instruction = processedText.substring(0, instructionEnd).trim();
+
+                let title = "";
+                // If element is provided, look for bold text
+                if (element) {
+                    const bold = element.querySelector('strong, b');
+                    if (bold) {
+                        title = bold.textContent.trim();
+                    }
+                }
+
+                // Fallback for title: take the next short part or sentence
+                if (!title) {
+                    const remaining = processedText.substring(instructionEnd).trim();
+                    if (remaining) {
+                        const parts = remaining.split(/\r?\n|(?<=[.!?])\s+/);
+                        const firstPart = parts[0].trim();
+                        if (firstPart.length > 0 && firstPart.length < 150) {
+                            title = firstPart;
+                        }
+                    }
+                }
+
+                // If we found a valid instruction and title, use them and ignore the rest of the text
+                if (instruction) {
+                    return (instruction + (title ? " " + title : "")).trim();
+                }
+            }
+        }
+
         // 0. Remove audio player scripts / CDATA
         if (processedText.includes('//]]>')) {
             const parts = processedText.split('//]]>');
@@ -832,20 +889,20 @@
                 let afterAudio = processedText.substring(idx + ext.length).trim();
 
                 // Quick cleanup for encoded spaces and common 'track' tokens
-                beforeAudio = beforeAudio.replace(/%20/g, ' ').replace(/track\s*[\d\.%-]*/ig, '').replace(/\s+$/,'').replace(/\/\/.*$/,'').trim();
+                beforeAudio = beforeAudio.replace(/%20/g, ' ').replace(/track\s*[\d\.%-]*/ig, '').replace(/\s+$/, '').replace(/\/\/.*$/, '').trim();
                 afterAudio = afterAudio.replace(/%20/g, ' ').trim();
 
                 // If meaningful content exists AFTER audio (audio at start), prefer content after it
                 if (afterAudio.length > 5) {
                     processedText = afterAudio.replace(/https?:\/\/\S+/gi, '').trim();
                     // cleanup stray 'Track' left-overs
-                    processedText = processedText.replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g,'').trim();
+                    processedText = processedText.replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g, '').trim();
                     break;
                 }
 
                 // If meaningful content exists BEFORE audio (audio at end), prefer content before it
                 if (beforeAudio.length > 5) {
-                    processedText = beforeAudio.replace(/https?:\/\/\S+/gi, '').replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g,'').trim();
+                    processedText = beforeAudio.replace(/https?:\/\/\S+/gi, '').replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g, '').trim();
                     break;
                 }
 

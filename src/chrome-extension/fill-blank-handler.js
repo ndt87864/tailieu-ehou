@@ -182,10 +182,10 @@
         if (!answerText) return [];
 
         const answers = [];
-        
+
         // Trim và chuẩn hóa input
         const trimmedText = answerText.trim();
-        
+
         // Pattern 1: Nhận diện numbered format rõ ràng - số đầu dòng/sau dấu phân cách + dấu chấm/ngoặc + nội dung
         // QUAN TRỌNG: Pattern này phải yêu cầu số thứ tự ở đầu dòng hoặc sau dấu phân cách (không giữa câu)
         // Ví dụ: "1. answer1, 2. answer2" hoặc "1) answer1\n2) answer2"
@@ -195,18 +195,18 @@
 
         // Kiểm tra xem text có đúng numbered format không (bắt đầu với số + dấu)
         const startsWithNumber = /^\s*\d+\s*[.\):\-]/.test(trimmedText);
-        
+
         if (startsWithNumber) {
             while ((match = numberedPattern.exec(trimmedText)) !== null) {
                 const idx = parseInt(match[1]);
                 const ans = match[2].trim();
-                
+
                 // Bỏ qua nếu số quá lớn (> 100) - không phải index, có thể là số trong đáp án như "200 million"
                 if (idx > 100) continue;
-                
+
                 // Bỏ qua nếu answer rỗng
                 if (!ans) continue;
-                
+
                 hasNumberedFormat = true;
                 answers.push({
                     index: idx,
@@ -218,11 +218,11 @@
         // Nếu không tìm thấy numbered format, xử lý như text đơn hoặc list
         if (!hasNumberedFormat || answers.length === 0) {
             answers.length = 0; // Reset
-            
+
             // Pattern 2: Split by newline trước (ưu tiên), sau đó by comma/semicolon
             // Nhưng KHÔNG split nếu có dấu phẩy trong cụm từ thông thường
             let parts = [];
-            
+
             // Kiểm tra có newline không
             if (trimmedText.includes('\n')) {
                 parts = trimmedText.split(/\n+/).map(p => p.trim()).filter(p => p);
@@ -230,7 +230,7 @@
                 // Không có newline - kiểm tra có phải danh sách có số thứ tự không
                 // Pattern: "1. xxx, 2. xxx" hoặc "1) xxx; 2) xxx"
                 const listPattern = /^\s*\d+\s*[.\):\-]/;
-                
+
                 if (listPattern.test(trimmedText)) {
                     // Có vẻ là danh sách numbered - split bằng pattern
                     parts = trimmedText.split(/(?=\d+\s*[.\):\-])/).map(p => p.trim()).filter(p => p);
@@ -238,7 +238,7 @@
                     // Không phải danh sách - có thể là câu trả lời đơn hoặc list đơn giản
                     // Chỉ split nếu có comma/semicolon VÀ pattern giống list (nhiều items ngắn)
                     const potentialParts = trimmedText.split(/[,;]+/).map(p => p.trim()).filter(p => p);
-                    
+
                     // Nếu chỉ có 1 phần hoặc các phần đều dài (>30 ký tự), giữ nguyên
                     if (potentialParts.length <= 1 || potentialParts.every(p => p.length > 30)) {
                         parts = [trimmedText];
@@ -272,7 +272,7 @@
 
         // Sort by index
         answers.sort((a, b) => a.index - b.index);
-        
+
         console.log('[Tailieu FillBlank] parseNumberedAnswers input:', answerText.substring(0, 100), '-> output:', answers);
 
         return answers;
@@ -435,7 +435,7 @@
     /**
      * Clean reading passages and instructions from text
      */
-    function cleanFillBlankContext(text) {
+    function cleanFillBlankContext(text, element = null) {
         if (!text) return text;
 
         const markers = [
@@ -456,6 +456,63 @@
         ];
 
         let processedText = text;
+
+        // Special Case: "Circle the best title for the reading text" dạng Instruction + Title + Passage
+        const titleMarkers = [
+            'Circle the best title for the reading text',
+            'Circle the best title for the text',
+            'Choose the best title',
+            'Choose the most suitable title',
+            'Select the best title',
+            'What is the best title',
+            'Which of the following is the best title',
+            'Which of the following is the most suitable title',
+            'Give a title to the passage',
+            'Chọn tiêu đề đúng nhất',
+            'Chọn tiêu đề phù hợp nhất',
+            'Chọn tiêu đề cho đoạn văn',
+            'Chọn tên đúng cho đoạn văn'
+        ];
+
+        const textLower = processedText.toLowerCase();
+        for (const marker of titleMarkers) {
+            if (textLower.includes(marker.toLowerCase())) {
+                const markerIdx = textLower.indexOf(marker.toLowerCase());
+                const endOfMarker = markerIdx + marker.length;
+
+                // Keep the part until the end of the marker (the instruction)
+                const afterMarker = processedText.substring(endOfMarker);
+                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
+                const instruction = processedText.substring(0, instructionEnd).trim();
+
+                let title = "";
+                // If element is provided, look for bold text
+                if (element) {
+                    const bold = element.querySelector('strong, b');
+                    if (bold) {
+                        title = bold.textContent.trim();
+                    }
+                }
+
+                // Fallback for title: take the next short part or sentence
+                if (!title) {
+                    const remaining = processedText.substring(instructionEnd).trim();
+                    if (remaining) {
+                        const parts = remaining.split(/\r?\n|(?<=[.!?])\s+/);
+                        const firstPart = parts[0].trim();
+                        if (firstPart.length > 0 && firstPart.length < 150) {
+                            title = firstPart;
+                        }
+                    }
+                }
+
+                // If we found a valid instruction and title, use them and ignore the rest of the text
+                if (instruction) {
+                    return (instruction + (title ? " " + title : "")).trim();
+                }
+            }
+        }
 
         // 0. Remove audio player scripts / CDATA
         if (processedText.includes('//]]>')) {
@@ -550,7 +607,7 @@
             .trim();
 
         // Strip reading passages/instructions
-        text = cleanFillBlankContext(text);
+        text = cleanFillBlankContext(text, element);
 
         console.log('[Tailieu FillBlank] Extracted sentence:', text.substring(0, 80), '| inputs:', actualInputs.length);
 

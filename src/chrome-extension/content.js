@@ -62,7 +62,7 @@ if (window.tailieuExtensionLoaded) {
     }
 
     // Helper to clean question text (strip reading passages and prefixes)
-    function cleanQuestionContent(text) {
+    function cleanQuestionContent(text, element = null) {
         if (!text) return '';
 
         // 1. Loại bỏ đoạn văn đọc hiểu nếu có marker
@@ -143,6 +143,63 @@ if (window.tailieuExtensionLoaded) {
         } catch (e) {
             // If anything goes wrong here, fall back to the original processedText
             console.warn('[Tailieu Extension] audio extraction helper error', e);
+        }
+
+        // Special Case: "Circle the best title for the reading text" dạng Instruction + Title + Passage
+        const titleMarkers = [
+            'Circle the best title for the reading text',
+            'Circle the best title for the text',
+            'Choose the best title',
+            'Choose the most suitable title',
+            'Select the best title',
+            'What is the best title',
+            'Which of the following is the best title',
+            'Which of the following is the most suitable title',
+            'Give a title to the passage',
+            'Chọn tiêu đề đúng nhất',
+            'Chọn tiêu đề phù hợp nhất',
+            'Chọn tiêu đề cho đoạn văn',
+            'Chọn tên đúng cho đoạn văn'
+        ];
+
+        const textLower = processedText.toLowerCase();
+        for (const marker of titleMarkers) {
+            if (textLower.includes(marker.toLowerCase())) {
+                const markerIdx = textLower.indexOf(marker.toLowerCase());
+                const endOfMarker = markerIdx + marker.length;
+
+                // Keep the part until the end of the marker (the instruction)
+                const afterMarker = processedText.substring(endOfMarker);
+                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
+                const instruction = processedText.substring(0, instructionEnd).trim();
+
+                let title = "";
+                // If element is provided, look for bold text
+                if (element) {
+                    const bold = element.querySelector('strong, b');
+                    if (bold) {
+                        title = bold.textContent.trim();
+                    }
+                }
+
+                // Fallback for title: take the next short part or sentence
+                if (!title) {
+                    const remaining = processedText.substring(instructionEnd).trim();
+                    if (remaining) {
+                        const parts = remaining.split(/\r?\n|(?<=[.!?])\s+/);
+                        const firstPart = parts[0].trim();
+                        if (firstPart.length > 0 && firstPart.length < 150) {
+                            title = firstPart;
+                        }
+                    }
+                }
+
+                // If we found a valid instruction and title, use them and ignore the rest of the text
+                if (instruction) {
+                    return (instruction + (title ? " " + title : "")).trim();
+                }
+            }
         }
 
         for (const marker of markers) {
@@ -777,7 +834,7 @@ if (window.tailieuExtensionLoaded) {
 
                 const questionText = qtextElement.textContent?.trim() || '';
                 // Clean text (remove reading passages) using helper
-                const finalQuestionText = cleanQuestionContent(questionText) || questionText;
+                const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
                 if (finalQuestionText.length < 5) return;
 
