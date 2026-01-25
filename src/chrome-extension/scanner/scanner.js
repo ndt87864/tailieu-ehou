@@ -328,7 +328,8 @@
             /appropriate\s+form/i,
             /verb\s+to\s+be/i,
             /in\s+these\s+(countries|sentences|words)/i,
-            /to\s+the\s+(countries|words)/i
+            /to\s+the\s+(countries|words)/i,
+            /in\s+which\s+(city|country|place)/i
         ];
         return patterns.some(p => p.test(text));
     }
@@ -548,6 +549,7 @@
         };
     }
 
+
     /**
      * Xây dựng question text bằng cách thay thế input/select bằng "..."
      * Duyệt qua DOM tree và build text
@@ -571,12 +573,15 @@
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tagName = node.tagName?.toUpperCase() || '';
 
-                // Skip các element không cần thiết
-                if (/^(SCRIPT|STYLE|SVG|IMG)$/.test(tagName)) return;
+                // Skip các element không cần thiết (bao gồm audio/video)
+                if (/^(SCRIPT|STYLE|SVG|IMG|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
 
                 // Skip feedback elements
                 const className = node.className || '';
                 if (/feedback|feedbackspan/i.test(className)) return;
+
+                // Skip audio/player elements by class or id
+                if (/audio|player/i.test(className) || /audio|player/i.test(node.id || '')) return;
 
                 // INPUT hoặc SELECT -> thay bằng "..."
                 if (tagName === 'INPUT' || tagName === 'SELECT') {
@@ -608,6 +613,7 @@
 
         return result;
     }
+
 
     /**
      * Kiểm tra một input có phải là correct (đúng) không

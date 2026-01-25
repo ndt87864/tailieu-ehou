@@ -31,7 +31,9 @@
         /true\s*\(t\)\s*or\s*false\s*\(f\)/i,
         /incorrect\s+or\s+correct/i,
         /(sentences|statements).*true.*false/i,
-        /correct.*answer/i
+        /correct.*answer/i,
+        /in\s+which\s+(city|country|place)/i,
+        /answer\s+the\s+questions?/i
     ];
 
     // Pattern để nhận diện chỗ trống cần điền
@@ -92,6 +94,7 @@
 
     /**
      * Chuẩn hóa câu để so sánh - thay tất cả chỗ trống thành placeholder thống nhất
+     * Xử lý đặc biệt: nếu câu hỏi có dạng "do people...?" thì đưa "..." về đầu
      * @param {string} text - Text gốc
      * @returns {string} - Text đã chuẩn hóa
      */
@@ -126,6 +129,16 @@
             .replace(/\s*\.\.\.\s*/g, ' ... ') // Ensure spaces around blanks
             .trim()
             .toLowerCase();
+
+        // 7. ĐẶC BIỆT: Nếu câu bắt đầu bằng từ khóa câu hỏi
+        const questionStarters = /^(do|does|did|is|are|was|were|can|could|will|would|what|when|where|who|why|how)\s+/i;
+        if (questionStarters.test(normalized)) {
+            // Kiểm tra "..." ở cuối
+            if (normalized.endsWith(' ...')) {
+                // Đưa "..." về đầu
+                normalized = '... ' + normalized.substring(0, normalized.length - 4).trim();
+            }
+        }
 
         return normalized;
     }
@@ -437,6 +450,8 @@
 
     /**
      * Clean reading passages and instructions from text
+     * Đặc biệt xử lý dạng: Mô tả + mp3 + Câu hỏi điền từ
+     * Chỉ lấy phần câu hỏi điền từ (có ô trống), bỏ qua mô tả và mp3
      */
     function cleanFillBlankContext(text, element = null) {
         if (!text) return text;
@@ -485,7 +500,7 @@
 
                 // Keep the part until the end of the marker (the instruction)
                 const afterMarker = processedText.substring(endOfMarker);
-                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const firstSentenceMatch = afterMarker.match(/^[\.\\s\:\-\n\r]*/);
                 const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
                 const instruction = processedText.substring(0, instructionEnd).trim();
 
@@ -528,18 +543,40 @@
             }
         }
 
-        // Remove .mp3 or similar audio references if they appear at the start
+        // ===== XỬ LÝ ĐẶC BIỆT: DẠNG MÔ TẢ + MP3 + CÂU HỎI ĐIỀN TỪ =====
+        // Ví dụ: "Listen to three people describing... mp3 ... do people like to be informal? ... are people very competitive?"
+        // Chỉ lấy phần có ô trống (câu hỏi điền từ), bỏ qua mô tả và mp3
+
+        // 1. Tìm vị trí mp3 (sau cùng)
         const audioExtensions = ['.mp3', '.wav', '.ogg'];
+        let lastAudioIndex = -1;
+        let lastAudioExt = '';
+
         for (const ext of audioExtensions) {
             const idx = processedText.lastIndexOf(ext);
-            if (idx !== -1) {
-                const afterAudio = processedText.substring(idx + ext.length).trim();
-                if (afterAudio.length > 5) {
-                    processedText = afterAudio;
-                }
+            if (idx > lastAudioIndex) {
+                lastAudioIndex = idx;
+                lastAudioExt = ext;
             }
         }
 
+        // 2. Nếu có mp3, lấy phần sau mp3
+        if (lastAudioIndex !== -1) {
+            const afterAudio = processedText.substring(lastAudioIndex + lastAudioExt.length).trim();
+
+            // Lấy phần sau mp3 nếu:
+            // - Có nội dung (length > 5)
+            // - Có ô trống "..." HOẶC có dạng câu hỏi
+            const hasBlankPattern = /(\.\.\.| \.\.\. |…|_{2,}|\[[\s]*\]|\([\s]*\))/.test(afterAudio);
+            const looksLikeQuestion = /\?|^(do|does|did|is|are|was|were|can|could|will|would|what|when|where|who|why|how)\s+/i.test(afterAudio);
+
+            if (afterAudio.length > 5 && (hasBlankPattern || looksLikeQuestion)) {
+                console.log('[Tailieu FillBlank] Phát hiện nội dung sau mp3. Chỉ lấy phần sau mp3:', afterAudio.substring(0, 60));
+                processedText = afterAudio;
+            }
+        }
+
+        // 3. Xử lý các marker thông thường
         for (const marker of markers) {
             const regex = new RegExp(marker, 'gi');
             const matches = [...processedText.matchAll(regex)];
@@ -561,8 +598,9 @@
     /**
      * Trích xuất text của một row/sentence có input fields
      * Thay input bằng placeholder "..." để tạo câu chuẩn hóa
+     * Sử dụng cách duyệt DOM như Scanner để skip audio/video elements
      * @param {Element} element - Row element chứa text và input
-     * @returns {{text: string, inputs: Array}} 
+     * @returns {{text: string, inputs: Array}}
      */
     function extractSentenceWithInputs(element) {
         if (!element) return { text: '', inputs: [] };
@@ -578,28 +616,49 @@
             };
         }
 
-        // Clone element để không ảnh hưởng DOM gốc
-        const clone = element.cloneNode(true);
+        // ===== SỬ DỤNG CÁCH DUYỆT DOM NHƯ SCANNER =====
+        // Thay vì clone và dùng textContent, ta duyệt DOM để skip audio/video
+        let text = '';
 
-        // Xóa các feedback elements (X marks, correct/incorrect indicators)
-        const feedbackEls = clone.querySelectorAll('.feedback, .feedbackspan, .incorrect, .correct, [class*="feedback"]');
-        feedbackEls.forEach(fb => fb.remove());
+        function traverse(node) {
+            if (!node) return;
 
-        // Xóa các icon, images
-        const icons = clone.querySelectorAll('img, svg, i.fa, .icon');
-        icons.forEach(icon => icon.remove());
-
-        // Tìm tất cả inputs trong clone và thay bằng marker
-        const inputEls = clone.querySelectorAll('input[type="text"], input:not([type]), textarea, select');
-        inputEls.forEach((input, idx) => {
-            const marker = document.createTextNode(' ... ');
-            if (input.parentNode) {
-                input.parentNode.replaceChild(marker, input);
+            // Text node - lấy text
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.textContent || '';
+                return;
             }
-        });
 
-        // Lấy text đã chuẩn hóa
-        let text = clone.textContent || '';
+            // Element node
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tagName = node.tagName?.toUpperCase() || '';
+
+                // Skip các element không cần thiết (bao gồm audio/video)
+                if (/^(SCRIPT|STYLE|SVG|IMG|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
+
+                // Skip feedback elements
+                const className = node.className || '';
+                const nodeId = node.id || '';
+                if (/feedback|feedbackspan|incorrect|correct/i.test(className)) return;
+
+                // Skip audio/player elements by class or id
+                if (/audio|player/i.test(className) || /audio|player/i.test(nodeId)) return;
+
+                // INPUT hoặc SELECT -> thay bằng "..."
+                if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') {
+                    text += ' ... ';
+                    return;
+                }
+
+                // Duyệt qua children
+                const children = node.childNodes;
+                for (let i = 0; i < children.length; i++) {
+                    traverse(children[i]);
+                }
+            }
+        }
+
+        traverse(element);
 
         // Clean up text
         text = text
@@ -609,7 +668,7 @@
             .replace(/^\s*[a-z]\.\s*/i, '')  // Remove leading labels like "a."
             .trim();
 
-        // Strip reading passages/instructions
+        // Strip reading passages/instructions (bao gồm cả phần mp3 và mô tả trước)
         text = cleanFillBlankContext(text, element);
 
         console.log('[Tailieu FillBlank] Extracted sentence:', text.substring(0, 80), '| inputs:', actualInputs.length);
