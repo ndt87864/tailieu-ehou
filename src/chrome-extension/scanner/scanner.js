@@ -583,8 +583,38 @@
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tagName = node.tagName?.toUpperCase() || '';
 
-                // Skip các element không cần thiết (bao gồm audio/video)
-                if (/^(SCRIPT|STYLE|SVG|IMG|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
+                // XỬ LÝ ẢNH (IMG) - Kiểm tra và lấy URL nếu là ảnh nội dung
+                if (tagName === 'IMG') {
+                    const src = node.getAttribute('src') ||
+                        node.getAttribute('data-src') ||
+                        node.getAttribute('data-original') ||
+                        node.getAttribute('data-lazy-src');
+
+                    if (src && src.trim() !== '') {
+                        const hasCIH = typeof window.tailieuContentImageHandler !== 'undefined';
+                        const fullUrl = hasCIH ?
+                            window.tailieuContentImageHandler.makeAbsoluteUrlFallback(src) :
+                            src;
+
+                        // Lọc chỉ lấy ảnh nội dung
+                        const isContentImage = fullUrl.includes('pluginfile.php') &&
+                            (fullUrl.includes('/question/answer/') ||
+                                fullUrl.includes('/question/questiontext/') ||
+                                fullUrl.includes('/question/'));
+
+                        if (isContentImage) {
+                            const prefix = (typeof window.tailieuImageHandler !== 'undefined') ?
+                                window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
+                            const suffix = (typeof window.tailieuImageHandler !== 'undefined') ?
+                                window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
+                            result += ` ${prefix}${fullUrl}${suffix} `;
+                        }
+                    }
+                    return;
+                }
+
+                // Skip các element không cần thiết khác (bao gồm audio/video)
+                if (/^(SCRIPT|STYLE|SVG|BUTTON|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
 
                 // Skip feedback elements
                 const className = node.className || '';

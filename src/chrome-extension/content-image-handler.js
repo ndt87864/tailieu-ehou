@@ -38,13 +38,25 @@
                         window.tailieuImageHandler.makeAbsoluteUrl(src) :
                         makeAbsoluteUrlFallback(src);
 
-                    const placeholderPrefix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
-                    const placeholderSuffix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
+                    // LỌC CHỈ LẤY CÁC LINK ẢNH NỘI DUNG (pluginfile.php và /question/)
+                    // Tránh lấy các icon hệ thống, icon tick/cross hoặc ảnh linh tinh
+                    const isContentImage = fullUrl.includes('pluginfile.php') &&
+                        (fullUrl.includes('/question/answer/') ||
+                            fullUrl.includes('/question/questiontext/') ||
+                            fullUrl.includes('/question/'));
 
-                    const urlText = `${placeholderPrefix}${fullUrl}${placeholderSuffix}`;
-                    const textNode = document.createTextNode(urlText);
-                    if (img.parentNode) {
-                        img.parentNode.replaceChild(textNode, img);
+                    if (isContentImage) {
+                        const placeholderPrefix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
+                        const placeholderSuffix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
+
+                        const urlText = `${placeholderPrefix}${fullUrl}${placeholderSuffix}`;
+                        const textNode = document.createTextNode(urlText);
+                        if (img.parentNode) {
+                            img.parentNode.replaceChild(textNode, img);
+                        }
+                    } else {
+                        // Nếu không phải ảnh nội dung, xóa bỏ để tránh nhiễu text
+                        img.remove();
                     }
                 } else {
                     img.remove();

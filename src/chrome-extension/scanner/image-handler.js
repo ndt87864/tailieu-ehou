@@ -54,13 +54,24 @@
                 // Tạo URL đầy đủ nếu là relative path
                 const fullUrl = makeAbsoluteUrl(src);
 
-                // Tạo text node thay thế cho img
-                const urlText = `${IMAGE_PLACEHOLDER_PREFIX}${fullUrl}${IMAGE_PLACEHOLDER_SUFFIX}`;
-                const textNode = document.createTextNode(urlText);
+                // LỌC CHỈ LẤY CÁC LINK ẢNH NỘI DUNG (pluginfile.php và /question/)
+                const isContentImage = fullUrl.includes('pluginfile.php') &&
+                    (fullUrl.includes('/question/answer/') ||
+                        fullUrl.includes('/question/questiontext/') ||
+                        fullUrl.includes('/question/'));
 
-                // Thay thế img bằng text node
-                if (img.parentNode) {
-                    img.parentNode.replaceChild(textNode, img);
+                if (isContentImage) {
+                    // Tạo text node thay thế cho img
+                    const urlText = `${IMAGE_PLACEHOLDER_PREFIX}${fullUrl}${IMAGE_PLACEHOLDER_SUFFIX}`;
+                    const textNode = document.createTextNode(urlText);
+
+                    // Thay thế img bằng text node
+                    if (img.parentNode) {
+                        img.parentNode.replaceChild(textNode, img);
+                    }
+                } else {
+                    // Nếu không phải ảnh nội dung, xóa img để tránh nhiễu
+                    img.remove();
                 }
             } else {
                 // Nếu không có src, xóa img
@@ -124,7 +135,17 @@
                 img.getAttribute('data-original') ||
                 img.getAttribute('data-lazy-src');
             if (src && src.trim() !== '') {
-                urls.push(makeAbsoluteUrl(src));
+                const fullUrl = makeAbsoluteUrl(src);
+
+                // Lọc logic tương tự
+                const isContentImage = fullUrl.includes('pluginfile.php') &&
+                    (fullUrl.includes('/question/answer/') ||
+                        fullUrl.includes('/question/questiontext/') ||
+                        fullUrl.includes('/question/'));
+
+                if (isContentImage) {
+                    urls.push(fullUrl);
+                }
             }
         });
 

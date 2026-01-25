@@ -633,8 +633,28 @@
             if (node.nodeType === Node.ELEMENT_NODE) {
                 const tagName = node.tagName?.toUpperCase() || '';
 
-                // Skip các element không cần thiết (bao gồm audio/video)
-                if (/^(SCRIPT|STYLE|SVG|IMG|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
+                // XỬ LÝ ẢNH (IMG) - Kiểm tra và lấy URL nếu là ảnh nội dung
+                if (tagName === 'IMG') {
+                    const src = node.getAttribute('src') ||
+                        node.getAttribute('data-src') ||
+                        node.getAttribute('data-original') ||
+                        node.getAttribute('data-lazy-src');
+
+                    if (src && src.trim() !== '') {
+                        const hasCIH = typeof window.tailieuContentImageHandler !== 'undefined';
+                        const fullUrl = hasCIH ?
+                            window.tailieuContentImageHandler.getElementVisibleTextWithImages(node) : // Trích xuất URL đã lọc từ helper
+                            '';
+
+                        if (fullUrl) {
+                            text += ` ${fullUrl} `;
+                        }
+                    }
+                    return;
+                }
+
+                // Skip các element không cần thiết khác (bao gồm audio/video)
+                if (/^(SCRIPT|STYLE|SVG|BUTTON|AUDIO|VIDEO|OBJECT|EMBED)$/.test(tagName)) return;
 
                 // Skip feedback elements
                 const className = node.className || '';
