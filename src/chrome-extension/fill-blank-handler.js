@@ -182,36 +182,89 @@
         if (!answerText) return [];
 
         const answers = [];
-
-        // Pattern 1: "1.answer1, 2.answer2, 3.answer3" hoặc "1. answer1, 2. answer2"
-        const numberedPattern = /(\d+)\s*[.\):\-]\s*([^,;\d]+)/g;
+        
+        // Trim và chuẩn hóa input
+        const trimmedText = answerText.trim();
+        
+        // Pattern 1: Nhận diện numbered format rõ ràng - số đầu dòng/sau dấu phân cách + dấu chấm/ngoặc + nội dung
+        // QUAN TRỌNG: Pattern này phải yêu cầu số thứ tự ở đầu dòng hoặc sau dấu phân cách (không giữa câu)
+        // Ví dụ: "1. answer1, 2. answer2" hoặc "1) answer1\n2) answer2"
+        const numberedPattern = /(?:^|[,;\n]\s*)(\d+)\s*[.\):\-]\s*([^,;\n]+)/g;
         let match;
+        let hasNumberedFormat = false;
 
-        while ((match = numberedPattern.exec(answerText)) !== null) {
-            answers.push({
-                index: parseInt(match[1]),
-                answer: match[2].trim()
-            });
+        // Kiểm tra xem text có đúng numbered format không (bắt đầu với số + dấu)
+        const startsWithNumber = /^\s*\d+\s*[.\):\-]/.test(trimmedText);
+        
+        if (startsWithNumber) {
+            while ((match = numberedPattern.exec(trimmedText)) !== null) {
+                const idx = parseInt(match[1]);
+                const ans = match[2].trim();
+                
+                // Bỏ qua nếu số quá lớn (> 100) - không phải index, có thể là số trong đáp án như "200 million"
+                if (idx > 100) continue;
+                
+                // Bỏ qua nếu answer rỗng
+                if (!ans) continue;
+                
+                hasNumberedFormat = true;
+                answers.push({
+                    index: idx,
+                    answer: ans
+                });
+            }
         }
 
-        // Nếu không tìm thấy pattern số, thử split bằng dấu phẩy hoặc xuống dòng
-        if (answers.length === 0) {
-            // Pattern 2: Split by comma, semicolon, or newline
-            const parts = answerText.split(/[,;\n]+/).map(p => p.trim()).filter(p => p);
+        // Nếu không tìm thấy numbered format, xử lý như text đơn hoặc list
+        if (!hasNumberedFormat || answers.length === 0) {
+            answers.length = 0; // Reset
+            
+            // Pattern 2: Split by newline trước (ưu tiên), sau đó by comma/semicolon
+            // Nhưng KHÔNG split nếu có dấu phẩy trong cụm từ thông thường
+            let parts = [];
+            
+            // Kiểm tra có newline không
+            if (trimmedText.includes('\n')) {
+                parts = trimmedText.split(/\n+/).map(p => p.trim()).filter(p => p);
+            } else {
+                // Không có newline - kiểm tra có phải danh sách có số thứ tự không
+                // Pattern: "1. xxx, 2. xxx" hoặc "1) xxx; 2) xxx"
+                const listPattern = /^\s*\d+\s*[.\):\-]/;
+                
+                if (listPattern.test(trimmedText)) {
+                    // Có vẻ là danh sách numbered - split bằng pattern
+                    parts = trimmedText.split(/(?=\d+\s*[.\):\-])/).map(p => p.trim()).filter(p => p);
+                } else {
+                    // Không phải danh sách - có thể là câu trả lời đơn hoặc list đơn giản
+                    // Chỉ split nếu có comma/semicolon VÀ pattern giống list (nhiều items ngắn)
+                    const potentialParts = trimmedText.split(/[,;]+/).map(p => p.trim()).filter(p => p);
+                    
+                    // Nếu chỉ có 1 phần hoặc các phần đều dài (>30 ký tự), giữ nguyên
+                    if (potentialParts.length <= 1 || potentialParts.every(p => p.length > 30)) {
+                        parts = [trimmedText];
+                    } else {
+                        // Có vẻ là list - nhưng kiểm tra xem có phải các câu có số không
+                        // Ví dụ: "200 million" không nên split thành "200" và "million"
+                        parts = potentialParts;
+                    }
+                }
+            }
 
-            // Check if parts contain numbered answers
+            // Check if parts contain numbered answers (1. xxx format)
             parts.forEach((part, idx) => {
-                const numMatch = part.match(/^(\d+)\s*[.\):\-]?\s*(.+)$/);
-                if (numMatch) {
+                // Pattern yêu cầu số ở ĐẦU part và số nhỏ (1-99)
+                const numMatch = part.match(/^(\d{1,2})\s*[.\):\-]\s*(.+)$/);
+                if (numMatch && parseInt(numMatch[1]) <= 99) {
                     answers.push({
                         index: parseInt(numMatch[1]),
                         answer: numMatch[2].trim()
                     });
                 } else {
-                    // No number prefix, use sequential index
+                    // No number prefix - use as-is với sequential index
+                    // Giữ nguyên toàn bộ part (bao gồm số như "200 million")
                     answers.push({
                         index: idx + 1,
-                        answer: part
+                        answer: part.trim()
                     });
                 }
             });
@@ -219,6 +272,8 @@
 
         // Sort by index
         answers.sort((a, b) => a.index - b.index);
+        
+        console.log('[Tailieu FillBlank] parseNumberedAnswers input:', answerText.substring(0, 100), '-> output:', answers);
 
         return answers;
     }

@@ -3064,7 +3064,8 @@ if (window.tailieuExtensionLoaded) {
         // PRIORITY 3: Add variations with different answer markers removed
         const markerVariations = [
             workingAnswer.replace(/^[A-Da-d][\.\)\s]+/i, '').trim(), // Remove A. B. C. D.
-            workingAnswer.replace(/^\d+[\.\)\s]+/, '').trim(), // Remove 1. 2. 3.
+            // FIXED: Only remove small number prefix (1-99) to avoid removing "200" from "200 million"
+            workingAnswer.replace(/^([1-9]\d?)[\.\)\s]+/, '').trim(), // Remove 1. 2. 3. etc (small numbers only)
             workingAnswer.replace(/^[-\*\+]\s*/, '').trim(), // Remove bullet points
         ];
 
@@ -3146,7 +3147,9 @@ if (window.tailieuExtensionLoaded) {
         if (!text) return '';
         return text
             .replace(/^[A-Da-d][\.\)]\s*/, '') // Remove A. B. C. D. prefixes
-            .replace(/^\d+[\.\)]\s*/, '') // Remove number prefixes
+            // FIXED: Only remove number prefix if followed by dot/bracket AND space, 
+            // AND number is small (1-99) to avoid removing numbers that are part of answer like "200 million"
+            .replace(/^([1-9]\d?)[\.\)]\s+/, '') // Remove 1. 2. etc (small numbers only, require space after)
             .replace(/^(Đáp án|Trả lời|Kết quả|Phương án|Chọn|Lựa chọn):\s*/gi, '') // Remove Vietnamese answer markers
             .replace(/\s+/g, ' ') // Normalize spaces
             .trim();
