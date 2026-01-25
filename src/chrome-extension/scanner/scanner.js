@@ -176,7 +176,8 @@
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
 
-                const questionText = qtextElement.textContent?.trim() || '';
+                // Use visible text extraction to avoid script/audio fragments
+                const questionText = getElementVisibleText(qtextElement) || qtextElement.textContent?.trim() || '';
                 if (questionText.length < 5) return;
 
                 // Tìm các đáp án (do dedupe phải bao gồm đáp án)
@@ -193,7 +194,7 @@
                 seenSignatures.add(signature);
 
                 questions.push({
-                    index: index + 1,
+                    index: questions.length + 1,
                     question: cleanQuestionText(questionText),
                     answers: answers,
                     element: qtextElement,
@@ -221,7 +222,7 @@
         elements.forEach((element, idx) => {
             if (isExtensionElement(element)) return;
 
-            const text = element.textContent?.trim() || '';
+            const text = getElementVisibleText(element) || element.textContent?.trim() || '';
             if (text.length < 10 || text.length > 1000) return;
 
             // Kiểm tra có phải câu hỏi không
@@ -270,7 +271,7 @@
 
             // Lấy instruction/header của câu hỏi
             const qtext = queContainer.querySelector('.qtext');
-            const instructionText = qtext?.textContent?.trim() || '';
+            const instructionText = getElementVisibleText(qtext) || qtext?.textContent?.trim() || '';
 
             // Kiểm tra có input fields trong container không (bất kể instruction)
             const hasInputs = queContainer.querySelectorAll('input[type="text"], input:not([type]), select').length > 0;
@@ -794,6 +795,8 @@
             'Select the correct answer',
             'Chọn câu trả lời đúng nhất',
             'Chọn đáp án đúng nhất',
+            'Chọn một câu trả lời',
+            'Choose one answer',
             'Trả lời câu hỏi',
             'Answer the question',
             'Are these following sentences true \\(T\\) or false \\(F\\)',
@@ -817,20 +820,42 @@
             }
         }
 
-        // Remove .mp3 or similar audio references if they appear at the start (or before question)
-        // Check for common audio pattern if no CDATA marker found or still present
+        // Remove or reassign .mp3/.wav/.ogg audio references
+        // Improved: if audio is at the start, prefer content after it; if audio is at the end, prefer content before it.
+        // Also try to strip labels like "Track 5.1" and leftover separators so we keep only the readable question text.
         const audioExtensions = ['.mp3', '.wav', '.ogg'];
         for (const ext of audioExtensions) {
-            const idx = processedText.lastIndexOf(ext);
-            if (idx !== -1) { // Audio likely in first half
-                // Try to split by whitespace after extension
-                const afterAudio = processedText.substring(idx + ext.length).trim();
-                // If clearly separated or just weird text, take valid part
+            const lower = processedText.toLowerCase();
+            const idx = lower.lastIndexOf(ext);
+            if (idx !== -1) {
+                let beforeAudio = processedText.substring(0, idx).trim();
+                let afterAudio = processedText.substring(idx + ext.length).trim();
+
+                // Quick cleanup for encoded spaces and common 'track' tokens
+                beforeAudio = beforeAudio.replace(/%20/g, ' ').replace(/track\s*[\d\.%-]*/ig, '').replace(/\s+$/,'').replace(/\/\/.*$/,'').trim();
+                afterAudio = afterAudio.replace(/%20/g, ' ').trim();
+
+                // If meaningful content exists AFTER audio (audio at start), prefer content after it
                 if (afterAudio.length > 5) {
-                    processedText = afterAudio;
+                    processedText = afterAudio.replace(/https?:\/\/\S+/gi, '').trim();
+                    // cleanup stray 'Track' left-overs
+                    processedText = processedText.replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g,'').trim();
+                    break;
                 }
+
+                // If meaningful content exists BEFORE audio (audio at end), prefer content before it
+                if (beforeAudio.length > 5) {
+                    processedText = beforeAudio.replace(/https?:\/\/\S+/gi, '').replace(/track\s*[\d\.%-]*/ig, '').replace(/(?:\/\/|-{2,}).*/g,'').trim();
+                    break;
+                }
+
+                // Otherwise, remove the audio token and continue
+                processedText = (beforeAudio + ' ' + afterAudio).replace(/https?:\/\/\S+/gi, '').trim();
             }
         }
+
+        // Also remove bare URLs that might remain (e.g., audio links) to avoid capturing them as question text
+        processedText = processedText.replace(/https?:\/\/\S+/gi, '').trim();
 
         // Tìm marker xuất hiện cuối cùng (gần câu hỏi nhất)
         for (const marker of markers) {
@@ -841,26 +866,40 @@
             if (matches.length > 0) {
                 // Lấy match cuối cùng
                 const lastMatch = matches[matches.length - 1];
-                const lastIndex = lastMatch.index;
+                const lastIndex = lastMatch.index || 0;
 
-                // Kiểm tra xem phần sau marker có nội dung không
+                // Kiểm tra phần trước và sau marker
                 const contentAfter = processedText.substring(lastIndex + lastMatch[0].length).trim();
+                const contentBefore = processedText.substring(0, lastIndex).trim();
 
-                // Chỉ cắt nếu phần sau đủ dài (lớn hơn 5 ký tự) để tránh cắt mất câu hỏi nếu nó quá ngắn hoặc lỗi
-                // Và phần sau phải chứa ít nhất một từ (không phải toàn ký tự đặc biệt)
+                // Detect if contentAfter looks like an answer list or instruction for answers
+                const looksLikeAnswerList = /(^|\n)\s*([A-Da-d]|\d+)[\.\)]\s+/m.test(contentAfter)
+                    || /(^|\n)\s*a\.\s+/im.test(contentAfter)
+                    || /\b(chọn|choose|select|circle|tick|đáp án)\b/i.test(contentAfter);
+
+                // If contentAfter looks like answers or non-question instructions, prefer contentBefore (the real question/instruction)
+                if ((contentAfter.length === 0 || looksLikeAnswerList) && contentBefore.length > 5) {
+                    processedText = contentBefore;
+                    break;
+                }
+
+                // Otherwise if contentAfter looks like a question/has enough content, take it
                 if (contentAfter.length > 5 && /[a-zA-Z0-9]/.test(contentAfter)) {
-                    // Cập nhật text để xử lý tiếp
                     processedText = contentAfter;
-                    // Break sau khi tìm thấy marker phù hợp nhất (ưu tiên marker nào khớp thì cắt luôn, 
-                    // nhưng logic này có thể cần refine nếu một bài có nhiều marker. 
-                    // Hiện tại ưu tiên cắt theo marker tìm thấy đầu tiên trong loop valid)
                     break;
                 }
             }
         }
 
         // 2. Loại bỏ prefix (Câu 1:, Question 1:, ...)
-        return processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+        processedText = processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+
+        // Final sanitization: remove leading/trailing code-like fragments and stray punctuation
+        // (e.g., things like '", true); //]]>' or leftover separators)
+        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF]+/, '').replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF]+\s*$/, '').trim();
+        processedText = processedText.replace(/["'`]\s*,\s*(true|false)\)\s*;?/i, '').trim();
+
+        return processedText;
     }
 
     // Normalize and extract visible text from an element
@@ -875,8 +914,10 @@
         // Clone to avoid modifying original DOM and remove irrelevant nodes
         try {
             const clone = el.cloneNode(true);
-            // remove inputs, svgs, icons, and numbering helper nodes
-            clone.querySelectorAll('input, svg, button, img, .answernumber, .bullet, .icon').forEach(n => n.remove());
+            // remove inputs, svgs, icons, scripts, styles, audio elements and numbering helper nodes
+            clone.querySelectorAll('input, svg, button, img, script, style, audio, source, iframe, noscript, .answernumber, .bullet, .icon, .audioplayer, .audio').forEach(n => n.remove());
+            // Also remove common inline tokens that sometimes include links or JS fragments
+            clone.querySelectorAll('[data-src], [data-audio], [data-track]').forEach(n => n.remove());
             return normalizeText(clone.textContent || '');
         } catch (e) {
             return normalizeText(el.textContent || '');
