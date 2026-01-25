@@ -1173,9 +1173,13 @@
                     transition: all 0.2s;
                 `;
 
+                const renderedAns = (typeof window.tailieuImageRenderer !== 'undefined')
+                    ? window.tailieuImageRenderer.renderImages(ans.answer)
+                    : ans.answer;
+
                 item.innerHTML = `
                     <span style="font-weight: bold; color: #fff;">${ans.index || (idx + 1)}.</span>
-                    <span style="color: #fff;">${ans.answer}</span>
+                    <span style="color: #fff;">${renderedAns}</span>
                 `;
 
                 // Click to copy/fill
@@ -1251,7 +1255,10 @@
             if (answers[idx]) {
                 const badge = document.createElement('span');
                 badge.className = 'tailieu-answer-badge';
-                badge.textContent = answers[idx].answer;
+                const renderedA = (typeof window.tailieuImageRenderer !== 'undefined')
+                    ? window.tailieuImageRenderer.renderImages(answers[idx].answer)
+                    : answers[idx].answer;
+                badge.innerHTML = renderedA;
                 badge.style.cssText = `
                     display: inline-block;
                     margin-left: 8px;

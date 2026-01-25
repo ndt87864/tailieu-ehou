@@ -2098,14 +2098,14 @@ if (window.tailieuExtensionLoaded) {
 
         let inner = '<div style="display:flex;flex-direction:column;gap:6px; margin-bottom: 2px;">';
         answers.forEach((ans, i) => {
-            if (isImageString(ans)) {
-                const src = extractImageSrcFromString(ans) || '';
-                inner += `<div style="display:block;max-width:320px;overflow:hidden"><img src="${src}" style="max-width:320px;max-height:160px;border-radius:4px;display:block"/></div>`;
-            } else {
-                // escape minimal HTML
-                const safe = String(ans).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                inner += `<div style="padding:4px 0; border-bottom: 1px solid rgba(255,255,255,0.1)">` + `<span style="font-weight: 500">${safe}</span>` + '</div>';
-            }
+            // Sử dụng bộ renderer chung để hiển thị ảnh (hỗ trợ cả link trong dấu nháy)
+            const rendered = (typeof window.tailieuImageRenderer !== 'undefined')
+                ? window.tailieuImageRenderer.renderImages(ans)
+                : String(ans).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            inner += `<div style="padding:4px 0; border-bottom: 1px solid rgba(255,255,255,0.1)">` +
+                `<span style="font-weight: 500">${rendered}</span>` +
+                '</div>';
         });
         inner += '</div>';
         tooltip.innerHTML = inner;
@@ -4570,27 +4570,33 @@ if (window.tailieuExtensionLoaded) {
             // Question number and text
             const questionHeader = document.createElement('div');
             questionHeader.style.cssText = `
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 8px;
-            font-size: 13px;
-            line-height: 1.4;
-        `;
-            questionHeader.innerHTML = `<span style="color: #667eea;">#${index + 1}</span> ${question.question}`;
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 8px;
+                font-size: 13px;
+                line-height: 1.4;
+            `;
+            const renderedQ = (typeof window.tailieuImageRenderer !== 'undefined')
+                ? window.tailieuImageRenderer.renderImages(question.question)
+                : question.question;
+            questionHeader.innerHTML = `<span style="color: #667eea;">#${index + 1}</span> ${renderedQ}`;
 
             // Answer
             const answerDiv = document.createElement('div');
             answerDiv.style.cssText = `
-            color: #666;
-            font-size: 12px;
-            background: #f0f8ff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border-left: 3px solid #667eea;
-            margin-top: 8px;
-            line-height: 1.4;
-        `;
-            answerDiv.innerHTML = `<strong>Đáp án:</strong> ${question.answer}`;
+                color: #666;
+                font-size: 12px;
+                background: #f0f8ff;
+                padding: 8px 12px;
+                border-radius: 6px;
+                border-left: 3px solid #667eea;
+                margin-top: 8px;
+                line-height: 1.4;
+            `;
+            const renderedA = (typeof window.tailieuImageRenderer !== 'undefined')
+                ? window.tailieuImageRenderer.renderImages(question.answer)
+                : question.answer;
+            answerDiv.innerHTML = `<strong>Đáp án:</strong> ${renderedA}`;
 
             questionItem.appendChild(questionHeader);
             questionItem.appendChild(answerDiv);
