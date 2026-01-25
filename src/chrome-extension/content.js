@@ -1119,16 +1119,36 @@ if (window.tailieuExtensionLoaded) {
                 // Try all variants (use first that matches)
                 let matchedVariant = null;
                 let matchedFinalValidation = null;
+
+                // Helper: strip common listen prompts for lenient comparision
+                function stripListen(s) {
+                    return (s || '').toString().replace(/^(listen( to the story)?|then listen( again)?|nghe( lại)?)[\.:,\-\s]*/i, '').trim();
+                }
+
                 for (const variant of cleanedVariants) {
+                    // Debug logging for comparisons
+                    debugLog('[Compare] Page variant:', variant, 'DB:', cleanExtQuestion);
+
                     // STRICT VALIDATION: exact normalized match
                     if (isQuestionSimilar(variant, cleanExtQuestion)) {
                         const originalVariantRaw = pageVariantsRaw[cleanedVariants.indexOf(variant)] || pageQ.text;
                         const finalValidation = performFinalValidation(originalVariantRaw, extQ.question);
+                        debugLog('[Compare] Exact match found, finalValidation:', finalValidation);
                         if (finalValidation.isValid) {
                             matchedVariant = variant;
                             matchedFinalValidation = finalValidation;
                             break;
                         }
+                    }
+
+                    // LENIENT: Strip 'Listen' prompt and compare normalized forms
+                    const vStrip = stripListen(variant);
+                    const eStrip = stripListen(cleanExtQuestion);
+                    if (vStrip && eStrip && normalizeForExactMatch(vStrip) === normalizeForExactMatch(eStrip)) {
+                        debugLog('[Compare] Matched after stripping Listen prompt:', vStrip, '==', eStrip);
+                        matchedVariant = variant;
+                        matchedFinalValidation = { isValid: true, confidence: 0.92 };
+                        break;
                     }
                 }
 
@@ -1136,6 +1156,7 @@ if (window.tailieuExtensionLoaded) {
                     // As a fallback, try more lenient enhanced similarity for variants
                     for (const variant of cleanedVariants) {
                         const sim = calculateEnhancedSimilarity(variant, cleanExtQuestion);
+                        debugLog('[Compare] Enhanced similarity', variant, cleanExtQuestion, '=>', sim);
                         if (sim > 0.86) { // high threshold
                             matchedVariant = variant;
                             matchedFinalValidation = { isValid: true, confidence: sim };
