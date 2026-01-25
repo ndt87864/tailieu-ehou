@@ -895,7 +895,11 @@ if (window.tailieuExtensionLoaded) {
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
 
-                const questionText = qtextElement.textContent?.trim() || '';
+                // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh
+                const hasContentImageHandler = typeof window.tailieuContentImageHandler !== 'undefined';
+                const questionText = hasContentImageHandler ?
+                    window.tailieuContentImageHandler.getElementVisibleTextWithImages(qtextElement) :
+                    (qtextElement.textContent?.trim() || '');
                 // Clean text (remove reading passages) using helper
                 const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
@@ -1001,7 +1005,10 @@ if (window.tailieuExtensionLoaded) {
                 return;
             }
 
-            const text = element.textContent.trim();
+            const hasContentImageHandler = typeof window.tailieuContentImageHandler !== 'undefined';
+            const text = hasContentImageHandler ?
+                window.tailieuContentImageHandler.getElementVisibleTextWithImages(element) :
+                element.textContent.trim();
 
             // Skip if too short, too long, or just whitespace
             if (text.length < 5 || text.length > 1000 || !text.match(/[a-zA-ZÀ-ỹ]/)) return;
@@ -2151,10 +2158,15 @@ if (window.tailieuExtensionLoaded) {
         options.forEach((option, index) => {
             if (isExtensionElement(option)) return;
 
-            let optionText = option.textContent?.trim() || '';
+            // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh cho đáp án
+            const hasCImgH = typeof window.tailieuContentImageHandler !== 'undefined';
+            let optionText = hasCImgH ?
+                window.tailieuContentImageHandler.getElementVisibleTextWithImages(option) :
+                (option.textContent?.trim() || '');
+
             let normalizedOption = normalizeTextForMatching(optionText);
 
-            // If option text is empty/short, try to extract useful text from images or nearby labels
+            // If option text is still empty/short even with images, try ALT or filename fallback
             if (normalizedOption.length < 2) {
                 const img = option.querySelector && (option.querySelector('img') || option.querySelector('picture img'));
                 let imgText = '';

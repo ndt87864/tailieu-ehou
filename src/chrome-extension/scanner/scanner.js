@@ -1050,54 +1050,11 @@
     }
 
     function getElementVisibleText(el) {
-        if (!el) return '';
-
-        const hasImageHandler = typeof window.tailieuImageHandler !== 'undefined';
-
-        // Clone to avoid modifying original DOM and remove irrelevant nodes
-        try {
-            const clone = el.cloneNode(true);
-
-            // NẾU CÓ IMAGE HANDLER: Xử lý thay thế <img> bằng URL trước khi remove
-            if (hasImageHandler) {
-                const images = clone.querySelectorAll('img');
-                images.forEach(img => {
-                    const src = img.getAttribute('src') ||
-                        img.getAttribute('data-src') ||
-                        img.getAttribute('data-original') ||
-                        img.getAttribute('data-lazy-src');
-
-                    if (src && src.trim() !== '') {
-                        const fullUrl = window.tailieuImageHandler.makeAbsoluteUrl(src);
-                        const urlText = `${window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX}${fullUrl}${window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX}`;
-                        const textNode = document.createTextNode(urlText);
-                        if (img.parentNode) {
-                            img.parentNode.replaceChild(textNode, img);
-                        }
-                    } else {
-                        img.remove();
-                    }
-                });
-            }
-
-            // remove các element không cần thiết khác
-            // Lưu ý: Đã bỏ 'img' khỏi danh sách remove nếu có image handler đã xử lý ở trên
-            const toRemove = 'input, svg, button, script, style, audio, source, iframe, noscript, .answernumber, .bullet, .icon, .audioplayer, .audio';
-            const selectors = hasImageHandler ? toRemove : toRemove + ', img';
-
-            clone.querySelectorAll(selectors).forEach(n => n.remove());
-
-            // Also remove common inline tokens that sometimes include links or JS fragments
-            clone.querySelectorAll('[data-src], [data-audio], [data-track]').forEach(n => {
-                // Chỉ xóa nếu không phải là <img> (vì data-src có thể đã được dùng ở trên)
-                if (n.tagName !== 'IMG') n.remove();
-            });
-
-            return normalizeText(clone.textContent || '');
-        } catch (e) {
-            console.warn('[Scanner] Error in getElementVisibleText:', e);
-            return normalizeText(el.textContent || '');
+        if (typeof window.tailieuContentImageHandler !== 'undefined') {
+            return window.tailieuContentImageHandler.getElementVisibleTextWithImages(el);
         }
+        // Fallback if module not loaded
+        return (el.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
     function extractAnswersFromContainer(container) {

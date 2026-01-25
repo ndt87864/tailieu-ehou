@@ -18,14 +18,22 @@
     "default_popup": "popup.html",
     "default_title": "Tailieu Questions"
   },
-    "content_scripts": [
+  "content_scripts": [
     {
       "matches": [
         "https://learning.ehou.edu.vn/*",
         "https://tailieuehou.id.vn/editor"
       ],
-      "js": ["scanner/image-handler.js", "content.js", "scanner/scanner.js", "fill-blank-handler.js"],
-      "css": ["styles.css"],
+      "js": [
+        "scanner/image-handler.js",
+        "content-image-handler.js",
+        "content.js",
+        "scanner/scanner.js",
+        "fill-blank-handler.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -46,8 +54,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "styles.css"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "icons/*.png",
+        "styles.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "icons": {
