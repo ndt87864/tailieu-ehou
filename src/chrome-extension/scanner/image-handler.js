@@ -43,6 +43,7 @@
         // Tìm tất cả các thẻ img trong clone
         const images = clone.querySelectorAll('img');
 
+        let firstFullUrlFound = null;
         images.forEach(img => {
             // Thử lấy src từ nhiều thuộc tính khác nhau (hỗ trợ lazy loading)
             const src = img.getAttribute('src') ||
@@ -61,8 +62,24 @@
                         fullUrl.includes('/question/'));
 
                 if (isContentImage) {
+                    let processedUrl = fullUrl;
+
+                    // LOGIC RÚT GỌN: Chỉ giữ link đầu tiên đầy đủ
+                    if (!firstFullUrlFound) {
+                        firstFullUrlFound = fullUrl;
+                    } else {
+                        // Các link sau rút gọn thành ..../filename.png
+                        try {
+                            const parts = fullUrl.split('/');
+                            const filename = parts[parts.length - 1];
+                            processedUrl = `..../${filename}`;
+                        } catch (e) {
+                            processedUrl = `..../image.png`;
+                        }
+                    }
+
                     // Tạo text node thay thế cho img
-                    const urlText = `${IMAGE_PLACEHOLDER_PREFIX}${fullUrl}${IMAGE_PLACEHOLDER_SUFFIX}`;
+                    const urlText = `${IMAGE_PLACEHOLDER_PREFIX}${processedUrl}${IMAGE_PLACEHOLDER_SUFFIX}`;
                     const textNode = document.createTextNode(urlText);
 
                     // Thay thế img bằng text node

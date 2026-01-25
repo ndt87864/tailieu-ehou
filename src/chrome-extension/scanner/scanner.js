@@ -569,6 +569,8 @@
 
         let result = '';
 
+        let firstFullUrlFound = null;
+
         // Hàm đệ quy duyệt qua các node
         function traverse(node) {
             if (!node) return;
@@ -603,11 +605,27 @@
                                 fullUrl.includes('/question/'));
 
                         if (isContentImage) {
+                            let processedUrl = fullUrl;
+
+                            // LOGIC RÚT GỌN: Chỉ giữ link đầu tiên đầy đủ
+                            if (!firstFullUrlFound) {
+                                firstFullUrlFound = fullUrl;
+                            } else {
+                                // Các link sau rút gọn thành ..../filename.png
+                                try {
+                                    const parts = fullUrl.split('/');
+                                    const filename = parts[parts.length - 1];
+                                    processedUrl = `..../${filename}`;
+                                } catch (e) {
+                                    processedUrl = `..../image.png`;
+                                }
+                            }
+
                             const prefix = (typeof window.tailieuImageHandler !== 'undefined') ?
                                 window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
                             const suffix = (typeof window.tailieuImageHandler !== 'undefined') ?
                                 window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
-                            result += ` ${prefix}${fullUrl}${suffix} `;
+                            result += ` ${prefix}${processedUrl}${suffix} `;
                         }
                     }
                     return;

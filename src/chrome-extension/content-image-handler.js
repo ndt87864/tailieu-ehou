@@ -20,6 +20,7 @@
         if (!el) return '';
 
         const hasBaseImageHandler = typeof window.tailieuImageHandler !== 'undefined';
+        let firstFullUrlFound = null; // Theo dõi link đầy đủ đầu tiên trong scope này
 
         try {
             const clone = el.cloneNode(true);
@@ -46,10 +47,26 @@
                             fullUrl.includes('/question/'));
 
                     if (isContentImage) {
+                        let processedUrl = fullUrl;
+
+                        // LOGIC RÚT GỌN: Chỉ giữ link đầu tiên đầy đủ
+                        if (!firstFullUrlFound) {
+                            firstFullUrlFound = fullUrl;
+                        } else {
+                            // Các link sau rút gọn thành ..../filename.png
+                            try {
+                                const parts = fullUrl.split('/');
+                                const filename = parts[parts.length - 1];
+                                processedUrl = `..../${filename}`;
+                            } catch (e) {
+                                processedUrl = `..../image.png`;
+                            }
+                        }
+
                         const placeholderPrefix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
                         const placeholderSuffix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
 
-                        const urlText = `${placeholderPrefix}${fullUrl}${placeholderSuffix}`;
+                        const urlText = `${placeholderPrefix}${processedUrl}${placeholderSuffix}`;
                         const textNode = document.createTextNode(urlText);
                         if (img.parentNode) {
                             img.parentNode.replaceChild(textNode, img);
