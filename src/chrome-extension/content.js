@@ -97,16 +97,52 @@ if (window.tailieuExtensionLoaded) {
             }
         }
 
-        // Remove .mp3 or similar audio references if they appear at the start (or before question)
-        const audioExtensions = ['.mp3', '.wav', '.ogg'];
-        for (const ext of audioExtensions) {
-            const idx = processedText.lastIndexOf(ext);
-            if (idx !== -1) {
-                const afterAudio = processedText.substring(idx + ext.length).trim();
-                if (afterAudio.length > 5) {
-                    processedText = afterAudio;
+        // Handle audio file references smartly: prefer the question text AFTER the audio file when it looks like the real question (e.g., contains blanks, question words or punctuation).
+        // Otherwise, pick a cleaned sentence BEFORE the audio and strip generic "listen" prompts like "Listen." or "Then listen again.".
+        try {
+            const audioPattern = /\b(?:track\s*[^\s]*|[\w%\-\.]+)\.(mp3|wav|ogg)\b/i;
+            const audioMatch = processedText.match(audioPattern);
+            if (audioMatch) {
+                const idx = processedText.search(audioPattern);
+                const before = processedText.slice(0, idx).trim();
+                const after = processedText.slice(idx + audioMatch[0].length).trim();
+
+                function isQuestionLike(s) {
+                    if (!s) return false;
+                    const t = s.trim();
+                    if (t.length < 5) return false;
+                    if (/[?？]/.test(t)) return true;
+                    if (/_{2,}/.test(t) || /___/.test(t)) return true; // blanks
+                    if (/\b(is interested in|is interested|is known as|complete|complete each|best completes|main idea|which|who|what|when|where|why|how|choose|chọn|circle|select|hoàn thành)\b/i.test(t)) return true;
+                    return false;
+                }
+
+                function stripListenPrompt(s) {
+                    return s.replace(/^(listen|then listen( again)?|nghe|nghe lại|lắng nghe)[\.:,\-\s]*/i, '').trim();
+                }
+
+                if (isQuestionLike(after)) {
+                    // Use the question-like content after the audio file
+                    processedText = after;
+                    debugLog('[Tailieu Extension] Chose post-audio text for question extraction:', processedText);
+                } else {
+                    // Choose the best sentence from the part before the audio
+                    // Split into sentences by newline or punctuation, prefer the last meaningful sentence
+                    const sentences = before.split(/\r?\n|\/|(?<=[.!?])\s+/);
+                    let chosen = '';
+                    for (let i = sentences.length - 1; i >= 0; i--) {
+                        const s = sentences[i].trim();
+                        if (s.length <= 1) continue;
+                        if (isQuestionLike(s) || s.length > 12) { chosen = s; break; }
+                    }
+                    if (!chosen) chosen = before;
+                    processedText = stripListenPrompt(chosen);
+                    debugLog('[Tailieu Extension] Chose pre-audio text for question extraction:', processedText);
                 }
             }
+        } catch (e) {
+            // If anything goes wrong here, fall back to the original processedText
+            console.warn('[Tailieu Extension] audio extraction helper error', e);
         }
 
         for (const marker of markers) {
@@ -127,6 +163,65 @@ if (window.tailieuExtensionLoaded) {
 
         // 2. Remove Prefix
         return processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
+    }
+
+    // Generate candidate question variants (handles audio prompts like Track*.mp3 and 'Listen' instructions)
+    function generateQuestionVariants(rawText, cleanedText = null) {
+        try {
+            const variants = new Set();
+            const raw = (rawText || '').toString().trim();
+            const cleaned = (cleanedText || cleanQuestionContent(raw)).toString().trim();
+
+            function stripListenPrompt(s) {
+                return s.replace(/^(listen|then listen( again)?|nghe|nghe lại|lắng nghe)[\.:,\-\s]*/i, '').trim();
+            }
+
+            function splitSentences(s) {
+                if (!s) return [];
+                return s.split(/\r?\n|\/|(?<=[.!?])\s+/).map(x => x.trim()).filter(Boolean);
+            }
+
+            // Base variants
+            if (cleaned) variants.add(cleaned);
+            const stripped = stripListenPrompt(cleaned);
+            if (stripped) variants.add(stripped);
+
+            // Remove common trailing track markers
+            const noTrack = raw.replace(/(Track[^\s\n\r]*|[\w%\-\.]+\.(mp3|wav|ogg))(\s*\/{2,})?/ig, '').trim();
+            if (noTrack) {
+                const noTrackClean = cleanQuestionContent(noTrack);
+                if (noTrackClean) variants.add(noTrackClean);
+                variants.add(stripListenPrompt(noTrackClean || noTrack));
+            }
+
+            // Prefer content after audio file if available and looks question-like
+            const audioPattern = /\b(?:track\s*[^\s]*|[\w%\-\.]+)\.(mp3|wav|ogg)\b/i;
+            const audioMatch = raw.match(audioPattern);
+            if (audioMatch) {
+                const idx = raw.search(audioPattern);
+                const before = raw.slice(0, idx).trim();
+                const after = raw.slice(idx + audioMatch[0].length).trim();
+
+                // Add sentences from after (likely the real question)
+                splitSentences(after).forEach(s => {
+                    if (s.length > 3) variants.add(stripListenPrompt(s));
+                });
+
+                // Add last meaningful sentence from before (often instruction like "Listen. Circle...")
+                const beforeSentences = splitSentences(before);
+                for (let i = beforeSentences.length - 1; i >= 0; i--) {
+                    const s = beforeSentences[i];
+                    if (s.length > 8) { variants.add(stripListenPrompt(s)); break; }
+                }
+            }
+
+            // Final normalization - keep only unique and reasonable length variants
+            const final = Array.from(variants).map(v => v.trim()).filter(v => v && v.length > 3);
+            return Array.from(new Set(final));
+        } catch (e) {
+            console.warn('[Tailieu Extension] generateQuestionVariants error', e);
+            return rawText ? [rawText] : [];
+        }
     }
 
     // Load cached questions when page loads (immediately and asynchronously)
@@ -902,6 +997,7 @@ if (window.tailieuExtensionLoaded) {
                     answerContainer: answerContainer,
                     text: cleanText,  // Use clean text for matching
                     originalText: text,  // Keep full text for context
+                    variants: generateQuestionVariants(text, cleanText),
                     index: index,
                     reason: questionReason
                 });
@@ -1007,7 +1103,10 @@ if (window.tailieuExtensionLoaded) {
 
         for (let pageIndex = 0; pageIndex < pageQuestions.length; pageIndex++) {
             const pageQ = pageQuestions[pageIndex];
-            const cleanPageQuestion = cleanQuestionText(pageQ.text);
+
+            // Generate cleaned variants for the page question (handles audio prompts)
+            const pageVariantsRaw = (pageQ.variants && pageQ.variants.length > 0) ? pageQ.variants : [pageQ.text];
+            const cleanedVariants = Array.from(new Set(pageVariantsRaw.map(v => cleanQuestionText(v)))).filter(Boolean);
 
             // Track if this page question has been matched to avoid duplicate processing
             let hasMatchedThisPageQuestion = false;
@@ -1017,14 +1116,35 @@ if (window.tailieuExtensionLoaded) {
                 const cleanExtQuestion = cleanQuestionText(extQ.question);
                 comparisons++;
 
-                // STRICT VALIDATION: Check for similarity with enhanced accuracy
-                if (isQuestionSimilar(cleanPageQuestion, cleanExtQuestion)) {
-                    // ADDITIONAL VALIDATION: Double-check with stricter criteria
-                    const finalValidation = performFinalValidation(pageQ.text, extQ.question);
-                    if (!finalValidation.isValid) {
-                        continue; // Skip this match
+                // Try all variants (use first that matches)
+                let matchedVariant = null;
+                let matchedFinalValidation = null;
+                for (const variant of cleanedVariants) {
+                    // STRICT VALIDATION: exact normalized match
+                    if (isQuestionSimilar(variant, cleanExtQuestion)) {
+                        const originalVariantRaw = pageVariantsRaw[cleanedVariants.indexOf(variant)] || pageQ.text;
+                        const finalValidation = performFinalValidation(originalVariantRaw, extQ.question);
+                        if (finalValidation.isValid) {
+                            matchedVariant = variant;
+                            matchedFinalValidation = finalValidation;
+                            break;
+                        }
                     }
+                }
 
+                if (!matchedVariant) {
+                    // As a fallback, try more lenient enhanced similarity for variants
+                    for (const variant of cleanedVariants) {
+                        const sim = calculateEnhancedSimilarity(variant, cleanExtQuestion);
+                        if (sim > 0.86) { // high threshold
+                            matchedVariant = variant;
+                            matchedFinalValidation = { isValid: true, confidence: sim };
+                            break;
+                        }
+                    }
+                }
+
+                if (matchedVariant) {
                     // Only highlight the question ONCE (first match)
                     if (!hasMatchedThisPageQuestion) {
                         // Find ALL correct answers for this question
@@ -1032,15 +1152,18 @@ if (window.tailieuExtensionLoaded) {
                         // Highlight the question and try to find/highlight all answers
                         highlightMatchedQuestion(pageQ, extQ);
                         hasMatchedThisPageQuestion = true;
+
+                        // Debug: show which variant matched which DB question
+                        debugLog('[Tailieu Extension] Matched variant:', matchedVariant, '-> DB question:', extQ.question);
                     }
 
                     // Always record the match for statistics
                     matched.push({
-                        pageQuestion: pageQ.text,
+                        pageQuestion: matchedVariant,
                         extensionQuestion: extQ.question,
                         answer: extQ.answer,
-                        similarity: calculateEnhancedSimilarity(cleanPageQuestion, cleanExtQuestion),
-                        confidence: finalValidation.confidence
+                        similarity: calculateEnhancedSimilarity(matchedVariant, cleanExtQuestion),
+                        confidence: (matchedFinalValidation && matchedFinalValidation.confidence) || 1
                     });
                     // KHÔNG dừng vòng lặp, để có thể tìm và highlight tất cả câu trả lời giống nhau
                 }
