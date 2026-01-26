@@ -28,11 +28,11 @@ if (window.tailieuExtensionLoaded) {
     let debugMode = true; // Enable debug mode for troubleshooting
 
     // Debug logging function
-    function debugLog(...args) {
-        if (debugMode) {
-            console.log('[Tailieu Extension]', ...args);
-        }
-    }
+    // function debugLog(...args) {
+    //     if (debugMode) {
+    //         //console.log('[Tailieu Extension]', ...args);
+    //     }
+    // }
 
     // Enforce strict exact-match for answers when true.
     // This makes the extension require answers to match 100% (ignoring punctuation)
@@ -137,7 +137,7 @@ if (window.tailieuExtensionLoaded) {
                 if (isQuestionLike(after)) {
                     // Use the question-like content after the audio file
                     processedText = after;
-                    debugLog('[Tailieu Extension] Chose post-audio text for question extraction:', processedText);
+                   // debugLog('[Tailieu Extension] Chose post-audio text for question extraction:', processedText);
                 } else {
                     // Choose the best sentence from the part before the audio
                     // Split into sentences by newline or punctuation, prefer the last meaningful sentence
@@ -150,7 +150,7 @@ if (window.tailieuExtensionLoaded) {
                     }
                     if (!chosen) chosen = before;
                     processedText = stripListenPrompt(chosen);
-                    debugLog('[Tailieu Extension] Chose pre-audio text for question extraction:', processedText);
+                    // debugLog('[Tailieu Extension] Chose pre-audio text for question extraction:', processedText);
                 }
             }
         } catch (e) {
@@ -665,7 +665,7 @@ if (window.tailieuExtensionLoaded) {
                 if (changes['tailieu_auto_select'] && typeof changes['tailieu_auto_select'].newValue !== 'undefined') {
                     try {
                         autoSelectEnabled = !!changes['tailieu_auto_select'].newValue;
-                        console.log('[Tailieu Extension] tailieu_auto_select changed ->', autoSelectEnabled);
+                        //console.log('[Tailieu Extension] tailieu_auto_select changed ->', autoSelectEnabled);
                     } catch (e) { }
                 }
 
@@ -892,7 +892,7 @@ if (window.tailieuExtensionLoaded) {
         // Look for .que (question) containers - standard Moodle structure
         const moodleQuestions = document.querySelectorAll('.que');
         if (moodleQuestions.length > 0) {
-            console.log('[Tailieu Extension] Phát hiện cấu trúc Moodle, tìm thấy', moodleQuestions.length, 'câu hỏi .que');
+            //console.log('[Tailieu Extension] Phát hiện cấu trúc Moodle, tìm thấy', moodleQuestions.length, 'câu hỏi .que');
 
             moodleQuestions.forEach((queContainer, index) => {
                 if (isExtensionElement(queContainer)) return;
@@ -1191,29 +1191,29 @@ if (window.tailieuExtensionLoaded) {
         // Prevent excessive calls and logging
         const now = Date.now();
         if (isComparing) {
-            console.log('[Tailieu Extension] ⏱️ Already comparing, please wait...');
+            //console.log('[Tailieu Extension] ⏱️ Already comparing, please wait...');
             return { matched: [], pageQuestions: [] };
         }
 
         if (!isManual && (now - lastCompareTime) < debounceTime) {
-            console.log('[Tailieu Extension] ⏱️ Skipping auto-compare - throttled');
+            //console.log('[Tailieu Extension] ⏱️ Skipping auto-compare - throttled');
             return { matched: [], pageQuestions: [] };
         }
 
         // CRITICAL: Ensure questions are loaded before comparing
         if (extensionQuestions.length === 0) {
-            console.log('[Tailieu Extension]  No questions loaded, trying to load from cache...');
+            //console.log('[Tailieu Extension]  No questions loaded, trying to load from cache...');
             await loadCachedQuestions();
 
             if (extensionQuestions.length === 0) {
-                console.log('[Tailieu Extension] Still no questions after loading cache');
+                //console.log('[Tailieu Extension] Still no questions after loading cache');
                 // Show user-friendly message
                 if (isManual) {
                     showNotification('Chưa có câu hỏi nào được tải. Vui lòng chọn danh mục và tài liệu trước.', 'warning');
                 }
                 return { matched: [], pageQuestions: [] };
             } else {
-                console.log('[Tailieu Extension] Successfully loaded', extensionQuestions.length, 'questions from cache');
+                //console.log('[Tailieu Extension] Successfully loaded', extensionQuestions.length, 'questions from cache');
             }
         }
 
@@ -1322,9 +1322,9 @@ if (window.tailieuExtensionLoaded) {
                     scores.sort((a, b) => b.score - a.score);
                     const top = scores.slice(0, 3).filter(s => s.score > 0.4);
                     if (top.length > 0) {
-                        console.log('[Tailieu Extension] No exact match for page question -- top candidates:', pageQ.text, top);
+                        //console.log('[Tailieu Extension] No exact match for page question -- top candidates:', pageQ.text, top);
                     } else {
-                        console.log('[Tailieu Extension] No match candidates for page question:', pageQ.text);
+                        //console.log('[Tailieu Extension] No match candidates for page question:', pageQ.text);
                     }
                 } catch (e) {
                     // ignore
@@ -1932,7 +1932,7 @@ if (window.tailieuExtensionLoaded) {
             const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
 
             if (!allCorrectAnswers || allCorrectAnswers.length === 0 || !answerHighlightingEnabled) {
-                console.log('[Tailieu Extension] Không có đáp án hoặc highlight bị tắt');
+                //console.log('[Tailieu Extension] Không có đáp án hoặc highlight bị tắt');
                 return;
             }
 
@@ -1947,7 +1947,7 @@ if (window.tailieuExtensionLoaded) {
             if (!answerContainer) {
                 const found = findAnswerContainerForQuestion(element);
                 if (found) {
-                    console.log('[Tailieu Extension] Heuristic found answerContainer for question');
+                    //console.log('[Tailieu Extension] Heuristic found answerContainer for question');
                     answerContainer = found;
                 }
             }
@@ -1984,7 +1984,7 @@ if (window.tailieuExtensionLoaded) {
                 // METHOD 4: If options appear to be images-only (no text), pass the image elements directly
                 const imgOptions = answerContainer.querySelectorAll('img');
                 if (imgOptions.length > 0) {
-                    console.log('[Tailieu Extension] Tìm thấy', imgOptions.length, 'image options');
+                    //console.log('[Tailieu Extension] Tìm thấy', imgOptions.length, 'image options');
                     // Wrap images into synthetic option wrappers for matching
                     const imgWrappers = Array.from(imgOptions).map(img => img.closest('label') || img.parentElement || img);
                     totalHighlightedCount = highlightMatchingOptions(imgWrappers, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
@@ -1996,7 +1996,7 @@ if (window.tailieuExtensionLoaded) {
             // Fallback: search in the entire question container
             if (container) {
                 const allOptions = container.querySelectorAll('.flex-fill, label, .answer div, .answer span');
-                console.log('[Tailieu Extension] Fallback - Tìm trong container:', allOptions.length, 'options');
+                //console.log('[Tailieu Extension] Fallback - Tìm trong container:', allOptions.length, 'options');
                 totalHighlightedCount = highlightMatchingOptions(allOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
                 showMultipleAnswersWarning(element, totalHighlightedCount);
             }
@@ -2057,7 +2057,7 @@ if (window.tailieuExtensionLoaded) {
         // Append warning to question element
         questionElement.appendChild(warningBadge);
 
-        console.log('[Tailieu Extension] ⚠️ Cảnh báo: Câu hỏi có', highlightedCount, 'đáp án được highlight - cần tự xác định!');
+        //console.log('[Tailieu Extension] ⚠️ Cảnh báo: Câu hỏi có', highlightedCount, 'đáp án được highlight - cần tự xác định!');
     }
 
     // Create and show an answer tooltip next to a question element
@@ -2221,7 +2221,7 @@ if (window.tailieuExtensionLoaded) {
                         }
                         // Debug logging for strict mode mismatch (lightweight)
                         if (debugMode && normalizedAnswers.indexOf(normalizedAns) === 0) {
-                            console.log('[Tailieu Extension][STRICT_MATCH] Checking web option:', webOpt.index, webExact.substring(0, 50));
+                            //console.log('[Tailieu Extension][STRICT_MATCH] Checking web option:', webOpt.index, webExact.substring(0, 50));
                         }
                         // If strict mode and not exact, do not fallback to fuzzy matches
                         continue;
@@ -2356,11 +2356,11 @@ if (window.tailieuExtensionLoaded) {
 
         // Log debug info nếu không tìm được match nào
         if (highlightedCount === 0) {
-            console.log('[Tailieu Extension] Không tìm thấy match - Web options:');
+            //console.log('[Tailieu Extension] Không tìm thấy match - Web options:');
             webOptions.forEach((opt, i) => {
                 console.log('  ', i, ':', opt.normalizedText.substring(0, 100));
             });
-            console.log('[Tailieu Extension] DB answers:');
+            //console.log('[Tailieu Extension] DB answers:');
             normalizedAnswers.forEach((ans, i) => {
                 console.log('  ', i, ':', ans.substring(0, 100));
             });
@@ -3969,7 +3969,7 @@ if (window.tailieuExtensionLoaded) {
             if (compareNowBtn) {
                 compareNowBtn.addEventListener('click', async () => {
                     if (!compareNowBtn.disabled) {
-                        console.log('[Tailieu Extension] 🖱️ User clicked "So sánh ngay" button');
+                        //console.log('[Tailieu Extension] 🖱️ User clicked "So sánh ngay" button');
 
                         // Disable button and show loading state
                         compareNowBtn.disabled = true;

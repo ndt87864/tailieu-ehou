@@ -8,8 +8,6 @@
 
     if (window.tailieuImageRenderer) return;
 
-    console.log('[Tailieu ImageRenderer] Module loaded');
-
     /**
      * Render văn bản có chứa link ảnh thành HTML có thẻ <img> thực tế
      * @param {string} text - Văn bản chứa link (ví dụ: "Cho đồ thị "https://..."")

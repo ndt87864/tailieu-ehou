@@ -66,7 +66,7 @@
         scannerButton.addEventListener('click', handleScanClick);
 
         document.body.appendChild(scannerButton);
-        console.log('[Tailieu Scanner] Button đã được tạo');
+        //console.log('[Tailieu Scanner] Button đã được tạo');
     }
 
     // ==================== SCAN HANDLER ====================
@@ -86,7 +86,7 @@
         const hasHighlights = document.querySelector(highlightSelectors.join(','));
 
         if (hasHighlights) {
-            console.log('[Tailieu Scanner] Đã phát hiện highlight từ chức năng "So sánh ngay". Đang reload trang...');
+           //console.log('[Tailieu Scanner] Đã phát hiện highlight từ chức năng "So sánh ngay". Đang reload trang...');
             try {
                 sessionStorage.setItem('tailieu_auto_scan_trigger', 'true');
                 window.location.reload();
@@ -102,7 +102,7 @@
         try {
             // Quét câu hỏi
             scannedQuestions = scanQuestionsFromPage();
-            console.log('[Tailieu Scanner] Đã quét được', scannedQuestions.length, 'câu hỏi');
+            //console.log('[Tailieu Scanner] Đã quét được', scannedQuestions.length, 'câu hỏi');
 
             // Hiển thị popup kết quả
             showScannerPopup(scannedQuestions);
@@ -148,12 +148,12 @@
         const seenSignatures = new Set();
 
         // Check if image-handler module is loaded
-        const hasImageHandler = typeof window.tailieuImageHandler !== 'undefined';
-        if (hasImageHandler) {
-            console.log('[Scanner] Image Handler module detected - sẽ xử lý hình ảnh trong câu hỏi');
-        } else {
-            console.log('[Scanner] Image Handler module not found - bỏ qua xử lý hình ảnh');
-        }
+        //const hasImageHandler = typeof window.tailieuImageHandler !== 'undefined';
+        // if (hasImageHandler) {
+        //     console.log('[Scanner] Image Handler module detected - sẽ xử lý hình ảnh trong câu hỏi');
+        // } else {
+        //     console.log('[Scanner] Image Handler module not found - bỏ qua xử lý hình ảnh');
+        // }
 
         // ===== FILL-BLANK WITH INPUT FIELDS (e.g., "Br" + [a][z][i][l] = Brazil) =====
         // Xử lý dạng câu hỏi điền từ với chữ cái + input liên tiếp
@@ -172,7 +172,7 @@
                     type: 'điền từ'
                 });
             });
-            console.log('[Scanner] Tìm thấy', fillBlankQuestions.length, 'câu điền từ');
+           //console.log('[Scanner] Tìm thấy', fillBlankQuestions.length, 'câu điền từ');
         }
 
         // ===== MOODLE STRUCTURE =====
@@ -290,13 +290,13 @@
             const isFillBlank = isFillBlankInstruction(instructionText) || hasInputs;
             if (!isFillBlank) return;
 
-            console.log('[Scanner FillBlank] Processing container:', instructionText.substring(0, 60), '| hasInputs:', hasInputs);
+            //console.log('[Scanner FillBlank] Processing container:', instructionText.substring(0, 60), '| hasInputs:', hasInputs);
 
             // Tìm các sub-questions (dạng a. Italy, b. Brazil, etc.)
             const subQuestions = extractFillBlankSubQuestions(queContainer);
 
             if (subQuestions.length > 0) {
-                console.log('[Scanner FillBlank] Tìm thấy', subQuestions.length, 'sub-questions trong:', instructionText.substring(0, 50));
+                //console.log('[Scanner FillBlank] Tìm thấy', subQuestions.length, 'sub-questions trong:', instructionText.substring(0, 50));
 
                 subQuestions.forEach((sq, idx) => {
                     // Chỉ thêm nếu có đáp án đúng (correct inputs)
@@ -358,7 +358,7 @@
         // Method 1: Tìm theo structure .ablock .answer hoặc table rows
         const answerBlocks = container.querySelectorAll('.ablock .answer, .answer table tr, .formulation table tr, .subquestion, table.answer tr');
 
-        console.log('[Scanner FillBlank] Method 1 - Found', answerBlocks.length, 'answer blocks');
+        //console.log('[Scanner FillBlank] Method 1 - Found', answerBlocks.length, 'answer blocks');
 
         if (answerBlocks.length > 0) {
             answerBlocks.forEach((block) => {
@@ -373,7 +373,7 @@
         // Method 2: Tìm các table rows có chứa input + text (dạng matching)
         if (subQuestions.length === 0) {
             const tableRows = container.querySelectorAll('table tr, .matching-question tr');
-            console.log('[Scanner FillBlank] Method 2 - Found', tableRows.length, 'table rows');
+            //console.log('[Scanner FillBlank] Method 2 - Found', tableRows.length, 'table rows');
 
             tableRows.forEach((row) => {
                 const inputs = row.querySelectorAll('input[type="text"], input:not([type]), select');
@@ -391,7 +391,7 @@
         if (subQuestions.length === 0) {
             // Tìm tất cả inputs và lấy parent có nghĩa
             const allInputs = container.querySelectorAll('input[type="text"], input:not([type]), select');
-            console.log('[Scanner FillBlank] Method 3 - Found', allInputs.length, 'inputs');
+            //console.log('[Scanner FillBlank] Method 3 - Found', allInputs.length, 'inputs');
 
             allInputs.forEach((input) => {
                 // Tìm parent row/container gần nhất
@@ -450,7 +450,7 @@
         // Method 4: Fallback - quét toàn bộ container tìm pattern label + inputs
         if (subQuestions.length === 0) {
             const allElements = container.querySelectorAll('p, div, span, td, li, label');
-            console.log('[Scanner FillBlank] Method 4 - Scanning', allElements.length, 'elements');
+            //console.log('[Scanner FillBlank] Method 4 - Scanning', allElements.length, 'elements');
 
             allElements.forEach((el) => {
                 if (isExtensionElement(el)) return;
@@ -471,7 +471,7 @@
             });
         }
 
-        console.log('[Scanner FillBlank] Total sub-questions found:', subQuestions.length);
+        //console.log('[Scanner FillBlank] Total sub-questions found:', subQuestions.length);
         return subQuestions;
     }
 
@@ -513,7 +513,7 @@
             // Kiểm tra input này có đúng không
             const isCorrect = isInputCorrect(input);
 
-            console.log('[Scanner FillBlank] Input #' + idx + ':', value, '| isCorrect:', isCorrect);
+            //console.log('[Scanner FillBlank] Input #' + idx + ':', value, '| isCorrect:', isCorrect);
 
             if (isCorrect && value) {
                 correctAnswers.push({
@@ -525,7 +525,7 @@
 
         // Nếu không có correct inputs, skip
         if (correctAnswers.length === 0) {
-            console.log('[Scanner FillBlank] No correct answers found in row');
+            //console.log('[Scanner FillBlank] No correct answers found in row');
             return null;
         }
 
@@ -549,7 +549,7 @@
         // Relaxed check: accept if there's any content left (even 1 char) OR if original had multiple parts
         if (textWithoutDots.length === 0 && questionText.length < 5) return null;
 
-        console.log('[Scanner FillBlank] Extracted:', label, '|', questionText, '| Answer:', correctAnswer);
+        //console.log('[Scanner FillBlank] Extracted:', label, '|', questionText, '| Answer:', correctAnswer);
 
         return {
             label: label,
@@ -680,13 +680,13 @@
             // Check 1: Input hoặc parent có class correct
             const inputClass = input.className || '';
             if (/\b(correct|right|ok)\b/i.test(inputClass)) {
-                console.log('[Scanner isInputCorrect] CORRECT via input class');
+                //console.log('[Scanner isInputCorrect] CORRECT via input class');
                 return true;
             }
 
             // Check for incorrect in input class first
             if (/\b(incorrect|wrong)\b/i.test(inputClass)) {
-                console.log('[Scanner isInputCorrect] INCORRECT via input class');
+         //       console.log('[Scanner isInputCorrect] INCORRECT via input class');
                 return false;
             }
 
@@ -698,12 +698,12 @@
 
                 // Check for incorrect first (more specific)
                 if (/\b(incorrect|wrong)\b/i.test(parentClass)) {
-                    console.log('[Scanner isInputCorrect] INCORRECT via parent class:', parentClass);
+             //       console.log('[Scanner isInputCorrect] INCORRECT via parent class:', parentClass);
                     return false;
                 }
 
                 if (/\b(correct)\b/i.test(parentClass)) {
-                    console.log('[Scanner isInputCorrect] CORRECT via parent class:', parentClass);
+             //       console.log('[Scanner isInputCorrect] CORRECT via parent class:', parentClass);
                     return true;
                 }
 
@@ -724,21 +724,21 @@
 
                     // Có dấu X -> incorrect (check này TRƯỚC)
                     if (/[✗×❌]/.test(elText) && !/[✓✔]/.test(elText)) {
-                        console.log('[Scanner isInputCorrect] INCORRECT via sibling X mark');
+                 //       console.log('[Scanner isInputCorrect] INCORRECT via sibling X mark');
                         return false;
                     }
                     if (/\b(incorrect|wrong|error)\b/i.test(elClass)) {
-                        console.log('[Scanner isInputCorrect] INCORRECT via sibling class');
+                 //       console.log('[Scanner isInputCorrect] INCORRECT via sibling class');
                         return false;
                     }
 
                     // Có dấu tick
                     if (/[✓✔✅]/.test(elText)) {
-                        console.log('[Scanner isInputCorrect] CORRECT via sibling check mark');
+                 //       console.log('[Scanner isInputCorrect] CORRECT via sibling check mark');
                         return true;
                     }
                     if (/\b(correct|check|tick|ok)\b/i.test(elClass)) {
-                        console.log('[Scanner isInputCorrect] CORRECT via sibling class');
+                 //       console.log('[Scanner isInputCorrect] CORRECT via sibling class');
                         return true;
                     }
                 }
@@ -757,13 +757,13 @@
 
                     // Red/pink (incorrect): r > g && r > 180
                     if (r > g + 50 && r > 180) {
-                        console.log('[Scanner isInputCorrect] INCORRECT via red background:', bgColor);
+                 //       console.log('[Scanner isInputCorrect] INCORRECT via red background:', bgColor);
                         return false;
                     }
 
                     // Green: g > r && g > b && g > 150
                     if (g > r + 30 && g > b && g > 150) {
-                        console.log('[Scanner isInputCorrect] CORRECT via green background:', bgColor);
+                 //       console.log('[Scanner isInputCorrect] CORRECT via green background:', bgColor);
                         return true;
                     }
                 }
@@ -772,16 +772,16 @@
             // Check 5: Border color
             const borderColor = style.borderColor || '';
             if (/green|#4caf50|#8bc34a|#2e7d32|rgb\(76,\s*175,\s*80\)/i.test(borderColor)) {
-                console.log('[Scanner isInputCorrect] CORRECT via green border');
+         //       console.log('[Scanner isInputCorrect] CORRECT via green border');
                 return true;
             }
             if (/red|#f44336|#e53935|#d32f2f/i.test(borderColor)) {
-                console.log('[Scanner isInputCorrect] INCORRECT via red border');
+         //       console.log('[Scanner isInputCorrect] INCORRECT via red border');
                 return false;
             }
 
             // Default: KHÔNG tự động coi là đúng nữa - phải có indicator rõ ràng
-            console.log('[Scanner isInputCorrect] No clear indicator found, returning false');
+     //       console.log('[Scanner isInputCorrect] No clear indicator found, returning false');
             return false;
 
         } catch (e) {
@@ -1176,7 +1176,7 @@
                     // BƯỚC 2: ƯU TIÊN tìm dấu tick thật sự (ký tự, icon, SVG)
                     // Kiểm tra ký tự tick trong nội dung
                     if (/[✓✔✅]/.test(text)) {
-                        console.log('[Scanner] Phát hiện ký tự tick:', label, answerText.substring(0, 50));
+                 //       console.log('[Scanner] Phát hiện ký tự tick:', label, answerText.substring(0, 50));
                         return true;
                     }
 
@@ -1189,32 +1189,32 @@
 
                         // Kiểm tra class có chứa check/tick/ok
                         if (/\b(check|tick|correct|ok|success|selected)\b/i.test(iconClass)) {
-                            console.log('[Scanner] Phát hiện icon tick qua class:', label, iconClass);
+                     //       console.log('[Scanner] Phát hiện icon tick qua class:', label, iconClass);
                             return true;
                         }
 
                         // Kiểm tra src có chứa check/tick
                         if (/check|tick|correct|ok/i.test(iconSrc)) {
-                            console.log('[Scanner] Phát hiện icon tick qua src:', label, iconSrc);
+                     //       console.log('[Scanner] Phát hiện icon tick qua src:', label, iconSrc);
                             return true;
                         }
 
                         // Kiểm tra nội dung icon có ký tự tick
                         if (/[✓✔✅]/.test(iconContent)) {
-                            console.log('[Scanner] Phát hiện ký tự tick trong icon:', label);
+                     //       console.log('[Scanner] Phát hiện ký tự tick trong icon:', label);
                             return true;
                         }
                     }
 
                     // Kiểm tra FontAwesome/Glyphicon classes
                     if (el.querySelector('.fa-check, .fa-check-circle, .glyphicon-ok, .glyphicon-ok-circle, .icon-checked, .tick-icon, .icon-correct, .icon-ok')) {
-                        console.log('[Scanner] Phát hiện icon class tick:', label);
+                 //       console.log('[Scanner] Phát hiện icon class tick:', label);
                         return true;
                     }
 
                     // BƯỚC 3: Kiểm tra input checkbox/radio được checked
                     if (input?.checked) {
-                        console.log('[Scanner] Phát hiện input checked:', label);
+                 //       console.log('[Scanner] Phát hiện input checked:', label);
                         return true;
                     }
 
