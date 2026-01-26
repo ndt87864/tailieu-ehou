@@ -1539,6 +1539,7 @@ if (window.tailieuExtensionLoaded) {
 
         // Auto update popup if it's visible
         if (matched.length > 0) {
+            currentPopupTab = 'matched';
             updateQuestionsPopup(extensionQuestions);
         }
 
