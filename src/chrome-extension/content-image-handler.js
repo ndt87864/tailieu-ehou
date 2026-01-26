@@ -139,7 +139,9 @@
     window.tailieuContentImageHandler = {
         getElementVisibleTextWithImages,
         areTextsWithImagesEqual,
-        containsImageUrls
+        containsImageUrls,
+        // Export fallback absolute URL helper for scanner compatibility
+        makeAbsoluteUrlFallback
     };
 
 })();
