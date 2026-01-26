@@ -4191,6 +4191,9 @@ if (window.tailieuExtensionLoaded) {
                 <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
                     So sánh
                 </button>
+                <button id="tailieu-next-page" style="display: none; background: linear-gradient(135deg, #2196F3, #b515c0ff); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
+                    Tiếp tục
+                </button>
                 <button id="tailieu-expand-indicator" title="Cài đặt" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer; display: flex; align-items: center;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
@@ -4417,6 +4420,8 @@ if (window.tailieuExtensionLoaded) {
 
             // --- Original Comparison Logic ---
             const compareNowBtn = document.getElementById('tailieu-compare-now');
+            const nextBtn = document.getElementById('tailieu-next-page');
+
             if (compareNowBtn) {
                 compareNowBtn.onclick = async () => {
                     if (compareNowBtn.disabled) return;
@@ -4428,10 +4433,53 @@ if (window.tailieuExtensionLoaded) {
                         compareNowBtn.textContent = `Làm lại (${matched})`;
                         compareNowBtn.dataset.state = 'repeat';
                         compareNowBtn.disabled = false;
+                        if (nextBtn) nextBtn.style.display = 'block';
                     } else {
                         clearAllHighlights(); highlightedQA = [];
+                        if (nextBtn) nextBtn.style.display = 'none';
                         await new Promise(r => setTimeout(r, 150));
                         compareNowBtn.dataset.state = 'ready'; compareNowBtn.click();
+                    }
+                };
+            }
+
+            if (nextBtn) {
+                nextBtn.onclick = () => {
+                    const possibleButtons = [
+                        'input[name="next"]',
+                        'button.next',
+                        '.mod_quiz-next-nav input',
+                        '.submitbtns input[value="Trang sau"]',
+                        '.submitbtns input[value="Tiếp theo"]',
+                        '.submitbtns .btn-primary:not([name="previous"])',
+                        'a[title="Next page"]'
+                    ];
+
+                    let found = false;
+                    for (const selector of possibleButtons) {
+                        const b = document.querySelector(selector);
+                        if (b && (b.offsetWidth > 0 || b.offsetHeight > 0)) {
+                            b.click();
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a.btn'));
+                        const target = buttons.find(b => {
+                            const text = (b.value || b.textContent || '').toLowerCase();
+                            return (text.includes('tiếp') || text.includes('next') || text.includes('sau')) &&
+                                !text.includes('trước') && !text.includes('về');
+                        });
+                        if (target) {
+                            target.click();
+                            found = true;
+                        }
+                    }
+
+                    if (!found) {
+                        showNotification('Không tìm thấy nút chuyển trang!', 'warning');
                     }
                 };
             }
