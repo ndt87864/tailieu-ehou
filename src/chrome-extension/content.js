@@ -12,6 +12,8 @@ if (window.tailieuExtensionLoaded) {
 
     // Store questions from extension for comparison
     let extensionQuestions = [];
+    let lastMatchedQuestions = []; // Lưu trữ danh sách câu hỏi đã so sánh thành công
+    let currentPopupTab = 'all'; // 'all' hoặc 'matched'
     let answerHighlightingEnabled = true; // New setting
     let autoSelectEnabled = false; // New setting: controls automatic selection/compare (default OFF)
     // Track what QA pairs were highlighted in the current run
@@ -990,7 +992,8 @@ if (window.tailieuExtensionLoaded) {
                     text: finalQuestionText,
                     originalText: questionText,
                     index: index,
-                    reason: 'moodle .que structure'
+                    reason: 'moodle .que structure',
+                    userAnswer: getSelectedAnswer(queContainer)
                 });
                 // Attach hover listeners to show DB answers tooltip
                 try {
@@ -1225,6 +1228,38 @@ if (window.tailieuExtensionLoaded) {
         return questions;
     }
 
+    // Function to get selected answer text from a container
+    function getSelectedAnswer(container) {
+        if (!container) return null;
+        try {
+            // Find checked radio or checkbox
+            const checkedInput = container.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
+            if (checkedInput) {
+                // Find label text associated with this input
+                let label = null;
+                if (checkedInput.id) {
+                    label = document.querySelector(`label[for="${checkedInput.id}"]`);
+                }
+                if (!label) {
+                    label = checkedInput.closest('label') || checkedInput.closest('.flex-fill') || checkedInput.closest('.answer-item') || checkedInput.parentElement;
+                }
+
+                if (label) {
+                    const hasCImgH = typeof window.tailieuContentImageHandler !== 'undefined';
+                    let text = hasCImgH ?
+                        window.tailieuContentImageHandler.getElementVisibleTextWithImages(label) :
+                        label.textContent.trim();
+
+                    // Remove input related text if any (like markers 'a.', 'b.')
+                    return text.replace(/^[a-z0-9][\.\)]\s*/i, '').trim();
+                }
+            }
+        } catch (e) {
+            console.warn('[Tailieu Extension] Error getting selected answer:', e);
+        }
+        return null;
+    }
+
     // Normalize text for matching - Simple like Hỗ Trợ HT
     function normalizeTextForMatching(text) {
         if (!text) return '';
@@ -1406,6 +1441,7 @@ if (window.tailieuExtensionLoaded) {
                         pageQuestion: matchedVariant,
                         extensionQuestion: extQ.question,
                         answer: extQ.answer,
+                        userAnswer: pageQ.userAnswer,
                         similarity: calculateEnhancedSimilarity(matchedVariant, cleanExtQuestion),
                         confidence: (matchedFinalValidation && matchedFinalValidation.confidence) || 1
                     });
@@ -1499,6 +1535,12 @@ if (window.tailieuExtensionLoaded) {
 
         // Reset comparison flag and button after completion with small delay for visual feedback
         isComparing = false;
+        lastMatchedQuestions = matched;
+
+        // Auto update popup if it's visible
+        if (matched.length > 0) {
+            updateQuestionsPopup(extensionQuestions);
+        }
 
         // Compute unique matched question counts (one per DB question and per page question)
         // Normalize questions before dedup to handle minor textual differences
@@ -4599,6 +4641,45 @@ if (window.tailieuExtensionLoaded) {
         header.appendChild(title);
         header.appendChild(controls);
 
+        // Create Tab Bar
+        const tabBar = document.createElement('div');
+        tabBar.id = 'tailieu-popup-tabs';
+        tabBar.style.cssText = `
+            display: flex;
+            background: #f1f3f4;
+            border-bottom: 1px solid #ddd;
+        `;
+
+        const createTab = (id, label, isActive = false) => {
+            const tab = document.createElement('button');
+            tab.id = `tab-${id}`;
+            tab.textContent = label;
+            tab.style.cssText = `
+                flex: 1;
+                padding: 10px;
+                border: none;
+                background: ${isActive ? 'white' : 'transparent'};
+                border-bottom: ${isActive ? '2px solid #1E88E5' : 'none'};
+                color: ${isActive ? '#1E88E5' : '#666'};
+                font-weight: ${isActive ? '600' : '400'};
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s;
+            `;
+            tab.onclick = () => {
+                currentPopupTab = id;
+                updateQuestionsPopup(extensionQuestions);
+            };
+            return tab;
+        };
+
+        const tabAll = createTab('all', 'Tìm kiếm', true);
+        const tabMatched = createTab('matched', 'Đã so sánh');
+        tabMatched.style.display = 'none'; // Ẩn khi chưa có so sánh
+
+        tabBar.appendChild(tabAll);
+        tabBar.appendChild(tabMatched);
+
         // Create content area
         const content = document.createElement('div');
         content.id = 'tailieu-questions-content';
@@ -4640,6 +4721,7 @@ if (window.tailieuExtensionLoaded) {
         content.appendChild(emptyState);
 
         popup.appendChild(header);
+        popup.appendChild(tabBar);
         popup.appendChild(content);
         safeAppendToBody(popup);
 
@@ -4817,10 +4899,11 @@ if (window.tailieuExtensionLoaded) {
         return popup;
     }
 
-    // Update questions popup content
     function updateQuestionsPopup(questions = [], retryCount = 0) {
         const popup = document.getElementById('tailieu-questions-popup');
         const content = document.getElementById('tailieu-questions-content');
+        const tabMatched = document.getElementById('tab-matched');
+        const tabAll = document.getElementById('tab-all');
 
         if (!popup || !content) {
             // Prevent infinite loop - limit retries to 5 attempts
@@ -4847,7 +4930,28 @@ if (window.tailieuExtensionLoaded) {
             return;
         }
 
-        if (questions.length === 0) {
+        // --- Cập nhật UI Tabs ---
+        if (tabMatched && tabAll) {
+            const hasMatched = lastMatchedQuestions && lastMatchedQuestions.length > 0;
+            tabMatched.style.display = hasMatched ? 'block' : 'none';
+
+            // Nếu mất dữ liệu so sánh mà đang ở tab matched, quay về tab all
+            if (!hasMatched && currentPopupTab === 'matched') {
+                currentPopupTab = 'all';
+            }
+
+            // Cập nhật style cho các tab
+            [tabAll, tabMatched].forEach(tab => {
+                const id = tab.id.replace('tab-', '');
+                const isActive = id === currentPopupTab;
+                tab.style.background = isActive ? 'white' : 'transparent';
+                tab.style.borderBottom = isActive ? '2px solid #1E88E5' : 'none';
+                tab.style.color = isActive ? '#1E88E5' : '#666';
+                tab.style.fontWeight = isActive ? '600' : '400';
+            });
+        }
+
+        if (questions.length === 0 && (!lastMatchedQuestions || lastMatchedQuestions.length === 0)) {
             // Hide popup when no questions
             popup.style.display = 'none';
             localStorage.setItem('tailieu-questions-popup-visible', 'false');
@@ -4883,28 +4987,50 @@ if (window.tailieuExtensionLoaded) {
         popup.style.display = 'block';
         localStorage.setItem('tailieu-questions-popup-visible', 'true');
 
+        // Xác định danh sách hiển thị dựa trên tab
+        let displayQuestions = [];
+        if (currentPopupTab === 'matched') {
+            // Deduplicate by pageQuestion to match the count shown on the button indicators
+            const seen = new Set();
+            displayQuestions = [];
+
+            (lastMatchedQuestions || []).forEach(m => {
+                const normalized = normalizeForExactMatch(m.pageQuestion || '');
+                if (normalized && !seen.has(normalized)) {
+                    seen.add(normalized);
+                    displayQuestions.push({
+                        question: m.extensionQuestion || m.pageQuestion,
+                        answer: m.answer,
+                        userAnswer: m.userAnswer
+                    });
+                }
+            });
+        } else {
+            displayQuestions = questions;
+        }
+
         // Create questions list
         content.innerHTML = '';
 
         // Add search bar
         const searchContainer = document.createElement('div');
         searchContainer.style.cssText = `
-        padding: 15px 20px;
-        border-bottom: 1px solid #eee;
-        background: #f8f9fa;
-    `;
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+        `;
 
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
-        searchInput.placeholder = 'Tìm kiếm câu hỏi...';
+        searchInput.placeholder = currentPopupTab === 'matched' ? 'Tìm trong kết quả so sánh...' : 'Tìm kiếm câu hỏi...';
         searchInput.style.cssText = `
-        width: 100%;
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 13px;
-        box-sizing: border-box;
-    `;
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            box-sizing: border-box;
+        `;
 
         searchContainer.appendChild(searchInput);
         content.appendChild(searchContainer);
@@ -4913,15 +5039,15 @@ if (window.tailieuExtensionLoaded) {
         const questionsContainer = document.createElement('div');
         questionsContainer.id = 'questions-list-container';
 
-        questions.forEach((question, index) => {
+        displayQuestions.forEach((question, index) => {
             const questionItem = document.createElement('div');
             questionItem.className = 'question-item-popup';
             questionItem.style.cssText = `
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        `;
+                padding: 15px 20px;
+                border-bottom: 1px solid #eee;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            `;
 
             questionItem.addEventListener('mouseenter', () => {
                 questionItem.style.backgroundColor = '#f8f9fa';
@@ -4965,6 +5091,27 @@ if (window.tailieuExtensionLoaded) {
             questionItem.appendChild(questionHeader);
             questionItem.appendChild(answerDiv);
 
+            // User Answer (if in matched tab and has answer)
+            if (currentPopupTab === 'matched' && question.userAnswer) {
+                const userAnsDiv = document.createElement('div');
+                userAnsDiv.style.cssText = `
+                    color: #555;
+                    font-size: 11.5px;
+                    background: #fff3e0;
+                    padding: 6px 10px;
+                    border-radius: 6px;
+                    border-left: 3px solid #ff9800;
+                    margin-top: 5px;
+                    line-height: 1.3;
+                    font-style: italic;
+                `;
+                const renderedUA = (typeof window.tailieuImageRenderer !== 'undefined')
+                    ? window.tailieuImageRenderer.renderImages(question.userAnswer)
+                    : question.userAnswer;
+                userAnsDiv.innerHTML = `<strong>Bạn chọn:</strong> ${renderedUA}`;
+                questionItem.appendChild(userAnsDiv);
+            }
+
             // Click to highlight on page
             questionItem.addEventListener('click', () => {
                 // Try to find and highlight this question on the page
@@ -4998,7 +5145,8 @@ if (window.tailieuExtensionLoaded) {
         if (header) {
             const title = header.querySelector('div');
             if (title) {
-                title.textContent = `Danh sách câu hỏi (${questions.length})`;
+                const countText = currentPopupTab === 'matched' ? `Đã khớp: ${displayQuestions.length}` : `Tổng: ${displayQuestions.length}`;
+                title.textContent = `Danh sách câu hỏi (${countText})`;
             }
 
             // Kiểm tra dữ liệu lỗi thời
