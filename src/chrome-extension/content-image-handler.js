@@ -9,7 +9,6 @@
 
     if (window.tailieuContentImageHandler) return;
 
-    console.log('[Tailieu ContentImageHandler] Module loaded');
 
     /**
      * Trích xuất text từ một element, bao gồm cả URL của các hình ảnh bên trong.

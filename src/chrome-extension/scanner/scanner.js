@@ -2197,5 +2197,4 @@
         showPopup: () => showScannerPopup(scannedQuestions)
     };
 
-    console.log('[Tailieu Scanner] Module initialized');
 })();

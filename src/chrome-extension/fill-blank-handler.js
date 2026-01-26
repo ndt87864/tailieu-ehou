@@ -9,7 +9,6 @@
     if (window.tailieuFillBlankLoaded) return;
     window.tailieuFillBlankLoaded = true;
 
-    console.log('[Tailieu FillBlank] Module loaded v1.1');
 
     // ==================== CONSTANTS ====================
 
@@ -309,8 +308,6 @@
         if (!sentenceText || sentenceText.length < 5) return null;
 
         const normalizedSentence = normalizeForBlankComparison(sentenceText);
-        console.log('[Tailieu FillBlank] Finding match for:', normalizedSentence.substring(0, 60));
-
         let bestMatch = null;
         let bestSimilarity = 0;
 
@@ -391,8 +388,7 @@
         const results = [];
         const autoSelectEnabled = options.autoSelectEnabled || false;
 
-        console.log('[Tailieu FillBlank] Processing with autoSelectEnabled:', autoSelectEnabled);
-
+        
         if (!extensionQuestions || extensionQuestions.length === 0) {
             console.log('[Tailieu FillBlank] Không có câu hỏi extension để so sánh');
             return results;
@@ -400,10 +396,10 @@
 
         // Tìm các section điền từ trên trang
         const fillBlankSections = findFillBlankSections();
-        console.log('[Tailieu FillBlank] Tìm thấy', fillBlankSections.length, 'section điền từ');
+        //console.log('[Tailieu FillBlank] Tìm thấy', fillBlankSections.length, 'section điền từ');
 
         fillBlankSections.forEach((section, sectionIdx) => {
-            console.log('[Tailieu FillBlank] Xử lý section', sectionIdx + 1, ':', section.instruction?.substring(0, 50));
+            //console.log('[Tailieu FillBlank] Xử lý section', sectionIdx + 1, ':', section.instruction?.substring(0, 50));
 
             // Xử lý từng câu trong section
             section.sentences.forEach((sentenceData, sentIdx) => {
@@ -435,13 +431,10 @@
                         inputElements: inputElements,
                         autoFilled: autoSelectEnabled
                     });
-                } else {
-                    console.log('[Tailieu FillBlank] ✗ No match for:', sentenceText.substring(0, 50));
                 }
             });
         });
 
-        console.log('[Tailieu FillBlank] Tổng cộng', results.length, 'câu được match');
 
         // Nếu autoSelectEnabled và có kết quả, log số input đã được tự động điền
         if (autoSelectEnabled && results.length > 0) {
@@ -695,8 +688,6 @@
         // Strip reading passages/instructions (bao gồm cả phần mp3 và mô tả trước)
         text = cleanFillBlankContext(text, element);
 
-        console.log('[Tailieu FillBlank] Extracted sentence:', text.substring(0, 80), '| inputs:', actualInputs.length);
-
         return {
             text: text,
             inputs: Array.from(actualInputs)
@@ -709,11 +700,9 @@
      */
     function findFillBlankSections() {
         const sections = [];
-        console.log('[Tailieu FillBlank] Bắt đầu quét trang...');
-
         // ===== METHOD 1: Moodle .que containers =====
         const moodleQuestions = document.querySelectorAll('.que');
-        console.log('[Tailieu FillBlank] Tìm thấy', moodleQuestions.length, 'Moodle .que containers');
+        //console.log('[Tailieu FillBlank] Tìm thấy', moodleQuestions.length, 'Moodle .que containers');
 
         moodleQuestions.forEach((queContainer, qIdx) => {
             if (isExtensionElement(queContainer)) return;
@@ -722,16 +711,12 @@
             if (!qtext) return;
 
             const questionText = qtext.textContent?.trim() || '';
-            console.log('[Tailieu FillBlank] Checking .que #' + qIdx + ':', questionText.substring(0, 60));
-
             // Kiểm tra xem có phải fill-blank section không
             const isFillBlank = isFillBlankSection(questionText);
 
             // Kiểm tra có input fields trong container không
             const allInputs = queContainer.querySelectorAll('input[type="text"], input:not([type]), textarea');
             const hasInputs = allInputs.length > 0;
-
-            console.log('[Tailieu FillBlank] .que #' + qIdx + ': isFillBlank=' + isFillBlank + ', hasInputs=' + hasInputs + ' (' + allInputs.length + ' inputs)');
 
             if (isFillBlank || hasInputs) {
                 // Tìm các câu riêng lẻ trong container
@@ -796,8 +781,6 @@
                     const { text, inputs: inputEls } = extractSentenceWithInputs(row);
 
                     if (text.length > 5 && inputEls.length > 0) {
-                        console.log('[Tailieu FillBlank] Found standalone row with inputs:', text.substring(0, 50));
-
                         // Add as standalone section
                         if (!sections.some(s => s.instruction === 'Standalone input rows')) {
                             sections.push({
@@ -823,7 +806,6 @@
             }
         });
 
-        console.log('[Tailieu FillBlank] Tổng cộng', sections.length, 'sections');
         return sections;
     }
 
@@ -1468,6 +1450,5 @@
         integrateWithCompareProcess();
     }
 
-    console.log('[Tailieu FillBlank] Module initialized and ready v1.1');
 
 })();

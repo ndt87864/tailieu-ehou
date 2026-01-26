@@ -9,7 +9,6 @@
     if (window.tailieuImageHandlerLoaded) return;
     window.tailieuImageHandlerLoaded = true;
 
-    console.log('[Tailieu ImageHandler] Module loaded v1.0');
 
     // ==================== CONSTANTS ====================
 
@@ -321,6 +320,5 @@
         IMAGE_PLACEHOLDER_SUFFIX
     };
 
-    console.log('[Tailieu ImageHandler] API exported to window.tailieuImageHandler');
 
 })();

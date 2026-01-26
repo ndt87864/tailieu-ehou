@@ -108,7 +108,7 @@ const RoomInforManagement = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1024
+    typeof window !== "undefined" ? window.innerWidth : 1024,
   );
 
   const getMatchingRoomDocs = async (roomObj) => {
@@ -131,22 +131,22 @@ const RoomInforManagement = () => {
           }
           if (norm(d.subject) !== norm(roomObj.subject)) {
             logReason.push(
-              `subject not match: excel=${norm(roomObj.subject)}, db=${norm(d.subject)}`
+              `subject not match: excel=${norm(roomObj.subject)}, db=${norm(d.subject)}`,
             );
           }
           if (norm(d.examSession) !== norm(roomObj.examSession)) {
             logReason.push(
-              `examSession not match: excel=${norm(roomObj.examSession)}, db=${norm(d.examSession)}`
+              `examSession not match: excel=${norm(roomObj.examSession)}, db=${norm(d.examSession)}`,
             );
           }
           if (norm(d.examRoom) !== norm(roomObj.examRoom)) {
             logReason.push(
-              `examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(d.examRoom)}`
+              `examRoom not match: excel=${norm(roomObj.examRoom)}, db=${norm(d.examRoom)}`,
             );
           }
           if (roomObj.examType && norm(d.examType) !== norm(roomObj.examType)) {
             logReason.push(
-              `examType not match: excel=${norm(roomObj.examType)}, db=${norm(d.examType)}`
+              `examType not match: excel=${norm(roomObj.examType)}, db=${norm(d.examType)}`,
             );
           }
           if (logReason.length > 0) {
@@ -236,7 +236,7 @@ const RoomInforManagement = () => {
         // examSession compare (allow numeric comparison when possible)
         const sessCmp = compareAlphaNum(
           x.examSession || "",
-          y.examSession || ""
+          y.examSession || "",
         );
         if (sessCmp !== 0) return sessCmp;
 
@@ -248,7 +248,7 @@ const RoomInforManagement = () => {
         return String(x.subject || "").localeCompare(
           String(y.subject || ""),
           undefined,
-          { sensitivity: "base" }
+          { sensitivity: "base" },
         );
       } catch (e) {
         return 0;
@@ -276,7 +276,7 @@ const RoomInforManagement = () => {
   // Import unique room metadata from existing student_infor records
   const importFromStudents = async () => {
     const proceed = await showConfirm(
-      "Nhập danh sách phòng từ dữ liệu thí sinh hiện có? Các phòng trùng sẽ được bỏ qua."
+      "Nhập danh sách phòng từ dữ liệu thí sinh hiện có? Các phòng trùng sẽ được bỏ qua.",
     );
     if (!proceed) return;
     setIsSaving(true);
@@ -293,8 +293,8 @@ const RoomInforManagement = () => {
           (r) =>
             `${r.examDate}||${r.subject}||${r.examSession}||${r.examRoom}||${
               r.examType
-            }||${r.majorCode || ""}`
-        )
+            }||${r.majorCode || ""}`,
+        ),
       );
 
       // From students, build unique room candidates
@@ -346,7 +346,7 @@ const RoomInforManagement = () => {
   const handleExcelImport = async (file) => {
     if (!file) return;
     const proceed = await showConfirm(
-      "Nhập từ file Excel: sẽ cập nhật ngày thi và link phòng cho các phòng khớp (không tạo mới). Tiếp tục?"
+      "Nhập từ file Excel: sẽ cập nhật ngày thi và link phòng cho các phòng khớp (không tạo mới). Tiếp tục?",
     );
     if (!proceed) return;
     setIsSaving(true);
@@ -371,9 +371,9 @@ const RoomInforManagement = () => {
         const wb = XLSX.read(data, { type: "array", cellDates: true });
         date1904 = Boolean(
           wb &&
-            wb.Workbook &&
-            wb.Workbook.WBProps &&
-            wb.Workbook.WBProps.date1904
+          wb.Workbook &&
+          wb.Workbook.WBProps &&
+          wb.Workbook.WBProps.date1904,
         );
         const firstSheet = wb.SheetNames[0];
         const sheet = wb.Sheets[firstSheet];
@@ -412,7 +412,7 @@ const RoomInforManagement = () => {
       });
       console.info(
         "📋 handleExcelImport: firstRow mapped data",
-        debugMappedFirstRow
+        debugMappedFirstRow,
       );
 
       // We expect at least subject, examSession, examTime, examRoom to match; date/link optional
@@ -527,7 +527,7 @@ const RoomInforManagement = () => {
           const majorCode = String(m.mapped.majorCode || "").trim();
           const examRoom = String(m.mapped.examRoom || "").trim();
           const examLink = String(
-            m.mapped.examLink || findUrlInAnyCell(m.raw) || ""
+            m.mapped.examLink || findUrlInAnyCell(m.raw) || "",
           ).trim();
           // Extract optional/required examDate, examSession, and subject from the row
           const examDate = m.mapped.examDate
@@ -545,7 +545,7 @@ const RoomInforManagement = () => {
           // - Allow matching even without examSession (many files don't have it)
           if (!majorCode && !examDate && !subject) {
             console.warn(
-              `Bỏ qua dòng thiếu dữ liệu: cần ít nhất (majorCode + examRoom) HOẶC (examDate + subject + examRoom)`
+              `Bỏ qua dòng thiếu dữ liệu: cần ít nhất (majorCode + examRoom) HOẶC (examDate + subject + examRoom)`,
             );
             continue;
           }
@@ -569,7 +569,7 @@ const RoomInforManagement = () => {
             // Find matching students based on criteria
             const matchingStudents = allStudents.filter((s) => {
               const dbExamRoom = normalizeForSearch(
-                String(s.examRoom || "")
+                String(s.examRoom || ""),
               ).trim();
               const inputExamRoom = normalizeForSearch(examRoom).trim();
 
@@ -589,7 +589,7 @@ const RoomInforManagement = () => {
               // If subject is provided, match by subject
               if (isMatch && subject) {
                 const dbSubject = normalizeForSearch(
-                  String(s.subject || "")
+                  String(s.subject || ""),
                 ).trim();
                 const inputSubject = normalizeForSearch(subject).trim();
                 const subjectMatch = dbSubject === inputSubject;
@@ -606,7 +606,7 @@ const RoomInforManagement = () => {
               // If examSession is provided, match by examSession (OPTIONAL)
               if (isMatch && examSession) {
                 const dbExamSession = normalizeForSearch(
-                  String(s.examSession || "")
+                  String(s.examSession || ""),
                 ).trim();
                 const inputExamSession = normalizeForSearch(examSession).trim();
                 const sessionMatch = dbExamSession === inputExamSession;
@@ -617,7 +617,7 @@ const RoomInforManagement = () => {
             });
 
             console.log(
-              `[Import] Found ${matchingStudents.length} matching students for examRoom="${examRoom}"`
+              `[Import] Found ${matchingStudents.length} matching students for examRoom="${examRoom}"`,
             );
 
             if (matchingStudents.length === 0) {
@@ -629,7 +629,7 @@ const RoomInforManagement = () => {
               if (examDate) criteria.push(`examDate: ${examDate}`);
               if (examSession) criteria.push(`examSession: ${examSession}`);
               console.warn(
-                `❌ Không tìm thấy sinh viên khớp cho: ${criteria.join(", ")}`
+                `❌ Không tìm thấy sinh viên khớp cho: ${criteria.join(", ")}`,
               );
 
               // Show sample of students with same examRoom to help debug
@@ -637,7 +637,7 @@ const RoomInforManagement = () => {
                 .filter(
                   (s) =>
                     normalizeForSearch(String(s.examRoom || "")).trim() ===
-                    normalizeForSearch(examRoom).trim()
+                    normalizeForSearch(examRoom).trim(),
                 )
                 .slice(0, 3);
               if (sameRoomSamples.length > 0) {
@@ -649,18 +649,18 @@ const RoomInforManagement = () => {
                     subject: s.subject,
                     examDate: parseDateToYMD(s.examDate),
                     examSession: s.examSession,
-                  }))
+                  })),
                 );
               } else {
                 console.warn(
-                  `   Không có sinh viên nào có số phòng "${examRoom}" trong database`
+                  `   Không có sinh viên nào có số phòng "${examRoom}" trong database`,
                 );
               }
               continue;
             }
 
             console.log(
-              `✅ Tìm thấy ${matchingStudents.length} sinh viên khớp, sẽ cập nhật link`
+              ` Tìm thấy ${matchingStudents.length} sinh viên khớp, sẽ cập nhật link`,
             );
 
             // Update examLink for all matching students using updateStudentsByMatch
@@ -675,20 +675,20 @@ const RoomInforManagement = () => {
             const res = await updateStudentsByMatch(
               updateCriteria,
               { examLink },
-              { allowBulk: true }
+              { allowBulk: true },
             );
 
             if (res && typeof res.updated === "number" && res.updated > 0) {
               applied++;
               studentsSynced += res.updated;
               console.log(
-                `✅ Đã cập nhật ${res.updated} sinh viên với link: ${examLink}`
+                ` Đã cập nhật ${res.updated} sinh viên với link: ${examLink}`,
               );
             }
           } catch (e) {
             console.error(
               "Error processing row with majorCode/examRoom/examLink:",
-              e
+              e,
             );
           }
         }
@@ -715,7 +715,7 @@ const RoomInforManagement = () => {
         // Build ordered list of links from the file
         const links = rowsMapped
           .map((m) =>
-            String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim()
+            String(m.mapped.examLink || findUrlInAnyCell(m.raw) || "").trim(),
           )
           .filter(Boolean);
 
@@ -794,7 +794,7 @@ const RoomInforManagement = () => {
                   const res = await updateStudentsByMatch(
                     studentCriteria,
                     { examLink: link },
-                    { allowBulk: true }
+                    { allowBulk: true },
                   );
                   if (res && typeof res.updated === "number") {
                     studentsSynced += res.updated;
@@ -804,7 +804,7 @@ const RoomInforManagement = () => {
                   console.warn(
                     "Failed to update students for group (no room_infor docs)",
                     grp,
-                    e
+                    e,
                   );
                 }
                 continue;
@@ -832,7 +832,7 @@ const RoomInforManagement = () => {
                     const res = await updateStudentsByMatch(
                       studentCriteria,
                       { examLink: link },
-                      { allowBulk: true }
+                      { allowBulk: true },
                     );
                     if (res && typeof res.updated === "number")
                       studentsSynced += res.updated;
@@ -840,7 +840,7 @@ const RoomInforManagement = () => {
                     console.warn(
                       "Failed to sync students for room doc",
                       doc.id,
-                      e
+                      e,
                     );
                   }
                 } catch (e) {
@@ -918,7 +918,7 @@ const RoomInforManagement = () => {
               mapped,
               keyObj,
               raw: row,
-            }
+            },
           );
           // store a lightweight representation for the modal
           skippedRowsList.push({
@@ -992,7 +992,7 @@ const RoomInforManagement = () => {
                 "[RoomImport][RelaxedMatch] found",
                 roomCandidates.length,
                 "candidates for row",
-                rowCount
+                rowCount,
               );
               matches = roomCandidates;
             }
@@ -1009,7 +1009,7 @@ const RoomInforManagement = () => {
               keyObj,
               mapped,
               raw: row,
-            }
+            },
           );
           // Also log a sample of existing room normalized keys to help debugging
           try {
@@ -1018,7 +1018,7 @@ const RoomInforManagement = () => {
             console.warn(
               `handleExcelImport: available rooms (sample ${Math.min(
                 50,
-                allRooms.length
+                allRooms.length,
               )}):`,
               allRooms.slice(0, 50).map((r) => ({
                 id: r.id,
@@ -1026,12 +1026,12 @@ const RoomInforManagement = () => {
                 examSession: norm(r.examSession),
                 examTime: norm(r.examTime),
                 examRoom: norm(r.examRoom),
-              }))
+              })),
             );
           } catch (e) {
             console.warn(
               "handleExcelImport: failed to fetch all rooms for debug",
-              e
+              e,
             );
           }
           // If there are no room_infor docs, but excel provides date/link, update student_infor directly
@@ -1054,7 +1054,7 @@ const RoomInforManagement = () => {
               const res = await updateStudentsByMatch(
                 criteria,
                 updatesFallback,
-                { allowBulk: true }
+                { allowBulk: true },
               );
               if (res && typeof res.updated === "number" && res.updated > 0) {
                 studentUpdatedCount += res.updated;
@@ -1074,7 +1074,7 @@ const RoomInforManagement = () => {
             } catch (e) {
               console.error(
                 "handleExcelImport: fallback updateStudentsByMatch failed",
-                e
+                e,
               );
               setImportModal((m) => ({
                 ...m,
@@ -1144,7 +1144,7 @@ const RoomInforManagement = () => {
             } catch (e) {
               console.error(
                 "handleExcelImport: failed to update student records",
-                e
+                e,
               );
               // ensure processed count advances so progress continues
               setImportModal((m) => ({
@@ -1265,11 +1265,11 @@ const RoomInforManagement = () => {
               {
                 allowBulk: true,
                 force: true,
-              }
+              },
             );
             if (res && typeof res.updated === "number" && res.updated > 0) {
               console.info(
-                `Updated ${res.updated} student_infor records to reflect room edits (original key).`
+                `Updated ${res.updated} student_infor records to reflect room edits (original key).`,
               );
             }
           }
@@ -1301,7 +1301,7 @@ const RoomInforManagement = () => {
                 res2.updated > 0
               ) {
                 console.info(
-                  `Updated ${res2.updated} student_infor records to reflect room edits (saved doc ${savedDoc.id}).`
+                  `Updated ${res2.updated} student_infor records to reflect room edits (saved doc ${savedDoc.id}).`,
                 );
               }
             }
@@ -1329,7 +1329,7 @@ const RoomInforManagement = () => {
   // Delete a displayed room (derived) and all matching student_infor records.
   const handleDeleteRoom = async (r) => {
     const proceed = await showConfirm(
-      "Xóa phòng này và tất cả bản ghi thí sinh trùng (Ngày thi, Tên môn, Ca, Thời gian, Phòng, Link). Hành động không thể hoàn tác. Tiếp tục?"
+      "Xóa phòng này và tất cả bản ghi thí sinh trùng (Ngày thi, Tên môn, Ca, Thời gian, Phòng, Link). Hành động không thể hoàn tác. Tiếp tục?",
     );
     if (!proceed) return;
     setIsSaving(true);
@@ -1369,12 +1369,12 @@ const RoomInforManagement = () => {
       alert(
         `Hoàn thành. Đã xóa ${deletedRooms} phòng (nếu có) và ${
           res.deleted || 0
-        } bản ghi thí sinh.`
+        } bản ghi thí sinh.`,
       );
     } catch (err) {
       console.error("handleDeleteRoom error", err);
       alert(
-        "Lỗi khi xóa phòng hoặc bản ghi thí sinh. Xem console để biết chi tiết."
+        "Lỗi khi xóa phòng hoặc bản ghi thí sinh. Xem console để biết chi tiết.",
       );
     } finally {
       setIsSaving(false);
@@ -1384,7 +1384,7 @@ const RoomInforManagement = () => {
   // Selection helpers
   const toggleSelect = (id) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
 
@@ -1400,7 +1400,7 @@ const RoomInforManagement = () => {
   const handleDeleteSelected = async () => {
     if (!selectedIds || selectedIds.length === 0) return;
     const proceed = await showConfirm(
-      `Xóa ${selectedIds.length} phòng đã chọn và tất cả bản ghi thí sinh liên quan? Hành động không thể hoàn tác.`
+      `Xóa ${selectedIds.length} phòng đã chọn và tất cả bản ghi thí sinh liên quan? Hành động không thể hoàn tác.`,
     );
     if (!proceed) return;
 
@@ -1447,7 +1447,7 @@ const RoomInforManagement = () => {
       }
 
       alert(
-        `Đã xóa ${totalDeleted} phòng và ${totalStudentsDeleted} bản ghi thí sinh.`
+        `Đã xóa ${totalDeleted} phòng và ${totalStudentsDeleted} bản ghi thí sinh.`,
       );
       setSelectedIds([]);
     } catch (err) {
@@ -1499,7 +1499,7 @@ const RoomInforManagement = () => {
         console.error("subscribeStudentInfor error", err);
         setError("Lỗi khi tải dữ liệu");
         setLoading(false);
-      }
+      },
     );
 
     return () => unsubscribe();
@@ -1718,7 +1718,9 @@ const RoomInforManagement = () => {
             ) : windowWidth < 770 ? (
               <div className="space-y-4">
                 {visibleRooms.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-gray-500">Không có dữ liệu</div>
+                  <div className="p-6 text-center text-sm text-gray-500">
+                    Không có dữ liệu
+                  </div>
                 ) : (
                   visibleRooms.map((r) => (
                     <RoomMobileCard
@@ -1805,7 +1807,7 @@ const RoomInforManagement = () => {
                           importModal.total > 0
                             ? `${Math.round(
                                 (importModal.processed / importModal.total) *
-                                  100
+                                  100,
                               )}%`
                             : "0%",
                       }}

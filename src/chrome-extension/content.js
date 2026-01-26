@@ -355,14 +355,12 @@ if (window.tailieuExtensionLoaded) {
     // Load cached questions when page loads (immediately and asynchronously)
     (async () => {
         await loadCachedQuestions();
-        console.log('[Tailieu Extension] Cached questions loaded:', extensionQuestions.length);
         // Restore auto-select preference from storage if available
         try {
             if (chrome?.storage?.local) {
                 chrome.storage.local.get('tailieu_auto_select', (res) => {
                     if (res && typeof res.tailieu_auto_select !== 'undefined') {
                         autoSelectEnabled = !!res.tailieu_auto_select;
-                        console.log('[Tailieu Extension] autoSelectEnabled restored:', autoSelectEnabled);
                     }
                 });
             }
@@ -955,12 +953,10 @@ if (window.tailieuExtensionLoaded) {
                     // ignore attach errors
                 }
 
-                console.log('[Tailieu Extension] Moodle Q', index + 1, ':', questionText.substring(0, 50) + '...');
             });
 
             // If we found Moodle questions, return them directly
             if (questions.length > 0) {
-                console.log('[Tailieu Extension] Tổng cộng', questions.length, 'câu hỏi Moodle');
                 return questions;
             }
         }
@@ -1261,14 +1257,10 @@ if (window.tailieuExtensionLoaded) {
                 }
 
                 for (const variant of cleanedVariants) {
-                    // Debug logging for comparisons
-                    debugLog('[Compare] Page variant:', variant, 'DB:', cleanExtQuestion);
-
                     // STRICT VALIDATION: exact normalized match
                     if (isQuestionSimilar(variant, cleanExtQuestion)) {
                         const originalVariantRaw = pageVariantsRaw[cleanedVariants.indexOf(variant)] || pageQ.text;
                         const finalValidation = performFinalValidation(originalVariantRaw, extQ.question);
-                        debugLog('[Compare] Exact match found, finalValidation:', finalValidation);
                         if (finalValidation.isValid) {
                             matchedVariant = variant;
                             matchedFinalValidation = finalValidation;
@@ -1291,7 +1283,6 @@ if (window.tailieuExtensionLoaded) {
                     // As a fallback, try more lenient enhanced similarity for variants
                     for (const variant of cleanedVariants) {
                         const sim = calculateEnhancedSimilarity(variant, cleanExtQuestion);
-                        debugLog('[Compare] Enhanced similarity', variant, cleanExtQuestion, '=>', sim);
                         if (sim > 0.86) { // high threshold
                             matchedVariant = variant;
                             matchedFinalValidation = { isValid: true, confidence: sim };
@@ -1308,9 +1299,6 @@ if (window.tailieuExtensionLoaded) {
                         // Highlight the question and try to find/highlight all answers
                         highlightMatchedQuestion(pageQ, extQ);
                         hasMatchedThisPageQuestion = true;
-
-                        // Debug: show which variant matched which DB question
-                        debugLog('[Tailieu Extension] Matched variant:', matchedVariant, '-> DB question:', extQ.question);
                     }
 
                     // Always record the match for statistics
@@ -1357,8 +1345,8 @@ if (window.tailieuExtensionLoaded) {
         let fillBlankMatches = [];
         try {
             if (window.TailieuFillBlank && typeof window.TailieuFillBlank.processFillBlankQuestions === 'function') {
-                console.log('[Tailieu Extension] Processing fill-in-the-blank questions...');
-                console.log('[Tailieu Extension] autoSelectEnabled for fill-blank:', autoSelectEnabled);
+                // console.log('[Tailieu Extension] Processing fill-in-the-blank questions...');
+                // console.log('[Tailieu Extension] autoSelectEnabled for fill-blank:', autoSelectEnabled);
 
                 // Truyền autoSelectEnabled vào fill-blank handler
                 // Khi bật: tự động điền đáp án vào input fields
@@ -1367,7 +1355,7 @@ if (window.tailieuExtensionLoaded) {
                     autoSelectEnabled: autoSelectEnabled
                 });
 
-                console.log('[Tailieu Extension] Fill-blank matches found:', fillBlankMatches.length);
+                //console.log('[Tailieu Extension] Fill-blank matches found:', fillBlankMatches.length);
 
                 // Add fill-blank matches to overall matched count
                 fillBlankMatches.forEach(fb => {
@@ -1387,30 +1375,27 @@ if (window.tailieuExtensionLoaded) {
         }
         // ==================== END FILL-BLANK PROCESSING ====================
 
-        if (matched.length > 0) {
-            // Log average confidence
-            const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
+        // if (matched.length > 0) {
+        //     // Log average confidence
+        //     const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
 
-            // Log các câu hỏi được highlight
-            const highlightedQuestionsLog = matched.map(m => m.pageQuestion);
-            // Count total highlights before cleanup
-            const highlightsBeforeCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
-            console.log('[Tailieu Extension] Số highlight trước khi cleanup:', highlightsBeforeCleanup);
-            console.log('[Tailieu Extension] Summary of highlighted question-answer pairs for this run (' + highlightedQA.length + '):', highlightedQA);
+        //     // Log các câu hỏi được highlight
+        //     const highlightedQuestionsLog = matched.map(m => m.pageQuestion);
+        //     // Count total highlights before cleanup
+        //     const highlightsBeforeCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
+        //     // console.log('[Tailieu Extension] Số highlight trước khi cleanup:', highlightsBeforeCleanup);
+        //     // console.log('[Tailieu Extension] Summary of highlighted question-answer pairs for this run (' + highlightedQA.length + '):', highlightedQA);
 
-            // Remove only duplicate highlights (same answer highlighted multiple times WITHIN same question)
-            // TEMPORARILY DISABLED FOR DEBUGGING
-            setTimeout(() => {
-                console.log('[Tailieu Extension]  CLEANUP FUNCTION DISABLED FOR DEBUGGING');
-                console.log('[Tailieu Extension] Nếu vẫn bị xóa highlight, vấn đề không phải ở cleanup function');
-
-                // UNCOMMENT TO ENABLE CLEANUP:
-                // const removedCount = removeDuplicateHighlights();
-                // const highlightsAfterCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
-                // console.log('[Tailieu Extension] Đã xóa', removedCount, 'highlight duplicate/sai');
-                // console.log('[Tailieu Extension] Số highlight sau cleanup:', highlightsAfterCleanup);
-            }, 500); // Small delay to let all highlighting complete first
-        }
+        //     // Remove only duplicate highlights (same answer highlighted multiple times WITHIN same question)
+        //     // TEMPORARILY DISABLED FOR DEBUGGING
+        //     // setTimeout(() => {
+        //     //     // UNCOMMENT TO ENABLE CLEANUP:
+        //     //     // const removedCount = removeDuplicateHighlights();
+        //     //     // const highlightsAfterCleanup = document.querySelectorAll('.tailieu-answer-highlight').length;
+        //     //     // console.log('[Tailieu Extension] Đã xóa', removedCount, 'highlight duplicate/sai');
+        //     //     // console.log('[Tailieu Extension] Số highlight sau cleanup:', highlightsAfterCleanup);
+        //     // }, 500); // Small delay to let all highlighting complete first
+        // }
 
         // Reset comparison flag and button after completion with small delay for visual feedback
         isComparing = false;
@@ -1972,7 +1957,7 @@ if (window.tailieuExtensionLoaded) {
                 // Method 1: Look for .flex-fill elements (NEU/Moodle structure)
                 const flexFillOptions = answerContainer.querySelectorAll('.flex-fill');
                 if (flexFillOptions.length > 0) {
-                    console.log('[Tailieu Extension] Tìm thấy', flexFillOptions.length, 'options dạng .flex-fill');
+                    //console.log('[Tailieu Extension] Tìm thấy', flexFillOptions.length, 'options dạng .flex-fill');
                     totalHighlightedCount = highlightMatchingOptions(flexFillOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
                     showMultipleAnswersWarning(element, totalHighlightedCount);
                     return;
@@ -1981,7 +1966,7 @@ if (window.tailieuExtensionLoaded) {
                 // Method 2: Look for label elements
                 const labelOptions = answerContainer.querySelectorAll('label');
                 if (labelOptions.length > 0) {
-                    console.log('[Tailieu Extension] Tìm thấy', labelOptions.length, 'options dạng label');
+                    //console.log('[Tailieu Extension] Tìm thấy', labelOptions.length, 'options dạng label');
                     totalHighlightedCount = highlightMatchingOptions(labelOptions, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
                     showMultipleAnswersWarning(element, totalHighlightedCount);
                     return;
@@ -1990,7 +1975,7 @@ if (window.tailieuExtensionLoaded) {
                 // Method 3: Look for any text elements within answer container
                 const allTextElements = answerContainer.querySelectorAll('div, span, p');
                 if (allTextElements.length > 0) {
-                    console.log('[Tailieu Extension] Tìm thấy', allTextElements.length, 'text elements');
+                    //console.log('[Tailieu Extension] Tìm thấy', allTextElements.length, 'text elements');
                     totalHighlightedCount = highlightMatchingOptions(allTextElements, normalizedAnswer, correctAnswer, pageQuestion, extensionQuestion);
                     showMultipleAnswersWarning(element, totalHighlightedCount);
                     return;
@@ -2154,14 +2139,6 @@ if (window.tailieuExtensionLoaded) {
             .map(a => extractImageSrcFromString(a))
             .filter(a => a && a.length > 0);
         const imageFingerprints = imageAnswers.map(src => fingerprintImagePath(src));
-        if (imageAnswers.length > 0) console.log('[Tailieu Extension] Image answers detected:', imageAnswers, imageFingerprints);
-
-        // console.log('[Tailieu Extension] Số đáp án trong DB:', normalizedAnswers.length);
-        // console.log('[Tailieu Extension] Số options trên web:', options.length);
-        // console.log('[Tailieu Extension] Cần tìm các đáp án (normalized):', normalizedAnswers);
-        // console.log('[Tailieu Extension] Kiểm tra', options.length, 'options...');
-
-        // Extract all web options first
         const webOptions = [];
         options.forEach((option, index) => {
             if (isExtensionElement(option)) return;
@@ -2387,8 +2364,6 @@ if (window.tailieuExtensionLoaded) {
             normalizedAnswers.forEach((ans, i) => {
                 console.log('  ', i, ':', ans.substring(0, 100));
             });
-        } else {
-            console.log('[Tailieu Extension] ✅ Đã highlight', highlightedCount, 'đáp án khớp cho câu hỏi này');
         }
 
         // Return the count so caller can show warning if multiple answers highlighted
@@ -4706,7 +4681,6 @@ if (window.tailieuExtensionLoaded) {
     }
 
     // Create questions popup at bottom right
-    console.log('Creating questions popup...');
     const questionsPopup = createQuestionsPopup();
     console.log('Questions popup created:', questionsPopup ? 'Success' : 'Failed');
 
