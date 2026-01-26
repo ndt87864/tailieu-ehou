@@ -914,6 +914,25 @@ if (window.tailieuExtensionLoaded) {
                 // Clean text (remove reading passages) using helper
                 const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
+                // DEBUG: If question contains image URLs, log extraction details for troubleshooting
+                try {
+                    const containsImage = typeof window.tailieuContentImageHandler !== 'undefined' ?
+                        window.tailieuContentImageHandler.containsImageUrls(finalQuestionText) : /"(?:https?:\/\/|(?:\.){3,}\/)[^"]+"/.test(finalQuestionText);
+                    if (containsImage && debugMode) {
+                        try {
+                            const extractor = window.tailieuImageHandler && typeof window.tailieuImageHandler.extractImageUrls === 'function' ? window.tailieuImageHandler.extractImageUrls : null;
+                            const urls = extractor ? extractor(qtextElement) : [];
+                            console.debug('[Tailieu Debug] Extracted image question:', {
+                                pageText: finalQuestionText,
+                                urls: urls.slice(0,10),
+                                snippet: (qtextElement && qtextElement.innerText) ? qtextElement.innerText.trim().slice(0,200) : ''
+                            });
+                        } catch (e) {
+                            console.debug('[Tailieu Debug] Error while extracting image urls:', e);
+                        }
+                    }
+                } catch (e) { }
+
                 if (finalQuestionText.length < 5) return;
 
                 // Find answer container
@@ -1294,6 +1313,37 @@ if (window.tailieuExtensionLoaded) {
                             break;
                         }
                     }
+
+                    // DEBUG: If either side contains image URLs and we still didn't match, log useful info
+                    try {
+                        const imageUrlRegex = /"(?:https?:\/\/|(?:\.){3,}\/)([^"?]+)(?:\?[^\"]*)?"/gi;
+                        const pageHasImage = cleanedVariants.some(v => /"(?:https?:\/\/|(?:\.){3,}\/)[^\"]+"/.test(v));
+                        const extHasImage = /"(?:https?:\/\/|(?:\.){3,}\/)[^\"]+"/.test(extQ.question);
+                        if ((pageHasImage || extHasImage) && debugMode) {
+                            function extractFilenames(s) {
+                                const arr = [];
+                                let m;
+                                while ((m = imageUrlRegex.exec(s)) !== null) {
+                                    arr.push(m[1]);
+                                }
+                                return arr;
+                            }
+
+                            const pageFiles = cleanedVariants.map(v => extractFilenames(v)).flat().filter(Boolean);
+                            const extFiles = extractFilenames(extQ.question);
+
+                            console.debug('[Tailieu Debug] Image compare miss:', {
+                                pageIdx: pageIndex,
+                                extIndex: extIndex,
+                                pageTextSamples: cleanedVariants.slice(0,2),
+                                extQuestion: extQ.question,
+                                pageFiles,
+                                extFiles,
+                                normPage: cleanedVariants.map(v => normalizeForExactMatch(v)).slice(0,3),
+                                normExt: normalizeForExactMatch(cleanExtQuestion)
+                            });
+                        }
+                    } catch (e) { /* ignore debug errors */ }
                 }
 
                 if (matchedVariant) {
@@ -1582,6 +1632,21 @@ if (window.tailieuExtensionLoaded) {
             if (nPage && nDb && nPage === nDb) {
                 return { isValid: true, reason: 'Exact normalized match', confidence: 1 };
             }
+
+            // Fallback for image-only differences: if both contain image filenames, accept match when filenames intersect
+            try {
+                const filenamePattern = /([A-Za-z0-9_\-]+\.(?:png|jpe?g|gif|svg))/gi;
+                const pageFiles = (nPage.match(filenamePattern) || []).map(s => s.toLowerCase());
+                const dbFiles = (nDb.match(filenamePattern) || []).map(s => s.toLowerCase());
+                if (pageFiles.length > 0 && dbFiles.length > 0) {
+                    const intersection = pageFiles.filter(f => dbFiles.includes(f));
+                    if (intersection.length > 0) {
+                    if (debugMode) console.debug('[Tailieu Debug] performFinalValidation accepted by image filename intersection:', intersection, { nPage, nDb });
+                    return { isValid: true, reason: 'Image filenames intersect', confidence: 0.95 };
+                }
+                }
+            } catch (e) { /* ignore fallback errors */ }
+
             return { isValid: false, reason: 'Not exact normalized match', confidence: 0 };
         } catch (e) {
             return { isValid: false, reason: 'Validation error', confidence: 0 };
