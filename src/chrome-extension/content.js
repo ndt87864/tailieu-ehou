@@ -4239,8 +4239,8 @@ if (window.tailieuExtensionLoaded) {
             </div>
 
             <div style="display: flex; gap: 8px; margin-top: 5px;">
-                <button id="tailieu-panel-clear-cache" style="flex: 1; background: #FF5722; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
-                    Xóa Cache
+                <button id="tailieu-panel-clear-selection" style="flex: 1; background: #607D8B; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                    Xóa lựa chọn
                 </button>
                 <button id="tailieu-panel-save" style="flex: 1; background: #16f18bff; color: black; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
                     Cập nhật
@@ -4451,12 +4451,12 @@ if (window.tailieuExtensionLoaded) {
                 });
             };
 
-            document.getElementById('tailieu-panel-clear-cache').onclick = async () => {
-                if (confirm('Bạn có chắc chắn muốn xóa cache?')) {
-                    await chrome.storage.local.clear();
-                    statusEl.textContent = 'Đã xóa cache! Đang tải lại...';
-                    setTimeout(() => window.location.reload(), 1000);
-                }
+            document.getElementById('tailieu-panel-clear-selection').onclick = () => {
+                selectedDocIds = [];
+                const cbs = expandedEl.querySelectorAll('.tailieu-doc-cb');
+                cbs.forEach(cb => cb.checked = false);
+                statusEl.textContent = 'Đã xóa các lựa chọn';
+                setTimeout(() => { if (statusEl.textContent.includes('lựa chọn')) statusEl.textContent = ''; }, 2000);
             };
 
             // --- Original Comparison Logic ---
