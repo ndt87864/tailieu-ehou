@@ -543,7 +543,7 @@ if (window.tailieuExtensionLoaded) {
         notification.textContent = message;
         notification.style.cssText = `
         position: fixed;
-        top: 20px;
+        top: 100px;
         right: 20px;
         background: ${colors[type] || colors.info};
         color: white;
@@ -4252,7 +4252,7 @@ if (window.tailieuExtensionLoaded) {
 
         indicator.style.cssText = `
         position: fixed;
-        top: 20px;
+        top: 100px;
         right: 20px;
         background: rgba(33, 150, 243, 0.95);
         color: white;
