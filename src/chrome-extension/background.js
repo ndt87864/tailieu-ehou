@@ -70,6 +70,44 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+
+    if (request.action === 'checkOutdatedData') {
+        (async () => {
+            try {
+                // Get selected documents and cached questions from storage
+                const storage = await chrome.storage.local.get(['tailieu_selected_documents', 'tailieu_questions', 'tailieu_db_updated']);
+                const selectedDocIds = storage.tailieu_selected_documents;
+                const cachedQuestions = storage.tailieu_questions || [];
+                const flagDbUpdated = storage.tailieu_db_updated || false;
+
+                if (!selectedDocIds || selectedDocIds.length === 0) {
+                    sendResponse({ success: true, isOutdated: false });
+                    return;
+                }
+
+                // If explicit flag is set, it's definitely outdated
+                if (flagDbUpdated) {
+                    sendResponse({ success: true, isOutdated: true, reason: 'flag_set' });
+                    return;
+                }
+
+                // Check count in Firestore
+                const remoteCount = await getQuestionsCountByDocuments(Array.isArray(selectedDocIds) ? selectedDocIds : [selectedDocIds]);
+
+                const isOutdated = remoteCount !== cachedQuestions.length;
+                if (isOutdated) {
+                    // Update the flag so other parts of the extension know
+                    await chrome.storage.local.set({ 'tailieu_db_updated': true });
+                }
+
+                sendResponse({ success: true, isOutdated, remoteCount, cachedCount: cachedQuestions.length });
+            } catch (err) {
+                console.error('[Background] Error checking outdated data:', err);
+                sendResponse({ success: false, error: err.message });
+            }
+        })();
+        return true;
+    }
 });
 
 // Batch Add Logic

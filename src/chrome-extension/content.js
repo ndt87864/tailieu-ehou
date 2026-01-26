@@ -375,6 +375,25 @@ if (window.tailieuExtensionLoaded) {
 
         // Start monitoring URL changes
         monitorUrlChanges();
+
+        // Check for outdated data
+        checkDataFreshness();
+    }
+
+    // Check if cached data is outdated compared to DB
+    async function checkDataFreshness() {
+        try {
+            if (chrome?.runtime?.sendMessage) {
+                chrome.runtime.sendMessage({ action: 'checkOutdatedData' }, (response) => {
+                    if (response && response.success && response.isOutdated) {
+                        // indicator function will handle showing the warning based on tailieu_db_updated flag
+                        showCachedQuestionsIndicator();
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('[Tailieu Extension] Error checking data freshness:', e);
+        }
     }
 
     // Wait for page to be completely loaded (including images and subresources)

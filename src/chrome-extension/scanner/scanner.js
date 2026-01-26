@@ -1496,6 +1496,10 @@
                 </button>
             </div>
             <div class="scanner-popup-body">
+                <div id="scanner-outdated-warning" style="display: none; background: #FFF9C4; border: 1px solid #FBC02D; border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; color: #444; font-size: 13px; font-weight: 500;">
+                    <span style="color: #F57C00; font-weight: bold; margin-right: 5px;">⚠️ Cảnh báo:</span>
+                    Dữ liệu câu hỏi trong Extension có thể đã lỗi thời. Vui lòng [Xóa cache] trong popup chính để cập nhật dữ liệu mới nhất nếu cần!
+                </div>
                 <div class="scanner-questions-list">
                     ${questionsHTML}
                 </div>
@@ -1562,6 +1566,20 @@
             scannerPopup.style.transform = 'scale(1)';
             scannerPopup.style.opacity = '1';
         });
+
+        // Check for outdated data status
+        try {
+            chrome.storage.local.get(['tailieu_db_updated'], (res) => {
+                if (res && res.tailieu_db_updated) {
+                    const warning = scannerPopup.querySelector('#scanner-outdated-warning');
+                    if (warning) {
+                        warning.style.display = 'block';
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('[Scanner] Error checking outdated data:', e);
+        }
 
         // Event listeners
         overlay.addEventListener('click', (e) => {
