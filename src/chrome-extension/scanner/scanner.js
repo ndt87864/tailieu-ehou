@@ -2177,11 +2177,16 @@
     }
 
     function init() {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => { createScannerButton(); checkAutoScanTrigger(); });
-        } else {
+        if (document.readyState === 'complete') {
             createScannerButton();
             checkAutoScanTrigger();
+        } else {
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    createScannerButton();
+                    checkAutoScanTrigger();
+                }, 1000);
+            });
         }
     }
 

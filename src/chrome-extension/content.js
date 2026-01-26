@@ -352,33 +352,51 @@ if (window.tailieuExtensionLoaded) {
         }
     }
 
-    // Load cached questions when page loads (immediately and asynchronously)
-    (async () => {
-        await loadCachedQuestions();
-        // Restore auto-select preference from storage if available
-        try {
-            if (chrome?.storage?.local) {
-                chrome.storage.local.get('tailieu_auto_select', (res) => {
-                    if (res && typeof res.tailieu_auto_select !== 'undefined') {
-                        autoSelectEnabled = !!res.tailieu_auto_select;
-                    }
-                });
+    // Load cached questions when page loads (Wait for window load to avoid overloading)
+    function initializeContentScript() {
+        (async () => {
+            await loadCachedQuestions();
+            // Restore auto-select preference from storage if available
+            try {
+                if (chrome?.storage?.local) {
+                    chrome.storage.local.get('tailieu_auto_select', (res) => {
+                        if (res && typeof res.tailieu_auto_select !== 'undefined') {
+                            autoSelectEnabled = !!res.tailieu_auto_select;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Could not restore autoSelect setting', e);
             }
-        } catch (e) {
-            console.warn('Could not restore autoSelect setting', e);
-        }
-    })();
+        })();
+
+        // Initialize auto-compare
+        initAutoCompareOnLoad();
+
+        // Start monitoring URL changes
+        monitorUrlChanges();
+    }
+
+    // Wait for page to be completely loaded (including images and subresources)
+    if (document.readyState === 'complete') {
+        initializeContentScript();
+    } else {
+        window.addEventListener('load', () => {
+            // Additional small delay to ensure page stabilizes
+            setTimeout(initializeContentScript, 500);
+        });
+    }
 
     // Auto-compare questions when page is fully loaded
     function initAutoCompareOnLoad() {
-        // Wait for DOM to be ready and page to be stable
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(performAutoCompare, 1000);
+        // Wait for page to be completely finished
+        if (document.readyState !== 'complete') {
+            window.addEventListener('load', () => {
+                setTimeout(performAutoCompare, 1500);
             });
         } else {
-            // DOM is already loaded
-            setTimeout(performAutoCompare, 1000);
+            // Page is already loaded
+            setTimeout(performAutoCompare, 1500);
         }
 
         // Also listen for dynamic content changes (only if not already observing)
@@ -579,8 +597,8 @@ if (window.tailieuExtensionLoaded) {
         });
     }
 
-    // Initialize auto-compare
-    initAutoCompareOnLoad();
+    // Initialize auto-compare (moved to initializeContentScript)
+    // initAutoCompareOnLoad();
 
     // Monitor URL changes for Single Page Applications
     let currentUrl = window.location.href;
@@ -611,8 +629,8 @@ if (window.tailieuExtensionLoaded) {
         }
     }
 
-    // Start monitoring URL changes
-    monitorUrlChanges();
+    // Start monitoring URL changes (moved to initializeContentScript)
+    // monitorUrlChanges();
 
     // Also listen to popstate events (back/forward buttons)
     if (!window.tailieuPopstateListener) {
