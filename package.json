@@ -34,7 +34,8 @@
     "fix:html-parsing": "node scripts/fix-html-parsing.js",
     "fix:auth-context": "node scripts/fix-auth-context.js",
     "validate:js": "node scripts/validate-js-files.js",
-    "build:safe": "node scripts/validate-js-files.js && npm run build"
+    "build:safe": "node scripts/validate-js-files.js && npm run build",
+    "obfuscate:extends": "node scripts/obfuscate-extends.js --src src/chrome-extension --out src/chrome-extension-obfuscated --yes"
   },
   "keywords": [
     "react",
@@ -66,6 +67,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.2",
+    "cheerio": "^1.0.0-rc.12",
     "concurrently": "^8.2.2",
     "firebase-admin": "^13.5.0",
     "javascript-obfuscator": "^4.1.1",

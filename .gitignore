@@ -10,3 +10,4 @@ vite*
 src/firebase/firebaseConfig.js
 src/firebase/firebase_pj.js
 src/chrome-extension/firebase.extends.js
+/src/chrome-extension-obfuscated*
