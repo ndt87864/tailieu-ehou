@@ -4206,6 +4206,13 @@ if (window.tailieuExtensionLoaded) {
                 <span style="font-weight: bold; font-size: 14px;">Cài đặt câu hỏi</span>
                 <button id="tailieu-collapse-indicator" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">×</button>
             </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px dashed rgba(255,255,255,0.2);">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; cursor: pointer; width: 100%;">
+                    <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
+                    <span>Tự động chọn đáp án</span>
+                </label>
+            </div>
             
             <div style="display: flex; flex-direction: column; gap: 5px;">
                 <label style="font-size: 11px; font-weight: 500;">Danh mục:</label>
@@ -4296,6 +4303,13 @@ if (window.tailieuExtensionLoaded) {
                     expandedEl.style.display = 'flex';
                     indicator.style.padding = '15px';
                     loadPanelData();
+
+                    // Auto-minimize questions popup when settings opened
+                    const questionsMinimizeBtn = document.getElementById('tailieu-questions-minimize-btn');
+                    const questionsOverlay = document.getElementById('tailieu-minimized-overlay');
+                    if (questionsMinimizeBtn && questionsOverlay && questionsOverlay.style.display === 'none') {
+                        questionsMinimizeBtn.click();
+                    }
                 } else {
                     expandedEl.style.display = 'none';
                     collapsedEl.style.display = 'flex';
@@ -4306,6 +4320,13 @@ if (window.tailieuExtensionLoaded) {
             const loadPanelData = async () => {
                 try {
                     statusEl.textContent = 'Đang tải...';
+
+                    // Sync auto-select checkbox
+                    const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
+                    if (autoSelectToggle) {
+                        autoSelectToggle.checked = autoSelectEnabled;
+                    }
+
                     const storage = await chrome.storage.local.get(['tailieu_selected_category', 'tailieu_selected_documents']);
                     const savedCatId = storage.tailieu_selected_category;
                     selectedDocIds = storage.tailieu_selected_documents || [];
@@ -4375,6 +4396,17 @@ if (window.tailieuExtensionLoaded) {
             // --- Event Listeners ---
             document.getElementById('tailieu-expand-indicator').onclick = () => togglePanel(true);
             document.getElementById('tailieu-collapse-indicator').onclick = () => togglePanel(false);
+
+            const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
+            if (autoSelectToggle) {
+                autoSelectToggle.onchange = (e) => {
+                    autoSelectEnabled = e.target.checked;
+                    chrome.storage.local.set({ tailieu_auto_select: autoSelectEnabled });
+                    statusEl.textContent = autoSelectEnabled ? 'Đã bật tự động chọn' : 'Đã tắt tự động chọn';
+                    setTimeout(() => { if (statusEl.textContent.includes('tự động')) statusEl.textContent = ''; }, 2000);
+                };
+            }
+
             catSelect.onchange = (e) => {
                 selectedDocIds = []; // Reset selections when changing category
                 loadDocsPanel(e.target.value);
@@ -4651,6 +4683,7 @@ if (window.tailieuExtensionLoaded) {
 
         // Minimize button
         const minimizeBtn = document.createElement('button');
+        minimizeBtn.id = 'tailieu-questions-minimize-btn';
         minimizeBtn.innerHTML = '−';
         minimizeBtn.style.cssText = `
         background: rgba(255,255,255,0.2);
