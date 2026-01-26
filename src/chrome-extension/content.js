@@ -4137,14 +4137,14 @@ if (window.tailieuExtensionLoaded) {
         const indicator = document.createElement('div');
         indicator.id = 'tailieu-cached-indicator';
         indicator.innerHTML = `
-        <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 10px;">
+        <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 15px;">
             <div style="display: flex; flex-direction: column;">
-                <span style="font-weight: bold; font-size: 13px;">${extensionQuestions.length} câu hỏi sẵn sàng</span>
-                <span id="tailieu-indicator-doc-name" style="font-size: 10px; opacity: 0.9; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
+                <span style="font-weight: bold; font-size: 14px;">${extensionQuestions.length} câu hỏi sẵn sàng</span>
+                <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
                     📄 ${selectedDocNames}
                 </span>
             </div>
-            <div style="display: flex; align-items: center; gap: 5px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
                 <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
                     So sánh
                 </button>
@@ -4194,7 +4194,7 @@ if (window.tailieuExtensionLoaded) {
         right: 20px;
         background: rgba(33, 150, 243, 0.95);
         color: white;
-        padding: 12px 16px;
+        padding: 12px 20px;
         border-radius: 8px;
         z-index: 10000;
         font-size: 13px;
@@ -4202,7 +4202,7 @@ if (window.tailieuExtensionLoaded) {
         box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         animation: slideInRight 0.3s ease-out;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        max-width: 300px;
+        max-width: 500px;
     `;
 
         // Add CSS animation
