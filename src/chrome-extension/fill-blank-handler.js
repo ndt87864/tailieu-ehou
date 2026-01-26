@@ -388,7 +388,7 @@
         const results = [];
         const autoSelectEnabled = options.autoSelectEnabled || false;
 
-        
+
         if (!extensionQuestions || extensionQuestions.length === 0) {
             console.log('[Tailieu FillBlank] Không có câu hỏi extension để so sánh');
             return results;
@@ -1055,15 +1055,11 @@
         }
         element.classList.add('tailieu-fillblank-highlighted');
 
-        // Apply highlight style to the sentence
-        element.style.cssText += `
-            background: linear-gradient(135deg, #fff3e0, #ffe0b2) !important;
-            border-left: 4px solid #ff9800 !important;
-            padding: 8px 12px !important;
-            margin: 4px 0 !important;
-            border-radius: 4px !important;
-            position: relative !important;
-        `;
+        // Fix padding/margin to prevent layout distortion
+        // element.style.cssText += `
+        //     position: relative !important;
+        //     box-shadow: inset 3px 0 0 0 rgba(76, 175, 80, 0.3) !important;
+        // `;
 
         // ==================== AUTO-FILL LOGIC ====================
         // Nếu autoSelectEnabled = true, tự động điền đáp án vào input fields
@@ -1243,8 +1239,8 @@
                 badge.innerHTML = renderedA;
                 badge.style.cssText = `
                     display: inline-block;
-                    margin-left: 8px;
-                    padding: 2px 8px;
+                    margin-left: 2px;
+                    padding: 2px 4px;
                     background: #4CAF50;
                     color: white;
                     border-radius: 4px;

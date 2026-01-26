@@ -2352,6 +2352,15 @@ if (window.tailieuExtensionLoaded) {
         options.forEach((option, index) => {
             if (isExtensionElement(option)) return;
 
+            // Bỏ qua các phần tử metadata của Moodle để tránh highlight nhầm
+            if (option.matches && (
+                option.matches('.info') ||
+                option.matches('.state') ||
+                option.matches('.grade') ||
+                option.matches('.questionflag') ||
+                option.closest('.info')
+            )) return;
+
             // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh cho đáp án
             const hasCImgH = typeof window.tailieuContentImageHandler !== 'undefined';
             let optionText = hasCImgH ?
@@ -2609,7 +2618,7 @@ if (window.tailieuExtensionLoaded) {
     function applyHighlightStyle(element) {
         if (element.classList.contains('tailieu-answer-highlight')) return;
 
-        element.style.backgroundColor = '#00FF00';
+        element.style.backgroundColor = '#2cdb4c9c';
         element.classList.add('tailieu-answer-highlight');
         element.title = 'Đây là đáp án đúng!';
 
@@ -5272,11 +5281,8 @@ if (window.tailieuExtensionLoaded) {
             if (isQuestionSimilar(cleanTargetText, cleanPageText)) {
                 // Highlight this element
                 pageQuestion.element.style.cssText += `
-                background: linear-gradient(135deg, #ffeb3b 0%, #ffc107 100%) !important;
-                padding: 8px !important;
-                border-radius: 6px !important;
-                border: 2px solid #ff9800 !important;
-                box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3) !important;
+                box-shadow: inset 5px 0 0 0 #4CAF50, 0 2px 8px rgba(76, 175, 80, 0.2) !important;
+                border-radius: 4px !important;
                 animation: highlightPulse 2s ease-in-out !important;
             `;
 

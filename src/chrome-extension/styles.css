@@ -15,15 +15,14 @@
 @keyframes highlightPulse {
     0% {
         box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
-        transform: scale(1);
     }
+
     50% {
         box-shadow: 0 8px 24px rgba(255, 152, 0, 0.6);
-        transform: scale(1.02);
     }
+
     100% {
         box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
-        transform: scale(1);
     }
 }
 
@@ -32,6 +31,7 @@
         transform: translateX(100%);
         opacity: 0;
     }
+
     to {
         transform: translateX(0);
         opacity: 1;
@@ -41,15 +41,14 @@
 @keyframes answerPulse {
     0% {
         box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4);
-        transform: scale(1);
     }
+
     50% {
         box-shadow: 0 4px 8px rgba(76, 175, 80, 0.6);
-        transform: scale(1.05);
     }
+
     100% {
         box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4);
-        transform: scale(1);
     }
 }
 
@@ -67,13 +66,13 @@
 
 /* Answer highlight styles */
 .tailieu-answer-highlight {
-    background: linear-gradient(135deg, #4CAF50, #8BC34A) !important;
-    color: white !important;
+    /* background: linear-gradient(135deg, #4CAF50, #8BC34A) !important; */
+    color: #2E7D32 !important;
     border-radius: 4px !important;
-    padding: 3px 6px !important;
+    /* padding: 3px 6px !important; */
     font-weight: bold !important;
-    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4) !important;
-    border: 2px solid #2E7D32 !important;
+    box-shadow: 0 0 0 2px #2E7D32 !important;
+    /* Dùng box-shadow thay border để không chiếm chỗ */
     animation: answerPulse 2s ease-in-out !important;
 }
 
@@ -112,18 +111,18 @@
 
 /* Highlighted fill-blank question */
 .tailieu-fillblank-highlighted {
-    background: linear-gradient(135deg, #fff3e0, #ffe0b2) !important;
-    border-left: 4px solid #ff9800 !important;
-    padding: 8px 12px !important;
-    margin: 4px 0 !important;
-    border-radius: 4px !important;
+    /* background: linear-gradient(135deg, #fff3e0, #ffe0b2) !important; */
+    /* border-left: 4px solid #ff9800 !important; */
+    /* padding: 8px 12px !important; */
+    /* Bỏ padding/margin gây biến dạng layout */
+    /* margin: 4px 0 !important; */
     position: relative !important;
     transition: all 0.3s ease !important;
 }
 
 .tailieu-fillblank-highlighted:hover {
-    background: linear-gradient(135deg, #ffe0b2, #ffcc80) !important;
-    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3) !important;
+    background: rgba(76, 175, 80, 0.05) !important;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1) !important;
 }
 
 /* Fill-blank answer tooltip */
@@ -136,7 +135,7 @@
     color: white !important;
     padding: 12px !important;
     border-radius: 8px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
     z-index: 10001 !important;
     font-size: 13px !important;
     max-height: 300px !important;
@@ -146,7 +145,7 @@
 
 /* Answer item in tooltip */
 .tailieu-fillblank-tooltip .answer-item {
-    background: rgba(255,255,255,0.2) !important;
+    background: rgba(255, 255, 255, 0.2) !important;
     padding: 6px 10px !important;
     margin: 4px 0 !important;
     border-radius: 4px !important;
@@ -155,15 +154,15 @@
 }
 
 .tailieu-fillblank-tooltip .answer-item:hover {
-    background: rgba(255,255,255,0.4) !important;
+    background: rgba(255, 255, 255, 0.4) !important;
     transform: translateX(5px) !important;
 }
 
 /* Input fields in fill-blank questions */
 input.tailieu-fillblank-input,
 .tailieu-fillblank-highlighted input[type="text"] {
-    border: 2px solid #ff9800 !important;
-    background-color: #fff8e1 !important;
+    border: 1px solid #4CAF50 !important;
+    background-color: #fff !important;
     padding: 4px 8px !important;
     border-radius: 4px !important;
     transition: all 0.2s !important;
@@ -171,9 +170,9 @@ input.tailieu-fillblank-input,
 
 input.tailieu-fillblank-input:focus,
 .tailieu-fillblank-highlighted input[type="text"]:focus {
-    border-color: #f57c00 !important;
+    border-color: #4CAF50 !important;
     background-color: #fff !important;
-    box-shadow: 0 0 4px rgba(255, 152, 0, 0.5) !important;
+    box-shadow: 0 0 4px rgba(76, 175, 80, 0.3) !important;
 }
 
 /* Filled input (has answer) */
@@ -202,13 +201,12 @@ input.tailieu-fillblank-filled,
 
 /* Blank placeholder highlighting */
 .tailieu-blank-marker {
-    background: linear-gradient(135deg, #ffeb3b, #ffc107) !important;
-    color: #333 !important;
-    padding: 2px 8px !important;
-    border-radius: 3px !important;
+    color: #2E7D32 !important;
+    border-bottom: 2px solid #4CAF50 !important;
+    padding: 0 4px !important;
     font-weight: bold !important;
     display: inline-block !important;
-    min-width: 40px !important;
+    min-width: 30px !important;
     text-align: center !important;
 }
 
@@ -217,9 +215,11 @@ input.tailieu-fillblank-filled,
     0% {
         box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
     }
+
     50% {
         box-shadow: 0 0 0 8px rgba(255, 152, 0, 0);
     }
+
     100% {
         box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
     }
