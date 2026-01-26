@@ -649,6 +649,7 @@ function showQuestionsStatus(count) {
       ">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-weight: 600; font-size: 14px;">${count} câu hỏi sẵn sàng</span>
+          <span id="compareStatus" style="font-size:12px; color: rgba(255,255,255,0.95); margin-left:12px;"></span>
         </div>
         <button id="compareNowBtn" style="
           background: #4CAF50;
@@ -732,7 +733,27 @@ async function compareQuestionsWithPage() {
 
   if (result.success) {
     console.log(' Sent compare command to content script');
-    const matched = result.response && (result.response.matchedQuestions || result.response.matched) ? (result.response.matchedQuestions || result.response.matched) : 0;
+
+    // Extract matched and db counts
+    // Use unique matched questions count if provided by content script
+    const matched = result.response && (typeof result.response.matchedQuestions === 'number') ? result.response.matchedQuestions : (result.response && result.response.matched ? result.response.matched.length : 0);
+    // Use popup's loaded questions (DB) as source of truth for DB count
+    const dbCount = (questions && questions.length) ? questions.length : (result.response && typeof result.response.dbQuestionsCount === 'number' ? result.response.dbQuestionsCount : 0);
+
+    // Debug: log raw matched count as well
+    if (debugMode && typeof console !== 'undefined') {
+      console.debug('[Tailieu Debug][Popup] compareResults counts', { matchedUnique: matched, matchedRaw: result.response && result.response.matchedRaw, dbCount, pageQuestions: result.response && result.response.totalPageQuestions });
+    }
+    // Debug: log counts to help track mismatches between popup DB and content response
+    if (debugMode && typeof console !== 'undefined') {
+      console.debug('[Tailieu Debug][Popup] compareResults', { dbCountPopup: (questions && questions.length), responseDbCount: result.response && result.response.dbQuestionsCount, matched, pageQuestions: result.response && result.response.totalPageQuestions });
+    }
+
+    // Update compare status UI
+    const statusEl = document.getElementById('compareStatus');
+    if (statusEl) {
+      statusEl.textContent = `So sánh ${dbCount} câu từ DB — Tìm thấy ${matched}`;
+    }
 
     if (compareBtn) {
       compareBtn.textContent = `Làm lại (${matched})`;
@@ -762,6 +783,8 @@ async function compareQuestionsWithPage() {
     }
   } else {
     console.log('Could not compare questions:', result.reason);
+    const statusEl = document.getElementById('compareStatus');
+    if (statusEl) statusEl.textContent = `Lỗi: không thể so sánh (${result.reason || 'unknown'})`;
   }
 }
 

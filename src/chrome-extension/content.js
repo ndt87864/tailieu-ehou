@@ -746,8 +746,10 @@ if (window.tailieuExtensionLoaded) {
                     const result = await compareAndHighlightQuestions();
                     sendResponse({
                         success: true,
-                        matchedQuestions: result.matched.length,
-                        totalPageQuestions: result.pageQuestions.length
+                        matchedQuestions: (typeof result.matchedUniquePageCount === 'number') ? result.matchedUniquePageCount : (typeof result.matchedUniqueCount === 'number') ? result.matchedUniqueCount : (result.matched && result.matched.length) || 0,
+                        totalPageQuestions: result.pageQuestions.length,
+                        dbQuestionsCount: extensionQuestions.length,
+                        matchedRawCount: result.matched.length
                     });
                 } catch (error) {
 
@@ -1454,11 +1456,22 @@ if (window.tailieuExtensionLoaded) {
 
         // Reset comparison flag and button after completion with small delay for visual feedback
         isComparing = false;
+
+        // Compute unique matched question counts (one per DB question and per page question)
+        // Normalize questions before dedup to handle minor textual differences
+        const uniqueExtQuestions = new Set(matched.map(m => normalizeForExactMatch(m.extensionQuestion || '')).filter(Boolean));
+        const uniquePageQuestions = new Set(matched.map(m => normalizeForExactMatch(m.pageQuestion || '')).filter(Boolean));
+        const matchedUniqueCount = uniqueExtQuestions.size;
+        const matchedUniquePageCount = uniquePageQuestions.size;
+
+        if (debugMode) console.debug('[Tailieu Debug] matched unique counts', { matchedRaw: matched.length, matchedUniqueCount, matchedUniquePageCount });
+
         setTimeout(() => {
-            resetCompareButton(matched.length);
+            // Prefer using unique matched PAGE count for the button label
+            resetCompareButton(matchedUniquePageCount);
         }, 100); // Very short delay to show completion
 
-        return { matched, pageQuestions };
+        return { matched, pageQuestions, matchedUniqueCount, matchedUniquePageCount };
     }
 
     // Update compare button to comparing state
@@ -4086,11 +4099,12 @@ if (window.tailieuExtensionLoaded) {
 
                         try {
                             const res = await compareAndHighlightQuestions(true); // isManual
-                            const matched = (res && res.matched && res.matched.length) ? res.matched.length : (res && res.matchedQuestions) || 0;
+                            // Prefer unique PAGE matched count returned by the compare function
+                            const matchedUnique = (res && (typeof res.matchedUniquePageCount === 'number')) ? res.matchedUniquePageCount : (res && (typeof res.matchedUniqueCount === 'number')) ? res.matchedUniqueCount : (res && res.matchedQuestions) || 0;
 
-                            if (matched > 0) {
+                            if (matchedUnique > 0) {
                                 btn.dataset.state = 'repeat';
-                                btn.textContent = `Làm lại (${matched})`;
+                                btn.textContent = `Làm lại (${matchedUnique})`;
                                 btn.disabled = false;
                                 btn.style.opacity = '1';
                             } else {
