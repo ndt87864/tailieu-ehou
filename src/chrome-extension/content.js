@@ -137,7 +137,7 @@ if (window.tailieuExtensionLoaded) {
                 if (isQuestionLike(after)) {
                     // Use the question-like content after the audio file
                     processedText = after;
-                   // debugLog('[Tailieu Extension] Chose post-audio text for question extraction:', processedText);
+                    // debugLog('[Tailieu Extension] Chose post-audio text for question extraction:', processedText);
                 } else {
                     // Choose the best sentence from the part before the audio
                     // Split into sentences by newline or punctuation, prefer the last meaningful sentence
@@ -1522,6 +1522,50 @@ if (window.tailieuExtensionLoaded) {
                     }
                 }, 200);
 
+                // Kiểm tra dữ liệu lỗi thời
+                try {
+                    chrome.storage.local.get(['tailieu_db_updated'], (res) => {
+                        if (res && res.tailieu_db_updated) {
+                            // Tìm container để hiển thị (indicator hoặc popup header)
+                            const indicator = document.getElementById('tailieu-cached-indicator');
+                            const popup = document.getElementById('tailieu-questions-popup');
+
+                            // 1. Hiển thị trên indicator (banner xanh top-right)
+                            if (indicator) {
+                                let warningEl = indicator.querySelector('#tailieu-outdated-warning-indicator');
+                                if (!warningEl) {
+                                    warningEl = document.createElement('div');
+                                    warningEl.id = 'tailieu-outdated-warning-indicator';
+                                    warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                                    warningEl.textContent = ' Dữ liệu lỗi thời. Vui lòng xóa cache!';
+
+                                    const innerDiv = indicator.querySelector('div');
+                                    if (innerDiv) {
+                                        indicator.style.flexDirection = 'column';
+                                        indicator.style.alignItems = 'flex-start';
+                                        indicator.appendChild(warningEl);
+                                    }
+                                }
+                            }
+
+                            // 2. Hiển thị trên popup chính (góc bottom-right)
+                            if (popup) {
+                                const header = popup.querySelector('div'); // Header is usually the first div
+                                if (header && !header.querySelector('#tailieu-outdated-warning-popup')) {
+                                    const warningEl = document.createElement('div');
+                                    warningEl.id = 'tailieu-outdated-warning-popup';
+                                    warningEl.style.cssText = 'font-size: 11px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                                    warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng xóa cache!';
+                                    header.style.flexDirection = 'column';
+                                    header.style.alignItems = 'flex-start';
+                                    header.appendChild(warningEl);
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('Error checking tailieu_db_updated', e);
+                }
                 // Keep indicator visible; user can click "Làm lại" or manually close it
             } else {
                 compareBtn.textContent = 'Không tìm thấy';
@@ -1654,10 +1698,10 @@ if (window.tailieuExtensionLoaded) {
                 if (pageFiles.length > 0 && dbFiles.length > 0) {
                     const intersection = pageFiles.filter(f => dbFiles.includes(f));
                     if (intersection.length > 0) {
-                    if (debugMode) 
-                        //console.debug('[Tailieu Debug] performFinalValidation accepted by image filename intersection:', intersection, { nPage, nDb });
-                    return { isValid: true, reason: 'Image filenames intersect', confidence: 0.95 };
-                }
+                        if (debugMode)
+                            //console.debug('[Tailieu Debug] performFinalValidation accepted by image filename intersection:', intersection, { nPage, nDb });
+                            return { isValid: true, reason: 'Image filenames intersect', confidence: 0.95 };
+                    }
                 }
             } catch (e) { /* ignore fallback errors */ }
 
@@ -2136,7 +2180,7 @@ if (window.tailieuExtensionLoaded) {
         // Append warning to question element
         questionElement.appendChild(warningBadge);
 
-        //console.log('[Tailieu Extension] ⚠️ Cảnh báo: Câu hỏi có', highlightedCount, 'đáp án được highlight - cần tự xác định!');
+        //console.log('[Tailieu Extension]  Cảnh báo: Câu hỏi có', highlightedCount, 'đáp án được highlight - cần tự xác định!');
     }
 
     // Create and show an answer tooltip next to a question element
@@ -3997,13 +4041,13 @@ if (window.tailieuExtensionLoaded) {
                 }
             } catch (e) {
                 // fallback: attempt to remove class and style
-                try { el.classList.remove('tailieu-answer-highlight'); } catch (e2) {}
-                try { el.style.backgroundColor = ''; } catch (e3) {}
+                try { el.classList.remove('tailieu-answer-highlight'); } catch (e2) { }
+                try { el.style.backgroundColor = ''; } catch (e3) { }
             }
         });
 
         // Normalize document body to merge adjacent text nodes created by unwraps
-        try { document.body.normalize(); } catch (e) {}
+        try { document.body.normalize(); } catch (e) { }
 
         const afterQuestions = document.querySelectorAll('.tailieu-highlighted-question').length;
         const afterAnswers = document.querySelectorAll('.tailieu-answer-highlight').length;
@@ -4077,6 +4121,32 @@ if (window.tailieuExtensionLoaded) {
         }
 
         safeAppendToBody(indicator, () => {
+            // Kiểm tra dữ liệu lỗi thời
+            try {
+                chrome.storage.local.get(['tailieu_db_updated'], (res) => {
+                    if (res && res.tailieu_db_updated) {
+                        if (!indicator.querySelector('#tailieu-outdated-warning-indicator')) {
+                            const warningEl = document.createElement('div');
+                            warningEl.id = 'tailieu-outdated-warning-indicator';
+                            warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                            warningEl.textContent = ' Dữ liệu lỗi thời. Vui lòng xóa cache!';
+                            indicator.style.flexDirection = 'column';
+                            indicator.style.alignItems = 'flex-start';
+                            indicator.appendChild(warningEl);
+                        }
+                    } else {
+                        const warningEl = indicator.querySelector('#tailieu-outdated-warning-indicator');
+                        if (warningEl) {
+                            warningEl.remove();
+                            indicator.style.flexDirection = '';
+                            indicator.style.alignItems = '';
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('Error checking tailieu_db_updated in indicator', e);
+            }
+
             // Add event listeners after indicator is added to DOM
             const compareNowBtn = document.getElementById('tailieu-compare-now');
             if (compareNowBtn) {
@@ -4773,6 +4843,32 @@ if (window.tailieuExtensionLoaded) {
             const title = header.querySelector('div');
             if (title) {
                 title.textContent = `Danh sách câu hỏi (${questions.length})`;
+            }
+
+            // Kiểm tra dữ liệu lỗi thời
+            try {
+                chrome.storage.local.get(['tailieu_db_updated'], (res) => {
+                    if (res && res.tailieu_db_updated) {
+                        if (!header.querySelector('#tailieu-outdated-warning-popup')) {
+                            const warningEl = document.createElement('div');
+                            warningEl.id = 'tailieu-outdated-warning-popup';
+                            warningEl.style.cssText = 'font-size: 11px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                            warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng xóa cache!';
+                            header.style.flexDirection = 'column';
+                            header.style.alignItems = 'flex-start';
+                            header.appendChild(warningEl);
+                        }
+                    } else {
+                        const warningEl = header.querySelector('#tailieu-outdated-warning-popup');
+                        if (warningEl) {
+                            warningEl.remove();
+                            header.style.flexDirection = '';
+                            header.style.alignItems = '';
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('Error checking tailieu_db_updated in updateQuestionsPopup', e);
             }
         }
     }

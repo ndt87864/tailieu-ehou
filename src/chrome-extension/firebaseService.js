@@ -8,7 +8,7 @@ function getDb() {
   }
   // Lấy app "extendsApp" 
   const app = firebase.app('extendsApp');
-  
+
   // Log config để verify đang dùng đúng project
   if (app && app.options) {
     console.log('🔍 Firebase Config being used:', {
@@ -17,7 +17,7 @@ function getDb() {
       apiKey: app.options.apiKey ? app.options.apiKey.substring(0, 15) + '...' : 'N/A'
     });
   }
-  
+
   return firebase.firestore(app);
 }
 
@@ -30,21 +30,21 @@ function getDb() {
 async function getAllCategories() {
   try {
     const db = getDb();
-    
+
     console.log('🔍 Fetching categories from Firestore...');
     const querySnapshot = await db.collection('categories').limit(100).get();
-    
+
     console.log('📊 Raw query result:', {
       empty: querySnapshot.empty,
       size: querySnapshot.size,
       docs: querySnapshot.docs.length
     });
-    
+
     if (querySnapshot.empty) {
       console.warn(' No categories found in Firestore!');
       return [];
     }
-    
+
     const categoriesData = querySnapshot.docs.map(doc => {
       const data = doc.data();
       console.log(`   Found category: ${data.title} (stt:${data.stt}, id:${doc.id})`);
@@ -54,9 +54,9 @@ async function getAllCategories() {
         documentCount: 0
       };
     });
-    
+
     console.log(` Total categories fetched: ${categoriesData.length}`);
-    
+
     // Đếm số tài liệu cho mỗi category
     const countPromises = categoriesData.map(async (category) => {
       try {
@@ -64,7 +64,7 @@ async function getAllCategories() {
           .where('categoryId', '==', category.id)
           .limit(1000)
           .get();
-        
+
         return {
           ...category,
           documentCount: documentsQuery.size
@@ -74,22 +74,22 @@ async function getAllCategories() {
         return category;
       }
     });
-    
+
     const categoriesWithCount = await Promise.all(countPromises);
-    
+
     console.log('🔍 Categories before sort:', categoriesWithCount.length);
     categoriesWithCount.forEach(cat => {
       console.log(`  - stt:${cat.stt}, title:"${cat.title}", id:${cat.id}, docs:${cat.documentCount}`);
     });
-    
+
     // Sắp xếp theo stt (giống web)
     const sortedCategories = [...categoriesWithCount].sort((a, b) => (a.stt || 0) - (b.stt || 0));
-    
+
     console.log(' Categories after sort:', sortedCategories.length);
     sortedCategories.forEach(cat => {
       console.log(`  - stt:${cat.stt}, title:"${cat.title}"`);
     });
-    
+
     return sortedCategories;
   } catch (error) {
     console.error('Error getting categories:', error);
@@ -106,7 +106,7 @@ async function getCategoryById(categoryId) {
   try {
     const db = getDb();
     const docSnap = await db.collection('categories').doc(categoryId).get();
-    
+
     if (docSnap.exists) {
       return { id: docSnap.id, ...docSnap.data() };
     } else {
@@ -169,7 +169,7 @@ async function getDocumentsByCategory(categoryId) {
     const querySnapshot = await db.collection('documents')
       .where('categoryId', '==', categoryId)
       .get();
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -189,7 +189,7 @@ async function getDocumentById(documentId) {
   try {
     const db = getDb();
     const docSnap = await db.collection('documents').doc(documentId).get();
-    
+
     if (docSnap.exists) {
       return { id: docSnap.id, ...docSnap.data() };
     } else {
@@ -252,7 +252,7 @@ async function getQuestionsByDocument(documentId) {
     const querySnapshot = await db.collection('questions')
       .where('documentId', '==', documentId)
       .get();
-    
+
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -274,41 +274,73 @@ async function getQuestionsByDocuments(documentIds) {
     if (!documentIds || documentIds.length === 0) {
       return [];
     }
-    
+
     const db = getDb();
     const allQuestions = [];
-    
+
     // Firestore 'in' query giới hạn 10 items, chia thành chunks
     const chunkSize = 10;
     for (let i = 0; i < documentIds.length; i += chunkSize) {
       const chunk = documentIds.slice(i, i + chunkSize);
-      
+
       console.log(`🔍 Fetching questions for chunk:`, chunk);
-      
+
       const querySnapshot = await db.collection('questions')
         .where('documentId', 'in', chunk)
         .get();
-      
+
       console.log(`  📊 Found ${querySnapshot.size} questions for this chunk`);
-      
+
       const chunkQuestions = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      
+
       // Log breakdown by document
       const breakdown = {};
       chunkQuestions.forEach(q => {
         breakdown[q.documentId] = (breakdown[q.documentId] || 0) + 1;
       });
       console.log(`  📈 Breakdown:`, breakdown);
-      
+
       allQuestions.push(...chunkQuestions);
     }
-    
+
     return allQuestions;
   } catch (error) {
     console.error('Error getting questions by documents:', error);
+    throw error;
+  }
+}
+
+/**
+ * Đếm số lượng questions theo nhiều document IDs
+ * @param {Array<string>} documentIds - Mảng các document IDs
+ * @returns {Promise<number>} Tổng số lượng questions
+ */
+async function getQuestionsCountByDocuments(documentIds) {
+  try {
+    if (!documentIds || documentIds.length === 0) {
+      return 0;
+    }
+
+    const db = getDb();
+    let totalCount = 0;
+
+    // Firestore 'in' query giới hạn 10 items, chia thành chunks
+    const chunkSize = 10;
+    for (let i = 0; i < documentIds.length; i += chunkSize) {
+      const chunk = documentIds.slice(i, i + chunkSize);
+      const querySnapshot = await db.collection('questions')
+        .where('documentId', 'in', chunk)
+        .get();
+
+      totalCount += querySnapshot.size;
+    }
+
+    return totalCount;
+  } catch (error) {
+    console.error('Error counting questions by documents:', error);
     throw error;
   }
 }
@@ -323,14 +355,14 @@ async function searchQuestions(searchText, documentId = null) {
   try {
     const db = getDb();
     let questionsRef = db.collection('questions');
-    
+
     // Filter by document if provided
     if (documentId) {
       questionsRef = questionsRef.where('documentId', '==', documentId);
     }
-    
+
     const querySnapshot = await questionsRef.get();
-    
+
     // Client-side filtering (Firestore không support full-text search)
     const searchLower = searchText.toLowerCase();
     return querySnapshot.docs
@@ -416,7 +448,7 @@ async function getAllData() {
       getAllDocuments(),
       getAllQuestions()
     ]);
-    
+
     return { categories, documents, questions };
   } catch (error) {
     console.error('Error getting all data:', error);
@@ -433,11 +465,11 @@ async function getDataByCategory(categoryId) {
   try {
     const category = await getCategoryById(categoryId);
     const documents = await getDocumentsByCategory(categoryId);
-    
+
     // Lấy tất cả questions cho documents trong category này
     const documentIds = documents.map(doc => doc.id);
     const questions = await getQuestionsByDocuments(documentIds);
-    
+
     return { category, documents, questions };
   } catch (error) {
     console.error('Error getting data by category:', error);

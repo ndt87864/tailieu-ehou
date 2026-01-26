@@ -2,8 +2,8 @@
 // Không dùng ES6 imports vì extension không support
 
 // DOM Elements
-let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan, 
-    questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox;
+let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan,
+  questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox;
 let autoSelectCheckbox;
 
 // Data storage
@@ -14,76 +14,78 @@ let filteredDocuments = [];
 let questions = [];
 let highlightAnswersEnabled = true;
 let autoSelectEnabled = false;
+let debugMode = false;
 
 // Cache keys for persistent storage
 const CACHE_KEYS = {
-    CATEGORIES: 'tailieu_categories',
-    DOCUMENTS: 'tailieu_documents', 
-    QUESTIONS: 'tailieu_questions',
-    SELECTED_CATEGORY: 'tailieu_selected_category',
-    SELECTED_DOCUMENTS: 'tailieu_selected_documents',
-    LAST_SESSION: 'tailieu_last_session',
-    HIGHLIGHT_ANSWERS: 'tailieu_highlight_answers'
-    ,AUTO_SELECT: 'tailieu_auto_select'
+  CATEGORIES: 'tailieu_categories',
+  DOCUMENTS: 'tailieu_documents',
+  QUESTIONS: 'tailieu_questions',
+  SELECTED_CATEGORY: 'tailieu_selected_category',
+  SELECTED_DOCUMENTS: 'tailieu_selected_documents',
+  LAST_SESSION: 'tailieu_last_session',
+  HIGHLIGHT_ANSWERS: 'tailieu_highlight_answers'
+  , AUTO_SELECT: 'tailieu_auto_select',
+  DB_UPDATED: 'tailieu_db_updated'
 };
 
 // Helper: Check if tab can receive messages (valid URL, not chrome:// etc)
 function isTabMessageable(tab) {
-    if (!tab || !tab.id || tab.id === chrome.tabs.TAB_ID_NONE) return false;
-    if (!tab.url) return false;
-    const url = tab.url;
-    // Skip internal browser pages
-    if (url.startsWith('chrome://') || 
-        url.startsWith('chrome-extension://') ||
-        url.startsWith('edge://') ||
-        url.startsWith('about:') ||
-        url.startsWith('moz-extension://') ||
-        url.startsWith('devtools://')) {
-        return false;
-    }
-    return true;
+  if (!tab || !tab.id || tab.id === chrome.tabs.TAB_ID_NONE) return false;
+  if (!tab.url) return false;
+  const url = tab.url;
+  // Skip internal browser pages
+  if (url.startsWith('chrome://') ||
+    url.startsWith('chrome-extension://') ||
+    url.startsWith('edge://') ||
+    url.startsWith('about:') ||
+    url.startsWith('moz-extension://') ||
+    url.startsWith('devtools://')) {
+    return false;
+  }
+  return true;
 }
 
 // Helper: Safely send message to active tab's content script
 async function safeSendToContentScript(message) {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!isTabMessageable(tab)) {
-            console.log('Tab not messageable, skipping message:', message.action);
-            return { success: false, reason: 'tab_not_messageable' };
-        }
-        
-        // Use Promise with timeout to avoid hanging
-        return await new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-                resolve({ success: false, reason: 'timeout' });
-            }, 2000);
-            
-            chrome.tabs.sendMessage(tab.id, message, (response) => {
-                clearTimeout(timeoutId);
-                if (chrome.runtime.lastError) {
-                    // Silently handle - content script not ready
-                    console.log('Message not delivered:', chrome.runtime.lastError.message);
-                    resolve({ success: false, reason: chrome.runtime.lastError.message });
-                } else {
-                    resolve({ success: true, response });
-                }
-            });
-        });
-    } catch (error) {
-        console.log('safeSendToContentScript error:', error.message);
-        return { success: false, reason: error.message };
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!isTabMessageable(tab)) {
+      console.log('Tab not messageable, skipping message:', message.action);
+      return { success: false, reason: 'tab_not_messageable' };
     }
+
+    // Use Promise with timeout to avoid hanging
+    return await new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        resolve({ success: false, reason: 'timeout' });
+      }, 2000);
+
+      chrome.tabs.sendMessage(tab.id, message, (response) => {
+        clearTimeout(timeoutId);
+        if (chrome.runtime.lastError) {
+          // Silently handle - content script not ready
+          console.log('Message not delivered:', chrome.runtime.lastError.message);
+          resolve({ success: false, reason: chrome.runtime.lastError.message });
+        } else {
+          resolve({ success: true, response });
+        }
+      });
+    });
+  } catch (error) {
+    console.log('safeSendToContentScript error:', error.message);
+    return { success: false, reason: error.message };
+  }
 }
 
 // Initialize Firebase khi DOM loaded
 document.addEventListener('DOMContentLoaded', async () => {
   try {
     console.log(' Initializing extension popup with Firestore...');
-    
+
     // Wait for Firebase to be ready
     await waitForFirebase();
-    
+
     // Initialize Firebase app using config from firebase.extends.js
     if (!firebase.apps || !firebase.apps.find(app => app.name === 'extendsApp')) {
       // Use config from firebase.extends.js (loaded before this script)
@@ -94,21 +96,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       firebase.initializeApp(config, "extendsApp");
       console.log('Firebase initialized with project:', config.projectId);
     }
-    
+
     await initializeElements();
     setupEventListeners();
-    
+
     // Try to restore from cache first
     const hasCache = await restoreFromCache();
-    
+
     // Load categories (luôn load để đảm bảo có categories list)
     await loadCategories();
-    
+
     // Auto-restore selections if available (chỉ khi có cache)
     if (hasCache) {
       await autoRestoreSelections();
     }
-    
+
   } catch (error) {
     console.error('Failed to initialize extension popup:', error);
     showError('Lỗi khởi tạo extension: ' + error.message);
@@ -122,7 +124,7 @@ function waitForFirebase() {
       resolve();
       return;
     }
-    
+
     let attempts = 0;
     const maxAttempts = 50; // 5 seconds
     const checkInterval = setInterval(() => {
@@ -142,7 +144,7 @@ function initializeElements() {
   return new Promise((resolve, reject) => {
     try {
       console.log('Initializing DOM elements...');
-      
+
       categorySelect = document.getElementById('categorySelect');
       documentSearchInput = document.getElementById('documentSearchInput');
       documentList = document.getElementById('documentList');
@@ -158,24 +160,24 @@ function initializeElements() {
       highlightAnswersCheckbox = document.getElementById('highlightAnswers');
       // New auto-select toggle element
       autoSelectCheckbox = document.getElementById('autoSelectToggle');
-      
+
       // Kiểm tra elements
       const elements = {
         categorySelect, documentSearchInput, documentList, selectAllBtn,
-        clearAllBtn, selectedCountSpan, questionsSection, questionsList, 
+        clearAllBtn, selectedCountSpan, questionsSection, questionsList,
         loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox
-        ,autoSelectCheckbox
+        , autoSelectCheckbox
       };
-      
+
       const missingElements = Object.keys(elements).filter(key => !elements[key]);
-      
+
       if (missingElements.length > 0) {
         throw new Error(`Missing DOM elements: ${missingElements.join(', ')}`);
       }
-      
+
       console.log('All DOM elements found successfully');
       resolve();
-      
+
     } catch (err) {
       console.error('Error initializing elements:', err);
       reject(err);
@@ -249,9 +251,9 @@ async function getFromCache(key) {
 async function restoreFromCache() {
   try {
     console.log('Restoring data from cache...');
-    
+
     let hasUsefulCache = false;
-    
+
     const cachedCategories = await getFromCache(CACHE_KEYS.CATEGORIES);
     if (cachedCategories && cachedCategories.length > 0) {
       categories = cachedCategories;
@@ -261,11 +263,11 @@ async function restoreFromCache() {
 
     // KHÔNG restore documents - sẽ load khi user chọn category
     // documents = []; // Keep empty
-    
+
     // Restore questions và selected documents (nếu có session trước đó)
     const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
     const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
-    
+
     if (cachedQuestions && cachedQuestions.length > 0 && selectedDocumentIds && selectedDocumentIds.length > 0) {
       questions = cachedQuestions;
       selectedDocuments = selectedDocumentIds;
@@ -295,7 +297,7 @@ async function restoreFromCache() {
       // Default to OFF and persist that default so content script can read it
       autoSelectEnabled = false;
       if (autoSelectCheckbox) autoSelectCheckbox.checked = false;
-      try { await saveToCache(CACHE_KEYS.AUTO_SELECT, autoSelectEnabled); } catch (e) {}
+      try { await saveToCache(CACHE_KEYS.AUTO_SELECT, autoSelectEnabled); } catch (e) { }
       console.log('Auto-select defaulted to OFF and saved to cache');
     }
 
@@ -320,19 +322,19 @@ async function autoRestoreSelections() {
   try {
     const selectedCategoryId = await getFromCache(CACHE_KEYS.SELECTED_CATEGORY);
     const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
-    
+
     console.log('Auto-restoring selections:', { selectedCategoryId, selectedDocumentIds });
-    
+
     if (selectedCategoryId && categories.length > 0) {
       categorySelect.value = selectedCategoryId;
-      
+
       if (documents.length > 0) {
         populateDocumentList();
-        
+
         if (selectedDocumentIds && selectedDocumentIds.length > 0) {
           selectedDocuments = selectedDocumentIds;
           updateDocumentSelections();
-          
+
           if (questions.length > 0) {
             showQuestionsStatus(questions.length);
             setTimeout(() => compareQuestionsWithPage(), 1000);
@@ -347,7 +349,7 @@ async function autoRestoreSelections() {
         }
       }
     }
-    
+
   } catch (error) {
     console.error('Error auto-restoring selections:', error);
   }
@@ -361,17 +363,17 @@ async function loadCategories(forceReload = false) {
       populateCategorySelect();
       return;
     }
-    
+
     showLoading(true);
     hideError();
-    
+
     console.log('📂 Loading categories from Firestore...');
     categories = await getAllCategories();
     console.log(' Categories loaded from Firestore:', categories.length);
-    
+
     await saveToCache(CACHE_KEYS.CATEGORIES, categories);
     populateCategorySelect();
-    
+
   } catch (err) {
     console.error('Failed to load categories:', err);
     showError('Không thể tải danh sách danh mục từ Firestore: ' + err.message);
@@ -384,21 +386,21 @@ async function loadDocuments(categoryId) {
   try {
     showLoading(true);
     hideError();
-    
+
     console.log(`📄 Loading documents from Firestore for category: ${categoryId}...`);
-    
+
     // Luôn load fresh data từ Firestore khi user chọn category
     documents = await getDocumentsByCategory(categoryId);
     console.log(' Documents loaded from Firestore:', documents.length);
-    
+
     // Reset selected documents khi đổi category
     selectedDocuments = [];
     filteredDocuments = [];
-    
+
     populateDocumentList();
     updateSelectedCount();
     updateControlsState();
-    
+
   } catch (err) {
     console.error('Failed to load documents:', err);
     showError('Không thể tải danh sách tài liệu từ Firestore: ' + err.message);
@@ -411,21 +413,21 @@ async function loadQuestions(documentIds) {
   try {
     showLoading(true);
     hideError();
-    
+
     if (!documentIds || documentIds.length === 0) {
       console.log(' No documents selected');
       showQuestionsStatus(0);
       showLoading(false);
       return;
     }
-    
+
     console.log(`❓ Loading questions from Firestore for documents: ${documentIds.join(', ')}...`);
-    
+
     questions = await getQuestionsByDocuments(documentIds);
     console.log(' Questions loaded from Firestore:', questions.length);
-    
+
     showQuestionsStatus(questions.length);
-    
+
     if (questions.length > 0) {
       await saveToCache(CACHE_KEYS.QUESTIONS, questions);
       sendQuestionsToContentScript(questions);
@@ -433,7 +435,7 @@ async function loadQuestions(documentIds) {
       console.log('No questions found for selected documents');
       showQuestionsStatus(0);
     }
-    
+
   } catch (err) {
     console.error('Failed to load questions:', err);
     showError('Không thể tải danh sách câu hỏi từ Firestore: ' + err.message);
@@ -446,7 +448,7 @@ async function loadQuestions(documentIds) {
 async function onCategoryChange() {
   const categoryId = categorySelect.value;
   console.log('Category changed:', categoryId);
-  
+
   if (categoryId) {
     await saveToCache(CACHE_KEYS.SELECTED_CATEGORY, categoryId);
     await loadDocuments(categoryId);
@@ -454,7 +456,7 @@ async function onCategoryChange() {
     documents = [];
     populateDocumentList();
   }
-  
+
   selectedDocuments = [];
   updateSelectedCount();
   updateControlsState();
@@ -463,24 +465,24 @@ async function onCategoryChange() {
 
 function onDocumentSearch() {
   const searchTerm = documentSearchInput.value.toLowerCase().trim();
-  
+
   if (!searchTerm) {
     filteredDocuments = [];
     populateDocumentList();
     return;
   }
-  
-  filteredDocuments = documents.filter(doc => 
+
+  filteredDocuments = documents.filter(doc =>
     doc.title.toLowerCase().includes(searchTerm)
   );
-  
+
   populateDocumentList();
 }
 
 function onDocumentCheckboxChange(event) {
   const documentId = event.target.value;
   const isChecked = event.target.checked;
-  
+
   if (isChecked) {
     if (!selectedDocuments.includes(documentId)) {
       selectedDocuments.push(documentId);
@@ -491,10 +493,10 @@ function onDocumentCheckboxChange(event) {
       selectedDocuments.splice(index, 1);
     }
   }
-  
+
   updateSelectedCount();
   updateControlsState();
-  
+
   saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
   onDocumentsChange();
 }
@@ -511,15 +513,15 @@ async function onDocumentsChange() {
 function selectAllDocuments() {
   const checkboxes = documentList.querySelectorAll('.document-checkbox');
   selectedDocuments = [];
-  
+
   checkboxes.forEach(checkbox => {
     checkbox.checked = true;
     selectedDocuments.push(checkbox.value);
   });
-  
+
   updateSelectedCount();
   updateControlsState();
-  
+
   saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
   onDocumentsChange();
 }
@@ -527,14 +529,14 @@ function selectAllDocuments() {
 function clearAllDocuments() {
   const checkboxes = documentList.querySelectorAll('.document-checkbox');
   selectedDocuments = [];
-  
+
   checkboxes.forEach(checkbox => {
     checkbox.checked = false;
   });
-  
+
   updateSelectedCount();
   updateControlsState();
-  
+
   saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
   questionsSection.style.display = 'none';
 }
@@ -542,7 +544,7 @@ function clearAllDocuments() {
 function onHighlightAnswersChange() {
   highlightAnswersEnabled = highlightAnswersCheckbox.checked;
   saveToCache(CACHE_KEYS.HIGHLIGHT_ANSWERS, highlightAnswersEnabled);
-  
+
   safeSendToContentScript({
     action: 'setAnswerHighlighting',
     enabled: highlightAnswersEnabled
@@ -566,7 +568,7 @@ function onAutoSelectChange() {
 // UI Functions
 function populateCategorySelect() {
   categorySelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
-  
+
   console.log(' Populating categories, total:', categories.length);
   categories.forEach(category => {
     console.log(`  - ${category.stt || '?'}. ${category.title} (${category.id})`);
@@ -580,17 +582,17 @@ function populateCategorySelect() {
 function populateDocumentList() {
   documentList.innerHTML = '';
   documentList.style.display = 'block';
-  
+
   const documentsToShow = filteredDocuments.length > 0 ? filteredDocuments : documents;
-  
+
   if (documentsToShow.length === 0) {
     documentList.innerHTML = '<div class="no-documents">Không có tài liệu nào</div>';
     documentSearchInput.disabled = true;
     return;
   }
-  
+
   documentSearchInput.disabled = false;
-  
+
   documentsToShow.forEach(doc => {
     const documentItem = document.createElement('div');
     documentItem.className = 'document-item';
@@ -598,13 +600,13 @@ function populateDocumentList() {
       <input type="checkbox" id="doc-${doc.id}" class="document-checkbox" value="${doc.id}" ${selectedDocuments.includes(doc.id) ? 'checked' : ''}>
       <label for="doc-${doc.id}" class="document-label">${doc.title}</label>
     `;
-    
+
     const checkbox = documentItem.querySelector('.document-checkbox');
     checkbox.addEventListener('change', onDocumentCheckboxChange);
-    
+
     documentList.appendChild(documentItem);
   });
-  
+
   updateControlsState();
   updateSelectedCount();
 }
@@ -625,7 +627,7 @@ function updateSelectedCount() {
 function updateControlsState() {
   const totalDocuments = documents.length;
   const selectedCount = selectedDocuments.length;
-  
+
   selectAllBtn.disabled = totalDocuments === 0 || selectedCount === totalDocuments;
   clearAllBtn.disabled = selectedCount === 0;
 }
@@ -675,11 +677,11 @@ function showQuestionsStatus(count) {
         Extension sẽ tự động tìm và highlight câu hỏi trên trang web
       </div>
     `;
-    
+
     const compareBtn = document.getElementById('compareNowBtn');
     const closeBannerBtn = document.getElementById('closeBannerBtn');
     const notificationBanner = document.getElementById('notificationBanner');
-    
+
     if (compareBtn) {
       // Disable the button until the content page is fully loaded to avoid premature clicks
       compareBtn.disabled = true;
@@ -704,20 +706,72 @@ function showQuestionsStatus(count) {
 
       compareBtn.addEventListener('click', compareQuestionsWithPage);
     }
-    
+
     if (closeBannerBtn && notificationBanner) {
       closeBannerBtn.addEventListener('click', () => notificationBanner.style.display = 'none');
       // Insert close svg into closeBannerBtn
       try {
         closeBannerBtn.appendChild(svgIcon('close', 14));
-      } catch (e) {}
+      } catch (e) { }
     }
-    
+
     document.getElementById('questionsCount').textContent = `${count} câu hỏi sẵn sàng`;
+
+    // Kiểm tra dữ liệu lỗi thời
+    setTimeout(async () => {
+      try {
+        const isDbUpdated = await getFromCache(CACHE_KEYS.DB_UPDATED);
+        let isMismatched = false;
+
+        if (selectedDocuments && selectedDocuments.length > 0) {
+          const remoteCount = await getQuestionsCountByDocuments(selectedDocuments);
+          if (remoteCount !== count) {
+            isMismatched = true;
+            // Cập nhật cờ hiệu vào storage để các context khác (content script) cũng biết
+            await saveToCache(CACHE_KEYS.DB_UPDATED, true);
+          }
+        }
+
+        if (isDbUpdated || isMismatched) {
+          const banner = document.getElementById('notificationBanner');
+          if (banner) {
+            const warningId = 'outdatedDataWarning';
+            if (!document.getElementById(warningId)) {
+              const warningDiv = document.createElement('div');
+              warningDiv.id = warningId;
+              warningDiv.style.cssText = 'color: #FFEB3B; font-size: 11px; margin-top: 8px; font-weight: 600; width: 100%; text-align: left; padding: 0 5px; line-height: 1.4;';
+              warningDiv.textContent = ' Dữ liệu câu hỏi đã lỗi thời. Vui lòng xóa cache để cập nhật dữ liệu mới nhất!';
+
+              // Chèn vào dưới info div
+              const infoDiv = banner.querySelector('div');
+              if (infoDiv) {
+                // Wrap content to allow multiline warning
+                banner.style.flexDirection = 'column';
+                banner.style.alignItems = 'flex-start';
+
+                // Content row containing info and buttons
+                const contentRow = document.createElement('div');
+                contentRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; width: 100%;';
+
+                // Move existing elements to content row
+                while (banner.firstChild) {
+                  contentRow.appendChild(banner.firstChild);
+                }
+
+                banner.appendChild(contentRow);
+                banner.appendChild(warningDiv);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error checking outdated data:', e);
+      }
+    }, 500);
   }
-  
+
   questionsSection.style.display = 'block';
-  
+
   if (count > 0) {
     saveToCache(CACHE_KEYS.QUESTIONS, questions);
     showCacheSection();
@@ -728,7 +782,7 @@ async function compareQuestionsWithPage() {
   const result = await safeSendToContentScript({
     action: 'compareQuestions'
   });
-  
+
   const compareBtn = document.getElementById('compareNowBtn');
 
   if (result.success) {
@@ -794,16 +848,16 @@ async function sendQuestionsToContentScript(questionsData) {
     action: 'setExtensionQuestions',
     questions: questionsData
   });
-  
+
   if (result.success) {
     console.log('Questions sent to content script successfully');
-    
+
     // Also send highlight and auto-select settings
     await safeSendToContentScript({
       action: 'setAnswerHighlighting',
       enabled: highlightAnswersEnabled
     });
-    
+
     await safeSendToContentScript({
       action: 'setAutoSelect',
       enabled: !!(autoSelectCheckbox ? autoSelectCheckbox.checked : autoSelectEnabled)
@@ -816,27 +870,30 @@ async function sendQuestionsToContentScript(questionsData) {
 async function clearAllCache() {
   try {
     showLoading(true);
-    
+
     await chrome.storage.local.clear();
-    
+
+    // Explicitly ensure DB_UPDATED is cleared just in case clear() has issues
+    await saveToCache(CACHE_KEYS.DB_UPDATED, false);
+
     categories = [];
     documents = [];
     selectedDocuments = [];
     filteredDocuments = [];
     questions = [];
-    
+
     resetUI();
     hideCacheSection();
-    
+
     // Notify content script to clear its cache
     await safeSendToContentScript({ action: 'clearCache' });
     await safeSendToContentScript({ action: 'updateQuestionsPopup', questions: [] });
-    
+
     // Force reload categories from Firestore
     await loadCategories(true);
-    
+
     showSuccessMessage(' Cache đã được xóa thành công!');
-    
+
   } catch (error) {
     console.error('Error clearing all cache:', error);
     showError('Lỗi khi xóa cache: ' + error.message);
@@ -884,7 +941,7 @@ function showSuccessMessage(message) {
   if (existingSuccess) {
     existingSuccess.remove();
   }
-  
+
   const successDiv = document.createElement('div');
   successDiv.className = 'success-message';
   successDiv.style.cssText = `
@@ -897,10 +954,10 @@ function showSuccessMessage(message) {
     font-size: 13px;
   `;
   successDiv.textContent = message;
-  
+
   const header = document.querySelector('.header');
   header.insertAdjacentElement('afterend', successDiv);
-  
+
   setTimeout(() => {
     if (successDiv && successDiv.parentNode) {
       successDiv.remove();
@@ -1049,7 +1106,7 @@ async function syncPendingScannerToDB(button) {
     try {
       const docObj = documents.find(d => d.id === targetDocumentId);
       if (docObj) targetDocTitle = docObj.title || targetDocTitle;
-    } catch (e) {}
+    } catch (e) { }
 
     console.log(`Syncing ${pending.length} scanned questions into documentId=${targetDocumentId} title="${targetDocTitle}"`);
 
@@ -1077,6 +1134,7 @@ async function syncPendingScannerToDB(button) {
 
     // Clear pending storage on success (or partial success)
     await chrome.storage.local.remove('tailieu_scanner_pending');
+    await saveToCache(CACHE_KEYS.DB_UPDATED, true);
     renderScannerPendingUI([]);
 
     showSuccessMessage(`Đồng bộ xong: ${addedIds.length} thành công, ${failCount} lỗi`);
@@ -1084,7 +1142,7 @@ async function syncPendingScannerToDB(button) {
     // Extra verification: log current question count for the target document
     try {
       const currentQs = await getQuestionsByDocument(targetDocumentId);
-      console.log(`Document ${targetDocumentId} now has ${currentQs.length} questions (sample 5):`, currentQs.slice(0,5));
+      console.log(`Document ${targetDocumentId} now has ${currentQs.length} questions (sample 5):`, currentQs.slice(0, 5));
     } catch (e) {
       console.warn('Could not fetch questions for verification:', e);
     }
@@ -1104,7 +1162,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     checkScannerPending();
     sendResponse({ success: true });
   }
-  
+
   // Handle direct save-now requests from content script
   if (request && request.action === 'tailieu_scanner_save_now') {
     (async () => {
@@ -1148,6 +1206,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         }
 
+        await saveToCache(CACHE_KEYS.DB_UPDATED, true);
         sendResponse({ success: true, successCount, failCount });
       } catch (e) {
         console.error('tailieu_scanner_save_now handler error', e);
