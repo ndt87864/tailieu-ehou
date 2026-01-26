@@ -802,6 +802,12 @@ if (window.tailieuExtensionLoaded) {
 
                 // Save to cache
                 saveCachedQuestions();
+                // Clear the outdated-data flag: new questions pushed, data is fresh now
+                try {
+                    if (chrome && chrome.storage && chrome.storage.local) {
+                        chrome.storage.local.set({ tailieu_db_updated: false }, function () { });
+                    }
+                } catch (e) { }
                 showCachedQuestionsIndicator();
 
                 // Update questions popup with new questions
