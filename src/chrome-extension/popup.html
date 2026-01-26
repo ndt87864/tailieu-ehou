@@ -6,13 +6,14 @@
     <style>
         body {
             width: 380px;
-            min-height: 500px;
+            height: auto;
             margin: 0;
             padding: 15px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: rgba(248, 249, 250, 0.8);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
+            overflow-x: hidden;
         }
 
         .header {
@@ -521,7 +522,7 @@
         </button>
     </div>
 
-    <div class="selection-section">
+    <div id="selectionSection" class="selection-section">
         <div class="form-group">
             <label for="categorySelect">Chọn danh mục:</label>
             <select id="categorySelect">
@@ -583,8 +584,10 @@
     <div id="error" class="error" style="display: none;"></div>
 
     <div id="questionsSection" class="questions-section">
-        <div class="questions-header">
+        <div class="questions-header" style="display: flex; justify-content: space-between; align-items: center;">
             <span id="questionsCount">Danh sách câu hỏi</span>
+            <button id="changeDocsBtn" class="btn-control" style="padding: 2px 8px; font-size: 11px;">Đổi tài
+                liệu</button>
         </div>
         <div id="questionsList"></div>
     </div>

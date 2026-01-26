@@ -4,7 +4,7 @@
 // DOM Elements
 let categorySelect, documentSearchInput, documentList, selectAllBtn, clearAllBtn, selectedCountSpan,
   questionsSection, questionsList, loading, error, clearCacheBtn, cacheSection, highlightAnswersCheckbox;
-let autoSelectCheckbox;
+let autoSelectCheckbox, selectionSection, changeDocsBtn;
 
 // Data storage
 let categories = [];
@@ -160,6 +160,8 @@ function initializeElements() {
       highlightAnswersCheckbox = document.getElementById('highlightAnswers');
       // New auto-select toggle element
       autoSelectCheckbox = document.getElementById('autoSelectToggle');
+      selectionSection = document.getElementById('selectionSection');
+      changeDocsBtn = document.getElementById('changeDocsBtn');
 
       // Kiểm tra elements
       const elements = {
@@ -226,6 +228,14 @@ function setupEventListeners() {
   clearCacheBtn.addEventListener('click', clearAllCache);
   highlightAnswersCheckbox.addEventListener('change', onHighlightAnswersChange);
   if (autoSelectCheckbox) autoSelectCheckbox.addEventListener('change', onAutoSelectChange);
+
+  if (changeDocsBtn) {
+    changeDocsBtn.addEventListener('click', () => {
+      toggleSelectionForm(true);
+      questionsSection.style.display = 'none';
+      if (documentList) documentList.innerHTML = '<div class="no-documents">Vui lòng chọn lại tài liệu</div>';
+    });
+  }
 }
 
 // Cache Management Functions
@@ -507,6 +517,7 @@ async function onDocumentsChange() {
   } else {
     questions = [];
     questionsSection.style.display = 'none';
+    toggleSelectionForm(true);
   }
 }
 
@@ -734,6 +745,18 @@ function showQuestionsStatus(count) {
   if (count > 0) {
     saveToCache(CACHE_KEYS.QUESTIONS, questions);
     showCacheSection();
+    // Ẩn form chọn khi đã có câu hỏi
+    toggleSelectionForm(false);
+  }
+}
+
+/**
+ * Hiện/Ẩn form chọn danh mục và tài liệu
+ * @param {boolean} show 
+ */
+function toggleSelectionForm(show) {
+  if (selectionSection) {
+    selectionSection.style.display = show ? 'block' : 'none';
   }
 }
 
@@ -871,6 +894,7 @@ function resetUI() {
   clearAllBtn.disabled = true;
   selectedCountSpan.textContent = '0 được chọn';
   questionsSection.style.display = 'none';
+  toggleSelectionForm(true);
   hideError();
 }
 
