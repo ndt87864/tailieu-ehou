@@ -741,11 +741,23 @@ async function compareQuestionsWithPage() {
 
       // Rewire click to clear highlights and re-run
       compareBtn.removeEventListener('click', compareQuestionsWithPage);
-      compareBtn.addEventListener('click', async () => {
-        // Clear highlights on the page first
-        await safeSendToContentScript({ action: 'clearHighlights' });
-        // Re-run comparison after small delay to allow DOM cleanup
-        setTimeout(() => compareQuestionsWithPage(), 200);
+      compareBtn.addEventListener('click', async function _repeatClickHandler(e) {
+        const originalText = compareBtn.textContent;
+        compareBtn.disabled = true;
+        compareBtn.textContent = 'Đang xử lý...';
+
+        // Ask content script to clear highlights
+        const clearRes = await safeSendToContentScript({ action: 'clearHighlights' });
+        if (!clearRes.success) {
+          console.warn('Failed to clear highlights before re-run:', clearRes.reason);
+          compareBtn.disabled = false;
+          compareBtn.textContent = originalText;
+          return;
+        }
+
+        // Wait a tick for DOM cleanup then re-run the compare
+        await new Promise(r => setTimeout(r, 150));
+        await compareQuestionsWithPage();
       });
     }
   } else {

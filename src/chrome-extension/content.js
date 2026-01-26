@@ -922,11 +922,11 @@ if (window.tailieuExtensionLoaded) {
                         try {
                             const extractor = window.tailieuImageHandler && typeof window.tailieuImageHandler.extractImageUrls === 'function' ? window.tailieuImageHandler.extractImageUrls : null;
                             const urls = extractor ? extractor(qtextElement) : [];
-                            console.debug('[Tailieu Debug] Extracted image question:', {
-                                pageText: finalQuestionText,
-                                urls: urls.slice(0,10),
-                                snippet: (qtextElement && qtextElement.innerText) ? qtextElement.innerText.trim().slice(0,200) : ''
-                            });
+                            // console.debug('[Tailieu Debug] Extracted image question:', {
+                            //     pageText: finalQuestionText,
+                            //     urls: urls.slice(0,10),
+                            //     snippet: (qtextElement && qtextElement.innerText) ? qtextElement.innerText.trim().slice(0,200) : ''
+                            // });
                         } catch (e) {
                             console.debug('[Tailieu Debug] Error while extracting image urls:', e);
                         }
@@ -1332,16 +1332,16 @@ if (window.tailieuExtensionLoaded) {
                             const pageFiles = cleanedVariants.map(v => extractFilenames(v)).flat().filter(Boolean);
                             const extFiles = extractFilenames(extQ.question);
 
-                            console.debug('[Tailieu Debug] Image compare miss:', {
-                                pageIdx: pageIndex,
-                                extIndex: extIndex,
-                                pageTextSamples: cleanedVariants.slice(0,2),
-                                extQuestion: extQ.question,
-                                pageFiles,
-                                extFiles,
-                                normPage: cleanedVariants.map(v => normalizeForExactMatch(v)).slice(0,3),
-                                normExt: normalizeForExactMatch(cleanExtQuestion)
-                            });
+                            // console.debug('[Tailieu Debug] Image compare miss:', {
+                            //     pageIdx: pageIndex,
+                            //     extIndex: extIndex,
+                            //     pageTextSamples: cleanedVariants.slice(0,2),
+                            //     extQuestion: extQ.question,
+                            //     pageFiles,
+                            //     extFiles,
+                            //     normPage: cleanedVariants.map(v => normalizeForExactMatch(v)).slice(0,3),
+                            //     normExt: normalizeForExactMatch(cleanExtQuestion)
+                            // });
                         }
                     } catch (e) { /* ignore debug errors */ }
                 }
@@ -1641,7 +1641,8 @@ if (window.tailieuExtensionLoaded) {
                 if (pageFiles.length > 0 && dbFiles.length > 0) {
                     const intersection = pageFiles.filter(f => dbFiles.includes(f));
                     if (intersection.length > 0) {
-                    if (debugMode) console.debug('[Tailieu Debug] performFinalValidation accepted by image filename intersection:', intersection, { nPage, nDb });
+                    if (debugMode) 
+                        //console.debug('[Tailieu Debug] performFinalValidation accepted by image filename intersection:', intersection, { nPage, nDb });
                     return { isValid: true, reason: 'Image filenames intersect', confidence: 0.95 };
                 }
                 }
@@ -3929,26 +3930,32 @@ if (window.tailieuExtensionLoaded) {
 
     // Clear all highlights
     function clearAllHighlights() {
-        // Remove question highlights - restore original HTML (but skip extension elements)
-        document.querySelectorAll('.tailieu-highlighted-question').forEach(element => {
-            if (isExtensionElement(element)) return; // Skip extension elements
+        const beforeQuestions = document.querySelectorAll('.tailieu-highlighted-question').length;
+        const beforeAnswers = document.querySelectorAll('.tailieu-answer-highlight').length;
 
+        // Remove question highlights - restore original HTML
+        document.querySelectorAll('.tailieu-highlighted-question').forEach(element => {
             // Remove inline styles added to the container
             element.style.borderLeft = '';
             element.style.paddingLeft = '';
             element.style.margin = '';
             element.style.position = '';
+            element.style.color = '';
+            element.style.transform = '';
 
             // Restore original HTML if available
             if (element.dataset.originalHTML) {
                 element.innerHTML = element.dataset.originalHTML;
                 delete element.dataset.originalHTML;
             } else {
-                // Fallback: remove highlighting spans
+                // Fallback: remove highlighting spans (plain unwrap)
                 const highlightedSpans = element.querySelectorAll('.tailieu-text-highlight');
                 highlightedSpans.forEach(span => {
-                    if (!isExtensionElement(span)) {
+                    // Unwrap span by replacing it with its text content
+                    try {
                         span.outerHTML = span.textContent;
+                    } catch (e) {
+                        // ignore errors
                     }
                 });
             }
@@ -3958,22 +3965,36 @@ if (window.tailieuExtensionLoaded) {
             // Remove tooltips (they should be restored with original HTML, but just in case)
             const tooltips = element.querySelectorAll('.tailieu-answer-tooltip');
             tooltips.forEach(tooltip => {
-                if (!isExtensionElement(tooltip)) {
-                    tooltip.remove();
-                }
+                tooltip.remove();
             });
         });
 
-        // Remove answer highlights throughout the page (but skip extension elements)
-        document.querySelectorAll('.tailieu-answer-highlight').forEach(span => {
-            if (isExtensionElement(span)) return; // Skip extension elements
-
-            const parent = span.parentNode;
-            if (parent && !isExtensionElement(parent)) {
-                parent.replaceChild(document.createTextNode(span.textContent), span);
-                parent.normalize(); // Merge adjacent text nodes
+        // Remove answer highlights throughout the page
+        document.querySelectorAll('.tailieu-answer-highlight').forEach(el => {
+            // If it's a simple wrapper span inserted by the extension, unwrap it
+            try {
+                if (el.tagName === 'SPAN') {
+                    const textNode = document.createTextNode(el.textContent || '');
+                    if (el.parentNode) el.parentNode.replaceChild(textNode, el);
+                } else {
+                    // Otherwise, remove highlight class and inline style
+                    el.classList.remove('tailieu-answer-highlight');
+                    el.style.backgroundColor = '';
+                    el.removeAttribute('title');
+                }
+            } catch (e) {
+                // fallback: attempt to remove class and style
+                try { el.classList.remove('tailieu-answer-highlight'); } catch (e2) {}
+                try { el.style.backgroundColor = ''; } catch (e3) {}
             }
         });
+
+        // Normalize document body to merge adjacent text nodes created by unwraps
+        try { document.body.normalize(); } catch (e) {}
+
+        const afterQuestions = document.querySelectorAll('.tailieu-highlighted-question').length;
+        const afterAnswers = document.querySelectorAll('.tailieu-answer-highlight').length;
+        if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights counts:', { beforeQuestions, beforeAnswers, afterQuestions, afterAnswers });
     }
 
     // Show cached questions indicator
@@ -4093,8 +4114,12 @@ if (window.tailieuExtensionLoaded) {
                         // Clear previous highlights and re-run compare
                         try {
                             clearAllHighlights();
+                            if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights executed before re-run');
                         } catch (e) { /* ignore */ }
                         highlightedQA = [];
+
+                        // Allow a short delay for DOM to stabilize after removing highlights
+                        await new Promise(resolve => setTimeout(resolve, 150));
 
                         btn.disabled = true;
                         btn.dataset.state = 'processing';
@@ -4102,7 +4127,8 @@ if (window.tailieuExtensionLoaded) {
                         btn.style.opacity = '0.7';
 
                         try {
-                            await compareAndHighlightQuestions(true);
+                            const res = await compareAndHighlightQuestions(true);
+                            if (debugMode) console.debug('[Tailieu Debug] re-run compare completed', res);
                             // compare function will update the button text/state after completion
                         } catch (error) {
                             console.error('[Tailieu Extension] Error re-running comparison:', error);
