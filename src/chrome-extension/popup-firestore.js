@@ -680,9 +680,28 @@ function showQuestionsStatus(count) {
     const notificationBanner = document.getElementById('notificationBanner');
     
     if (compareBtn) {
+      // Disable the button until the content page is fully loaded to avoid premature clicks
+      compareBtn.disabled = true;
+      compareBtn.title = 'Chờ trang web tải xong để so sánh…';
+
+      let _tries = 0;
+      const _maxTries = 30; // ~15s max
+      const _checkLoaded = async () => {
+        const res = await safeSendToContentScript({ action: 'isPageLoaded' });
+        if (res.success && res.response && res.response.loaded) {
+          compareBtn.disabled = false;
+          compareBtn.title = '';
+          compareBtn.addEventListener('mouseenter', () => compareBtn.style.background = '#45A049');
+          compareBtn.addEventListener('mouseleave', () => compareBtn.style.background = '#4CAF50');
+        } else {
+          _tries++;
+          if (_tries < _maxTries) setTimeout(_checkLoaded, 500);
+          else compareBtn.title = 'Trang chưa sẵn sàng để so sánh';
+        }
+      };
+      _checkLoaded();
+
       compareBtn.addEventListener('click', compareQuestionsWithPage);
-      compareBtn.addEventListener('mouseenter', () => compareBtn.style.background = '#45A049');
-      compareBtn.addEventListener('mouseleave', () => compareBtn.style.background = '#4CAF50');
     }
     
     if (closeBannerBtn && notificationBanner) {
@@ -709,8 +728,26 @@ async function compareQuestionsWithPage() {
     action: 'compareQuestions'
   });
   
+  const compareBtn = document.getElementById('compareNowBtn');
+
   if (result.success) {
     console.log(' Sent compare command to content script');
+    const matched = result.response && (result.response.matchedQuestions || result.response.matched) ? (result.response.matchedQuestions || result.response.matched) : 0;
+
+    if (compareBtn) {
+      compareBtn.textContent = `Làm lại (${matched})`;
+      compareBtn.dataset.state = 'repeat';
+      compareBtn.disabled = false;
+
+      // Rewire click to clear highlights and re-run
+      compareBtn.removeEventListener('click', compareQuestionsWithPage);
+      compareBtn.addEventListener('click', async () => {
+        // Clear highlights on the page first
+        await safeSendToContentScript({ action: 'clearHighlights' });
+        // Re-run comparison after small delay to allow DOM cleanup
+        setTimeout(() => compareQuestionsWithPage(), 200);
+      });
+    }
   } else {
     console.log('Could not compare questions:', result.reason);
   }

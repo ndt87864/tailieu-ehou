@@ -724,6 +724,11 @@ if (window.tailieuExtensionLoaded) {
                 });
                 return true; // Keep message channel open
             }
+
+            if (request.action === 'isPageLoaded') {
+                sendResponse({ loaded: document.readyState === 'complete' });
+                return true; // Keep message channel open
+            }
         } catch (error) {
 
             sendResponse({ error: error.message });
@@ -1439,10 +1444,13 @@ if (window.tailieuExtensionLoaded) {
             compareBtn.style.animation = '';
 
             if (matchedCount > 0) {
-                compareBtn.textContent = ` Hoàn thành (${matchedCount})`;
+                // Set button to "Làm lại" so user can clear and re-run the comparison
+                compareBtn.style.animation = '';
+                compareBtn.dataset.state = 'repeat';
+                compareBtn.textContent = `Làm lại (${matchedCount})`;
                 compareBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45A049)';
                 compareBtn.style.transform = 'scale(1.05)';
-                compareBtn.disabled = true;
+                compareBtn.disabled = false;
 
                 // Small celebration effect
                 setTimeout(() => {
@@ -1451,15 +1459,7 @@ if (window.tailieuExtensionLoaded) {
                     }
                 }, 200);
 
-                // Auto-hide indicator after showing result
-                setTimeout(() => {
-                    const indicator = document.getElementById('tailieu-cached-indicator');
-                    if (indicator) {
-                        indicator.style.transform = 'translateX(100%)';
-                        indicator.style.opacity = '0';
-                        setTimeout(() => indicator.remove(), 300);
-                    }
-                }, 3000);
+                // Keep indicator visible; user can click "Làm lại" or manually close it
             } else {
                 compareBtn.textContent = 'Không tìm thấy';
                 compareBtn.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
@@ -3919,6 +3919,20 @@ if (window.tailieuExtensionLoaded) {
             existingIndicator.remove();
         }
 
+        // Only show the indicator when the page is fully loaded to avoid missing resources
+        if (document.readyState !== 'complete') {
+            // Avoid adding multiple listeners
+            if (!window._tailieu_showIndicatorOnLoad) {
+                window._tailieu_showIndicatorOnLoad = true;
+                window.addEventListener('load', () => {
+                    window._tailieu_showIndicatorOnLoad = false;
+                    // Try again after load
+                    showCachedQuestionsIndicator();
+                }, { once: true });
+            }
+            return;
+        }
+
         if (extensionQuestions.length === 0) return;
 
         const indicator = document.createElement('div');
@@ -3967,29 +3981,77 @@ if (window.tailieuExtensionLoaded) {
             // Add event listeners after indicator is added to DOM
             const compareNowBtn = document.getElementById('tailieu-compare-now');
             if (compareNowBtn) {
-                compareNowBtn.addEventListener('click', async () => {
-                    if (!compareNowBtn.disabled) {
-                        //console.log('[Tailieu Extension] 🖱️ User clicked "So sánh ngay" button');
+                // Use a unified handler and state machine so the button can act as "So sánh ngay" / "Làm lại"
+                compareNowBtn.dataset.state = 'ready';
 
-                        // Disable button and show loading state
-                        compareNowBtn.disabled = true;
-                        const originalText = compareNowBtn.textContent;
-                        compareNowBtn.textContent = 'Đang xử lý...';
-                        compareNowBtn.style.opacity = '0.7';
+                const compareHandler = async (e) => {
+                    const btn = e.currentTarget;
+                    const state = btn.dataset.state || 'ready';
+                    if (btn.disabled) return;
+
+                    const originalText = btn.textContent;
+
+                    if (state === 'ready') {
+                        // Start comparison
+                        btn.disabled = true;
+                        btn.dataset.state = 'processing';
+                        btn.textContent = 'Đang xử lý...';
+                        btn.style.opacity = '0.7';
 
                         try {
-                            await compareAndHighlightQuestions(true); // isManual = true
+                            const res = await compareAndHighlightQuestions(true); // isManual
+                            const matched = (res && res.matched && res.matched.length) ? res.matched.length : (res && res.matchedQuestions) || 0;
+
+                            if (matched > 0) {
+                                btn.dataset.state = 'repeat';
+                                btn.textContent = `Làm lại (${matched})`;
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                            } else {
+                                // No matches found - allow retry
+                                btn.dataset.state = 'ready';
+                                btn.textContent = 'So sánh ngay';
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                            }
                         } catch (error) {
                             console.error('[Tailieu Extension] Error during comparison:', error);
                             showNotification('Có lỗi xảy ra khi so sánh câu hỏi', 'error');
                             // Reset button
-                            compareNowBtn.disabled = false;
-                            compareNowBtn.textContent = originalText;
-                            compareNowBtn.style.opacity = '1';
+                            btn.dataset.state = 'ready';
+                            btn.disabled = false;
+                            btn.textContent = originalText;
+                            btn.style.opacity = '1';
                         }
-                        // Don't remove indicator immediately, let resetCompareButton handle it
+
+                    } else if (state === 'repeat') {
+                        // Clear previous highlights and re-run compare
+                        try {
+                            clearAllHighlights();
+                        } catch (e) { /* ignore */ }
+                        highlightedQA = [];
+
+                        btn.disabled = true;
+                        btn.dataset.state = 'processing';
+                        btn.textContent = 'Đang xử lý...';
+                        btn.style.opacity = '0.7';
+
+                        try {
+                            await compareAndHighlightQuestions(true);
+                            // compare function will update the button text/state after completion
+                        } catch (error) {
+                            console.error('[Tailieu Extension] Error re-running comparison:', error);
+                            btn.dataset.state = 'ready';
+                            btn.disabled = false;
+                            btn.textContent = 'So sánh ngay';
+                            btn.style.opacity = '1';
+                        }
                     }
-                });
+                };
+
+                // Ensure single listener
+                compareNowBtn.removeEventListener('click', compareHandler);
+                compareNowBtn.addEventListener('click', compareHandler);
             }
 
             const hideBtn = document.getElementById('tailieu-hide-indicator');
@@ -3999,12 +4061,8 @@ if (window.tailieuExtensionLoaded) {
                 });
             }
 
-            // Auto-hide after 8 seconds
-            setTimeout(() => {
-                if (indicator && indicator.parentNode) {
-                    indicator.remove();
-                }
-            }, 8000);
+            // Keep indicator visible until user closes it or triggers actions
+
         });
     }
 
