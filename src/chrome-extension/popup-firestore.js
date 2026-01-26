@@ -637,47 +637,6 @@ function showQuestionsStatus(count) {
     questionsList.innerHTML = '<div class="no-questions">Không có câu hỏi nào cho tài liệu này.</div>';
     document.getElementById('questionsCount').textContent = 'Không có câu hỏi';
   } else {
-    questionsList.innerHTML = `
-      <div id="notificationBanner" style="
-        background: linear-gradient(135deg, #42A5F5, #1E88E5);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 10px rgba(66, 165, 245, 0.3);
-      ">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-weight: 600; font-size: 14px;">${count} câu hỏi sẵn sàng</span>
-          <span id="compareStatus" style="font-size:12px; color: rgba(255,255,255,0.95); margin-left:12px;"></span>
-        </div>
-        <button id="compareNowBtn" style="
-          background: #4CAF50;
-          color: white;
-          border: none;
-          padding: 8px 16px;
-          border-radius: 5px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-        ">So sánh ngay</button>
-        <button id="closeBannerBtn" style="
-          background: none;
-          color: white;
-          border: none;
-          font-size: 16px;
-          cursor: pointer;
-          padding: 5px;
-          margin-left: 5px;
-        "></button>
-      </div>
-      <div style="padding: 15px; text-align: center; color: #666; font-size: 13px;">
-        Extension sẽ tự động tìm và highlight câu hỏi trên trang web
-      </div>
-    `;
-
     const compareBtn = document.getElementById('compareNowBtn');
     const closeBannerBtn = document.getElementById('closeBannerBtn');
     const notificationBanner = document.getElementById('notificationBanner');
@@ -740,7 +699,7 @@ function showQuestionsStatus(count) {
               const warningDiv = document.createElement('div');
               warningDiv.id = warningId;
               warningDiv.style.cssText = 'color: #FFEB3B; font-size: 11px; margin-top: 8px; font-weight: 600; width: 100%; text-align: left; padding: 0 5px; line-height: 1.4;';
-              warningDiv.textContent = ' Dữ liệu câu hỏi đã lỗi thời. Vui lòng xóa cache để cập nhật dữ liệu mới nhất!';
+              warningDiv.textContent = ' Dữ liệu câu hỏi đã lỗi thời. Vui lòng cập nhật dữ liệu mới nhất!';
 
               // Chèn vào dưới info div
               const infoDiv = banner.querySelector('div');

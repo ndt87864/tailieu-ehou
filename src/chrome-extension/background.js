@@ -108,6 +108,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })();
         return true;
     }
+
+    if (request.action === 'getCategories') {
+        getAllCategories()
+            .then(categories => sendResponse({ success: true, categories }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (request.action === 'getDocumentsByCategory') {
+        getDocumentsByCategory(request.categoryId)
+            .then(documents => sendResponse({ success: true, documents }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (request.action === 'getQuestionsByDocuments') {
+        getQuestionsByDocuments(request.documentIds)
+            .then(questions => sendResponse({ success: true, questions }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
 });
 
 // Batch Add Logic

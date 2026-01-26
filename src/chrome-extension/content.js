@@ -1574,7 +1574,7 @@ if (window.tailieuExtensionLoaded) {
                                     warningEl = document.createElement('div');
                                     warningEl.id = 'tailieu-outdated-warning-indicator';
                                     warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
-                                    warningEl.textContent = ' Dữ liệu lỗi thời. Vui lòng xóa cache!';
+                                    warningEl.textContent = ' Dữ liệu lỗi thời. Vui lòng cập nhật lại!';
 
                                     const innerDiv = indicator.querySelector('div');
                                     if (innerDiv) {
@@ -1592,7 +1592,7 @@ if (window.tailieuExtensionLoaded) {
                                     const warningEl = document.createElement('div');
                                     warningEl.id = 'tailieu-outdated-warning-popup';
                                     warningEl.style.cssText = 'font-size: 11px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
-                                    warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng xóa cache!';
+                                    warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng cập nhật lại!';
                                     header.style.flexDirection = 'column';
                                     header.style.alignItems = 'flex-start';
                                     header.appendChild(warningEl);
@@ -2514,17 +2514,17 @@ if (window.tailieuExtensionLoaded) {
             });
         }
 
-        // Log debug info nếu không tìm được match nào
-        if (highlightedCount === 0) {
-            //console.log('[Tailieu Extension] Không tìm thấy match - Web options:');
-            webOptions.forEach((opt, i) => {
-                console.log('  ', i, ':', opt.normalizedText.substring(0, 100));
-            });
-            //console.log('[Tailieu Extension] DB answers:');
-            normalizedAnswers.forEach((ans, i) => {
-                console.log('  ', i, ':', ans.substring(0, 100));
-            });
-        }
+        // // Log debug info nếu không tìm được match nào
+        // if (highlightedCount === 0) {
+        //     //console.log('[Tailieu Extension] Không tìm thấy match - Web options:');
+        //     webOptions.forEach((opt, i) => {
+        //         console.log('  ', i, ':', opt.normalizedText.substring(0, 100));
+        //     });
+        //     //console.log('[Tailieu Extension] DB answers:');
+        //     normalizedAnswers.forEach((ans, i) => {
+        //         console.log('  ', i, ':', ans.substring(0, 100));
+        //     });
+        // }
 
         // Return the count so caller can show warning if multiple answers highlighted
         return highlightedCount;
@@ -4092,21 +4092,19 @@ if (window.tailieuExtensionLoaded) {
     }
 
     // Show cached questions indicator
-    function showCachedQuestionsIndicator() {
+    async function showCachedQuestionsIndicator() {
         // Remove existing indicator
         const existingIndicator = document.getElementById('tailieu-cached-indicator');
         if (existingIndicator) {
             existingIndicator.remove();
         }
 
-        // Only show the indicator when the page is fully loaded to avoid missing resources
+        // Only show when the page is fully loaded
         if (document.readyState !== 'complete') {
-            // Avoid adding multiple listeners
             if (!window._tailieu_showIndicatorOnLoad) {
                 window._tailieu_showIndicatorOnLoad = true;
                 window.addEventListener('load', () => {
                     window._tailieu_showIndicatorOnLoad = false;
-                    // Try again after load
                     showCachedQuestionsIndicator();
                 }, { once: true });
             }
@@ -4115,17 +4113,72 @@ if (window.tailieuExtensionLoaded) {
 
         if (extensionQuestions.length === 0) return;
 
+        // Get selected document names for display
+        let selectedDocNames = 'Chưa chọn';
+        try {
+            const storage = await chrome.storage.local.get(['tailieu_selected_documents', 'tailieu_documents']);
+            const selectedIds = storage.tailieu_selected_documents || [];
+            const allDocs = storage.tailieu_documents || [];
+            if (selectedIds.length > 0 && allDocs.length > 0) {
+                const names = allDocs.filter(d => selectedIds.includes(d.id)).map(d => d.title);
+                if (names.length > 0) {
+                    selectedDocNames = names.join(', ');
+                    if (selectedDocNames.length > 40) selectedDocNames = selectedDocNames.substring(0, 37) + '...';
+                }
+            }
+        } catch (e) { }
+
         const indicator = document.createElement('div');
         indicator.id = 'tailieu-cached-indicator';
         indicator.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
-             <span>${extensionQuestions.length} câu hỏi sẵn sàng</span>
-            <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 3px; padding: 2px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s ease;">
-                So sánh ngay
-            </button>
-            <button id="tailieu-hide-indicator" style="background: #f44336; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer;">
-                ✕
-            </button>
+        <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-weight: bold; font-size: 13px;">${extensionQuestions.length} câu hỏi sẵn sàng</span>
+                <span id="tailieu-indicator-doc-name" style="font-size: 10px; opacity: 0.9; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
+                    📄 ${selectedDocNames}
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
+                    So sánh
+                </button>
+                <button id="tailieu-expand-indicator" title="Cài đặt" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer; display: flex; align-items: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button id="tailieu-hide-indicator" style="background: rgba(244, 67, 54, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕</button>
+            </div>
+        </div>
+
+        <div id="tailieu-indicator-expanded" style="display: none; flex-direction: column; gap: 10px; min-width: 220px; padding-top: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; margin-bottom: 5px;">
+                <span style="font-weight: bold; font-size: 14px;">Cài đặt câu hỏi</span>
+                <button id="tailieu-collapse-indicator" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">×</button>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 11px; font-weight: 500;">Danh mục:</label>
+                <select id="tailieu-panel-category" style="width: 100%; border-radius: 4px; border: none; padding: 4px; font-size: 12px; color: #333;"></select>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 11px; font-weight: 500;">Tìm tài liệu:</label>
+                <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa..." style="width: 100%; border-radius: 4px; border: none; padding: 4px 8px; font-size: 12px; color: #333; outline: none;">
+            </div>
+
+            <div id="tailieu-panel-doc-container" style="display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                <label style="font-size: 11px; font-weight: 500;">Tài liệu:</label>
+                <div id="tailieu-panel-documents" style="display: flex; flex-direction: column; gap: 3px;"></div>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 5px;">
+                <button id="tailieu-panel-clear-cache" style="flex: 1; background: #FF5722; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                    Xóa Cache
+                </button>
+                <button id="tailieu-panel-save" style="flex: 1; background: #16f18bff; color: black; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
+                    Cập nhật
+                </button>
+            </div>
+            <div id="tailieu-panel-status" style="font-size: 10px; color: #FFEE58; text-align: center; height: 12px;"></div>
         </div>
     `;
 
@@ -4139,9 +4192,11 @@ if (window.tailieuExtensionLoaded) {
         border-radius: 8px;
         z-index: 10000;
         font-size: 13px;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         animation: slideInRight 0.3s ease-out;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 300px;
     `;
 
         // Add CSS animation
@@ -4149,132 +4204,190 @@ if (window.tailieuExtensionLoaded) {
             const styles = document.createElement('style');
             styles.id = 'tailieu-indicator-styles';
             styles.textContent = `
-            @keyframes slideInRight {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
+            @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            #tailieu-panel-doc-container::-webkit-scrollbar { width: 4px; }
+            #tailieu-panel-doc-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
+            #tailieu-panel-doc-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
         `;
             document.head.appendChild(styles);
         }
 
         safeAppendToBody(indicator, () => {
-            // Kiểm tra dữ liệu lỗi thời
+            // Check for outdated data
             try {
                 chrome.storage.local.get(['tailieu_db_updated'], (res) => {
                     if (res && res.tailieu_db_updated) {
-                        if (!indicator.querySelector('#tailieu-outdated-warning-indicator')) {
-                            const warningEl = document.createElement('div');
-                            warningEl.id = 'tailieu-outdated-warning-indicator';
-                            warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
-                            warningEl.textContent = ' Dữ liệu lỗi thời. Vui lòng xóa cache!';
-                            indicator.style.flexDirection = 'column';
-                            indicator.style.alignItems = 'flex-start';
-                            indicator.appendChild(warningEl);
-                        }
-                    } else {
-                        const warningEl = indicator.querySelector('#tailieu-outdated-warning-indicator');
-                        if (warningEl) {
-                            warningEl.remove();
-                            indicator.style.flexDirection = '';
-                            indicator.style.alignItems = '';
-                        }
+                        const warningEl = document.createElement('div');
+                        warningEl.id = 'tailieu-outdated-warning-indicator';
+                        warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                        warningEl.textContent = 'Dữ liệu lỗi thời. Vui lòng cập nhật lại!';
+                        indicator.querySelector('#tailieu-indicator-collapsed > div:first-child').appendChild(warningEl);
                     }
                 });
-            } catch (e) {
-                console.error('Error checking tailieu_db_updated in indicator', e);
+            } catch (e) { }
+
+            // Local state for panel
+            let currentCategories = [];
+            let currentDocuments = [];
+            let selectedDocIds = [];
+
+            const collapsedEl = document.getElementById('tailieu-indicator-collapsed');
+            const expandedEl = document.getElementById('tailieu-indicator-expanded');
+            const catSelect = document.getElementById('tailieu-panel-category');
+            const docList = document.getElementById('tailieu-panel-documents');
+            const statusEl = document.getElementById('tailieu-panel-status');
+
+            // --- Toggle Functions ---
+            const togglePanel = async (expand) => {
+                if (expand) {
+                    collapsedEl.style.display = 'none';
+                    expandedEl.style.display = 'flex';
+                    indicator.style.padding = '15px';
+                    loadPanelData();
+                } else {
+                    expandedEl.style.display = 'none';
+                    collapsedEl.style.display = 'flex';
+                    indicator.style.padding = '12px 16px';
+                }
+            };
+
+            const loadPanelData = async () => {
+                try {
+                    statusEl.textContent = 'Đang tải...';
+                    const storage = await chrome.storage.local.get(['tailieu_selected_category', 'tailieu_selected_documents']);
+                    const savedCatId = storage.tailieu_selected_category;
+                    selectedDocIds = storage.tailieu_selected_documents || [];
+
+                    chrome.runtime.sendMessage({ action: 'getCategories' }, (res) => {
+                        if (res && res.success) {
+                            currentCategories = res.categories;
+                            catSelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
+                            currentCategories.forEach(cat => {
+                                const opt = document.createElement('option');
+                                opt.value = cat.id; opt.textContent = cat.title; opt.selected = cat.id === savedCatId;
+                                catSelect.appendChild(opt);
+                            });
+                            if (savedCatId) loadDocsPanel(savedCatId);
+                            statusEl.textContent = '';
+                        }
+                    });
+                } catch (e) { statusEl.textContent = 'Lỗi tải dữ liệu'; }
+            };
+
+            const loadDocsPanel = (catId) => {
+                if (!catId) {
+                    docList.innerHTML = '<div style="font-size:10px; opacity:0.7; text-align:center;">Vui lòng chọn danh mục</div>';
+                    return;
+                }
+                chrome.runtime.sendMessage({ action: 'getDocumentsByCategory', categoryId: catId }, (res) => {
+                    if (res && res.success) {
+                        currentDocuments = res.documents;
+                        renderDocumentsList();
+                    }
+                });
+            };
+
+            const renderDocumentsList = () => {
+                const searchTerm = document.getElementById('tailieu-panel-search')?.value?.toLowerCase() || '';
+                const filtered = currentDocuments.filter(d => d.title.toLowerCase().includes(searchTerm));
+
+                docList.innerHTML = '';
+                if (filtered.length === 0) {
+                    docList.innerHTML = '<div style="font-size:10px; opacity:0.7; text-align:center; padding: 10px 0;">Không tìm thấy tài liệu</div>';
+                    return;
+                }
+
+                filtered.forEach(doc => {
+                    const item = document.createElement('label');
+                    item.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;';
+                    item.onmouseenter = () => item.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                    item.onmouseleave = () => item.style.backgroundColor = '';
+
+                    const checked = selectedDocIds.includes(doc.id) ? 'checked' : '';
+                    item.innerHTML = `<input type="checkbox" value="${doc.id}" ${checked} class="tailieu-doc-cb" style="margin:0;"> <span style="flex:1;">${doc.title}</span>`;
+
+                    // Maintain selectedDocIds when checking/unchecking
+                    const cb = item.querySelector('input');
+                    cb.onclick = (e) => {
+                        if (cb.checked) {
+                            if (!selectedDocIds.includes(doc.id)) selectedDocIds.push(doc.id);
+                        } else {
+                            selectedDocIds = selectedDocIds.filter(id => id !== doc.id);
+                        }
+                    };
+
+                    docList.appendChild(item);
+                });
+            };
+
+            // --- Event Listeners ---
+            document.getElementById('tailieu-expand-indicator').onclick = () => togglePanel(true);
+            document.getElementById('tailieu-collapse-indicator').onclick = () => togglePanel(false);
+            catSelect.onchange = (e) => {
+                selectedDocIds = []; // Reset selections when changing category
+                loadDocsPanel(e.target.value);
+            };
+
+            const searchInput = document.getElementById('tailieu-panel-search');
+            if (searchInput) {
+                searchInput.oninput = () => renderDocumentsList();
             }
 
-            // Add event listeners after indicator is added to DOM
+            document.getElementById('tailieu-panel-save').onclick = async () => {
+                const cbs = expandedEl.querySelectorAll('.tailieu-doc-cb:checked');
+                const newSelectedIds = Array.from(cbs).map(cb => cb.value);
+                if (newSelectedIds.length === 0) {
+                    statusEl.textContent = 'Vui lòng chọn ít nhất 1 tài liệu';
+                    return;
+                }
+
+                statusEl.textContent = 'Đang cập nhật...';
+                await chrome.storage.local.set({
+                    tailieu_selected_category: catSelect.value,
+                    tailieu_selected_documents: newSelectedIds,
+                    tailieu_documents: currentDocuments // cache docs to show names later
+                });
+
+                chrome.runtime.sendMessage({ action: 'getQuestionsByDocuments', documentIds: newSelectedIds }, (res) => {
+                    if (res && res.success) {
+                        chrome.storage.local.set({ tailieu_questions: res.questions, tailieu_db_updated: false }, () => {
+                            statusEl.textContent = 'Thành công! Đang tải lại...';
+                            setTimeout(() => window.location.reload(), 1000);
+                        });
+                    }
+                });
+            };
+
+            document.getElementById('tailieu-panel-clear-cache').onclick = async () => {
+                if (confirm('Bạn có chắc chắn muốn xóa cache?')) {
+                    await chrome.storage.local.clear();
+                    statusEl.textContent = 'Đã xóa cache! Đang tải lại...';
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            };
+
+            // --- Original Comparison Logic ---
             const compareNowBtn = document.getElementById('tailieu-compare-now');
             if (compareNowBtn) {
-                // Use a unified handler and state machine so the button can act as "So sánh ngay" / "Làm lại"
-                compareNowBtn.dataset.state = 'ready';
-
-                const compareHandler = async (e) => {
-                    const btn = e.currentTarget;
-                    const state = btn.dataset.state || 'ready';
-                    if (btn.disabled) return;
-
-                    const originalText = btn.textContent;
-
+                compareNowBtn.onclick = async () => {
+                    if (compareNowBtn.disabled) return;
+                    const state = compareNowBtn.dataset.state || 'ready';
                     if (state === 'ready') {
-                        // Start comparison
-                        btn.disabled = true;
-                        btn.dataset.state = 'processing';
-                        btn.textContent = 'Đang xử lý...';
-                        btn.style.opacity = '0.7';
-
-                        try {
-                            const res = await compareAndHighlightQuestions(true); // isManual
-                            // Prefer unique PAGE matched count returned by the compare function
-                            const matchedUnique = (res && (typeof res.matchedUniquePageCount === 'number')) ? res.matchedUniquePageCount : (res && (typeof res.matchedUniqueCount === 'number')) ? res.matchedUniqueCount : (res && res.matchedQuestions) || 0;
-
-                            if (matchedUnique > 0) {
-                                btn.dataset.state = 'repeat';
-                                btn.textContent = `Làm lại (${matchedUnique})`;
-                                btn.disabled = false;
-                                btn.style.opacity = '1';
-                            } else {
-                                // No matches found - allow retry
-                                btn.dataset.state = 'ready';
-                                btn.textContent = 'So sánh ngay';
-                                btn.disabled = false;
-                                btn.style.opacity = '1';
-                            }
-                        } catch (error) {
-                            console.error('[Tailieu Extension] Error during comparison:', error);
-                            showNotification('Có lỗi xảy ra khi so sánh câu hỏi', 'error');
-                            // Reset button
-                            btn.dataset.state = 'ready';
-                            btn.disabled = false;
-                            btn.textContent = originalText;
-                            btn.style.opacity = '1';
-                        }
-
-                    } else if (state === 'repeat') {
-                        // Clear previous highlights and re-run compare
-                        try {
-                            clearAllHighlights();
-                            if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights executed before re-run');
-                        } catch (e) { /* ignore */ }
-                        highlightedQA = [];
-
-                        // Allow a short delay for DOM to stabilize after removing highlights
-                        await new Promise(resolve => setTimeout(resolve, 150));
-
-                        btn.disabled = true;
-                        btn.dataset.state = 'processing';
-                        btn.textContent = 'Đang xử lý...';
-                        btn.style.opacity = '0.7';
-
-                        try {
-                            const res = await compareAndHighlightQuestions(true);
-                            if (debugMode) console.debug('[Tailieu Debug] re-run compare completed', res);
-                            // compare function will update the button text/state after completion
-                        } catch (error) {
-                            console.error('[Tailieu Extension] Error re-running comparison:', error);
-                            btn.dataset.state = 'ready';
-                            btn.disabled = false;
-                            btn.textContent = 'So sánh ngay';
-                            btn.style.opacity = '1';
-                        }
+                        compareNowBtn.disabled = true; compareNowBtn.textContent = '...';
+                        const res = await compareAndHighlightQuestions(true);
+                        const matched = (res && res.matchedUniquePageCount) || (res && res.matchedQuestions) || 0;
+                        compareNowBtn.textContent = `Làm lại (${matched})`;
+                        compareNowBtn.dataset.state = 'repeat';
+                        compareNowBtn.disabled = false;
+                    } else {
+                        clearAllHighlights(); highlightedQA = [];
+                        await new Promise(r => setTimeout(r, 150));
+                        compareNowBtn.dataset.state = 'ready'; compareNowBtn.click();
                     }
                 };
-
-                // Ensure single listener
-                compareNowBtn.removeEventListener('click', compareHandler);
-                compareNowBtn.addEventListener('click', compareHandler);
             }
 
-            const hideBtn = document.getElementById('tailieu-hide-indicator');
-            if (hideBtn) {
-                hideBtn.addEventListener('click', () => {
-                    indicator.remove();
-                });
-            }
-
-            // Keep indicator visible until user closes it or triggers actions
-
+            document.getElementById('tailieu-hide-indicator').onclick = () => indicator.remove();
         });
     }
 
@@ -4890,7 +5003,7 @@ if (window.tailieuExtensionLoaded) {
                             const warningEl = document.createElement('div');
                             warningEl.id = 'tailieu-outdated-warning-popup';
                             warningEl.style.cssText = 'font-size: 11px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
-                            warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng xóa cache!';
+                            warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng cập nhật lại!';
                             header.style.flexDirection = 'column';
                             header.style.alignItems = 'flex-start';
                             header.appendChild(warningEl);
