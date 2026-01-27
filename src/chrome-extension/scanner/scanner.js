@@ -184,9 +184,11 @@
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
 
+                // Prefer the <p> inside .qtext when present (more precise question text)
+                const pEl = qtextElement.querySelector('p');
                 // XỬ LÝ HÌNH ẢNH TRƯỚC KHI EXTRACT TEXT
                 // Sử dụng getElementVisibleText đã được cập nhật để xử lý cả text và image URLs
-                const questionText = getElementVisibleText(qtextElement);
+                const questionText = getElementVisibleText(pEl || qtextElement);
                 if (questionText.length < 5) return;
 
                 // Tìm các đáp án (do dedupe phải bao gồm đáp án)
@@ -1121,8 +1123,12 @@
         // Prefer dedicated answer containers but fall back to container itself
         const answerContainer = container.querySelector('.answer, .answers, .options, .choices') || container;
 
-        // Select immediate child answer-like elements to avoid nested duplicates
-        const answerElements = answerContainer.querySelectorAll(':scope > .r0, :scope > .r1, :scope > label, :scope > li, :scope > [class*="answer"], :scope > [class*="option"], :scope > div');
+        // If explicit labels inside answer container exist, prefer them (common structure in target site)
+        let answerElements = answerContainer.querySelectorAll(':scope > label');
+        if (!answerElements || answerElements.length === 0) {
+            // Fallback to broader selectors if labels not present
+            answerElements = answerContainer.querySelectorAll(':scope > .r0, :scope > .r1, :scope > li, :scope > [class*="answer"], :scope > [class*="option"], :scope > div, :scope > label');
+        }
 
         answerElements.forEach(el => {
             if (!el || isExtensionElement(el)) return;

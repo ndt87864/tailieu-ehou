@@ -949,15 +949,16 @@ if (window.tailieuExtensionLoaded) {
             moodleQuestions.forEach((queContainer, index) => {
                 if (isExtensionElement(queContainer)) return;
 
-                // Find question text in .qtext
+                // Find question text in .qtext and prefer the <p> child when present
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
+                const pEl = qtextElement.querySelector('p');
 
                 // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh
                 const hasContentImageHandler = typeof window.tailieuContentImageHandler !== 'undefined';
                 const questionText = hasContentImageHandler ?
-                    window.tailieuContentImageHandler.getElementVisibleTextWithImages(qtextElement) :
-                    (qtextElement.textContent?.trim() || '');
+                    window.tailieuContentImageHandler.getElementVisibleTextWithImages(pEl || qtextElement) :
+                    ((pEl && pEl.textContent) ? pEl.textContent.trim() : (qtextElement.textContent?.trim() || ''));
                 // Clean text (remove reading passages) using helper
                 const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
@@ -982,13 +983,27 @@ if (window.tailieuExtensionLoaded) {
 
                 if (finalQuestionText.length < 5) return;
 
-                // Find answer container
+                // Find answer container and prefer label-based options inside it
                 const answerContainer = queContainer.querySelector('.answer');
+                // Collect labels inside answerContainer if present (for later matching/highlighting)
+                let pageOptions = [];
+                try {
+                    if (answerContainer) {
+                        const labels = Array.from(answerContainer.querySelectorAll('label'));
+                        if (labels.length > 0) {
+                            pageOptions = labels.map(l => {
+                                const txt = hasContentImageHandler ? window.tailieuContentImageHandler.getElementVisibleTextWithImages(l) : (l.textContent || '').trim();
+                                return normalizeTextForMatching(txt.replace(/^[a-z0-9][\.\)]\s*/i, '').trim());
+                            }).filter(Boolean);
+                        }
+                    }
+                } catch (e) { }
 
                 questions.push({
                     element: qtextElement,
                     container: queContainer,
                     answerContainer: answerContainer,
+                    pageOptions: pageOptions,
                     text: finalQuestionText,
                     originalText: questionText,
                     index: index,
