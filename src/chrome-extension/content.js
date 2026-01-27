@@ -179,6 +179,18 @@ if (window.tailieuExtensionLoaded) {
             'Chọn tên đúng cho đoạn văn'
         ];
 
+        // Feedback markers that often appear after the question text (e.g., 'Đáp án đúng là', 'Bạn chọn')
+        const feedbackMarkers = [
+            'Đáp án đúng là',
+            'Đáp án:',
+            'Câu trả lời đúng là',
+            'Bạn chọn',
+            'Bạn chọn:',
+            'Answer is',
+            'Correct answer',
+            'Đáp án chính xác là'
+        ];
+
         const textLower = processedText.toLowerCase();
         for (const marker of titleMarkers) {
             if (textLower.includes(marker.toLowerCase())) {
@@ -249,6 +261,23 @@ if (window.tailieuExtensionLoaded) {
                 }
             }
         }
+
+        // If any known feedback markers appear (e.g., 'Đáp án đúng là', 'Bạn chọn'), they usually follow the real question.
+        // Prefer the part BEFORE these markers to avoid picking feedback text as the question.
+        try {
+            if (typeof feedbackMarkers !== 'undefined' && feedbackMarkers.length > 0) {
+                for (const fbm of feedbackMarkers) {
+                    const idx = processedText.toLowerCase().indexOf(fbm.toLowerCase());
+                    if (idx > 5) { // ensure not cutting off extremely short text
+                        const before = processedText.substring(0, idx).trim();
+                        if (before.length > 5) {
+                            processedText = before;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
 
         for (const marker of markers) {
             const regex = new RegExp(marker, 'gi');
@@ -1050,6 +1079,11 @@ if (window.tailieuExtensionLoaded) {
                 // Clean text (remove reading passages) using helper
                 const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
+                // Debug: show raw concatenated question text vs cleaned final text to detect feedback being picked up
+                if (debugMode) {
+                    try { console.debug('[Tailieu Debug] qtext raw vs final:', { raw: questionText && questionText.slice(0,200), final: finalQuestionText && finalQuestionText.slice(0,200) }); } catch (e) {}
+                }
+
                 // DEBUG: If question contains image URLs, log extraction details for troubleshooting
                 try {
                     const containsImage = typeof window.tailieuContentImageHandler !== 'undefined' ?
@@ -1506,8 +1540,28 @@ if (window.tailieuExtensionLoaded) {
 
                 if (!matchedVariant) {
                     // As a fallback, try more lenient enhanced similarity for variants
+                    // Fallback similarity with special handling for negations (e.g., 'không')
+                    const negationWords = ['không', 'khong', 'not', 'no', 'never', 'chưa', 'chua', 'không phải', 'khong phai'];
                     for (const variant of cleanedVariants) {
                         const sim = calculateEnhancedSimilarity(variant, cleanExtQuestion);
+
+                        // Normalize for negation detection
+                        const nVar = normalizeForExactMatch(variant || '');
+                        const nExt = normalizeForExactMatch(cleanExtQuestion || '');
+                        const hasNegation = negationWords.some(w => (nVar && nVar.includes(w)) || (nExt && nExt.includes(w)));
+
+                        // If either side contains a negation word, require exact normalized equality to avoid flips (e.g., 'đúng' vs 'không đúng')
+                        if (hasNegation) {
+                            if (nVar && nExt && nVar === nExt) {
+                                matchedVariant = variant;
+                                matchedFinalValidation = { isValid: true, confidence: 1 };
+                                break;
+                            } else {
+                                if (debugMode) console.debug('[Tailieu Debug] Skipping fuzzy match due to negation difference', { variant: nVar, db: nExt, sim });
+                                continue; // skip fuzzy acceptance for negation mismatches
+                            }
+                        }
+
                         if (sim > 0.86) { // high threshold
                             matchedVariant = variant;
                             matchedFinalValidation = { isValid: true, confidence: sim };
@@ -2602,6 +2656,16 @@ if (window.tailieuExtensionLoaded) {
 
         //console.log('[Tailieu Extension] Extracted', webOptions.length, 'valid web options');
 
+        // Debug: show extracted web options and DB answers when in debugMode
+        if (debugMode) {
+            try {
+                const webSummary = webOptions.map(o => ({ index: o.index, normalized: o.normalizedText, original: o.originalText && o.originalText.slice(0,200) }));
+                const answersSummary = normalizedAnswers.slice(0,10);
+                console.debug('[Tailieu Debug] highlightMatchingOptions - webOptions:', webSummary);
+                console.debug('[Tailieu Debug] highlightMatchingOptions - normalizedAnswers:', answersSummary);
+            } catch (e) { /* ignore logging errors */ }
+        }
+
         // Track which web options have been highlighted to avoid duplicate processing
         const highlightedWebIndices = new Set();
 
@@ -2780,6 +2844,13 @@ if (window.tailieuExtensionLoaded) {
         //         console.log('  ', i, ':', ans.substring(0, 100));
         //     });
         // }
+
+        // Debug: If nothing was highlighted, log candidates for troubleshooting
+        if (debugMode && highlightedCount === 0) {
+            try {
+                console.debug('[Tailieu Debug] highlightMatchingOptions: NO HIGHLIGHTS. webOptions:', webOptions.map(o=>({i:o.index,n:o.normalizedText,orig:(o.originalText||'').slice(0,120)})), 'normalizedAnswers:', normalizedAnswers);
+            } catch (e) { /* ignore */ }
+        }
 
         // Return the count so caller can show warning if multiple answers highlighted
         return highlightedCount;
