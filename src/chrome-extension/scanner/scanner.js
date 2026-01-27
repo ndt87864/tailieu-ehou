@@ -181,15 +181,51 @@
             moodleQuestions.forEach((queContainer, index) => {
                 if (isExtensionElement(queContainer)) return;
 
-                const qtextElement = queContainer.querySelector('.qtext');
-                if (!qtextElement) return;
+                // Try .qtext first; if missing, fallback to .formulation (essay/fill-in content may be there)
+                let qtextElement = queContainer.querySelector('.qtext');
+                let usedFormulationFallback = false;
+                if (!qtextElement) {
+                    const formulation = queContainer.querySelector('.formulation');
+                    if (formulation) {
+                        qtextElement = formulation;
+                        usedFormulationFallback = true;
+                    } else {
+                        return;
+                    }
+                }
 
-                // If multiple <p> tags exist inside .qtext, concatenate their texts
+                // If multiple <p> tags exist inside .qtext/.formulation, concatenate their texts
                 const pEls = qtextElement.querySelectorAll('p');
                 let questionText = '';
                 if (pEls && pEls.length > 0) {
                     questionText = Array.from(pEls).map(p => {
                         try {
+                            if (usedFormulationFallback) {
+                                // Include input values inside paragraphs (fill-in style)
+                                const nodesParts = [];
+                                p.childNodes.forEach(node => {
+                                    if (node.nodeType === Node.TEXT_NODE) {
+                                        const t = (node.textContent || '').replace(/\s+/g, ' ').trim();
+                                        if (t) nodesParts.push(t);
+                                        return;
+                                    }
+                                    if (node.nodeType === Node.ELEMENT_NODE) {
+                                        const tag = node.tagName && node.tagName.toUpperCase();
+                                        if (tag === 'INPUT') {
+                                            const v = (node.value || node.getAttribute && node.getAttribute('value')) || '';
+                                            if (v && v.toString().trim()) nodesParts.push(v.toString().trim());
+                                            else nodesParts.push('___');
+                                            return;
+                                        }
+                                        const t = (typeof window.tailieuContentImageHandler !== 'undefined') ?
+                                            window.tailieuContentImageHandler.getElementVisibleTextWithImages(node) :
+                                            (node.textContent || '');
+                                        if (t && t.trim()) nodesParts.push(t.trim());
+                                    }
+                                });
+                                return nodesParts.join(' ').replace(/\s+/g, ' ').trim();
+                            }
+
                             const strongEls = p.querySelectorAll('strong, b');
                             if (strongEls && strongEls.length > 0) {
                                 const strongTexts = Array.from(strongEls).map(se => (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
@@ -2187,6 +2223,25 @@ const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof
         });
     }
 
+    // Helper: sanitize answer text before storing to DB (trim punctuation, markers, collapse spaces)
+    function sanitizeAnswerText(text) {
+        if (!text) return '';
+        try {
+            let s = text.toString().trim();
+            // Remove leading option markers like 'a.', 'A) ', '1.'
+            s = s.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/u, '');
+            // Collapse spaces
+            s = s.replace(/\s+/g, ' ').trim();
+            // Remove trailing punctuation and symbols (dots, ellipsis, dashes)
+            s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+            // Remove surrounding punctuation
+            s = s.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, '').trim();
+            return s;
+        } catch (e) {
+            return ('' + text).replace(/\s+/g, ' ').trim().replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+        }
+    }
+
     async function handleAddToDB(questions) {
         const btn = document.getElementById('scanner-add-db');
         if (!btn) return;
@@ -2205,7 +2260,9 @@ const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof
 
             const payloadQuestions = questions.map(q => ({
                 ...q,
-                answers: (q.answers || []).filter(a => a.isTicked || a.isSelected),
+                answers: (q.answers || []).filter(a => a.isTicked || a.isSelected).map(a => ({ ...a, text: sanitizeAnswerText(a.text) })),
+                // Sanitize top-level answer string if present
+                question: q.question ? q.question.toString().trim() : q.question,
                 documentId: selectedDocId
             }));
 

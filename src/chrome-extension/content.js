@@ -951,9 +951,18 @@ if (window.tailieuExtensionLoaded) {
             moodleQuestions.forEach((queContainer, index) => {
                 if (isExtensionElement(queContainer)) return;
 
-                // Find question text in .qtext and prefer the <p> child when present
-                const qtextElement = queContainer.querySelector('.qtext');
-                if (!qtextElement) return;
+                // Find question text in .qtext; if missing, fallback to .formulation (some essay/fill-in questions store content there)
+                let qtextElement = queContainer.querySelector('.qtext');
+                let usedFormulationFallback = false;
+                if (!qtextElement) {
+                    const formulation = queContainer.querySelector('.formulation');
+                    if (formulation) {
+                        qtextElement = formulation;
+                        usedFormulationFallback = true;
+                    } else {
+                        return;
+                    }
+                }
 
                 // If multiple <p> tags exist, concatenate their texts in order before comparing
                 const pEls = qtextElement.querySelectorAll('p');
@@ -964,7 +973,32 @@ if (window.tailieuExtensionLoaded) {
                     // Prefer text inside <strong> or <b> if present, append remaining text from the <p>
                     const parts = Array.from(pEls).map(p => {
                         try {
-                            // Collect all strong/b nodes inside this <p>
+                            // Special handling when we fell back to .formulation: include input values inside the paragraph (fill-in answers)
+                            if (usedFormulationFallback) {
+                                const nodesParts = [];
+                                p.childNodes.forEach(node => {
+                                    if (node.nodeType === Node.TEXT_NODE) {
+                                        const t = (node.textContent || '').replace(/\s+/g, ' ').trim();
+                                        if (t) nodesParts.push(t);
+                                        return;
+                                    }
+                                    if (node.nodeType === Node.ELEMENT_NODE) {
+                                        const tag = node.tagName && node.tagName.toUpperCase();
+                                        if (tag === 'INPUT') {
+                                            const v = (node.value || node.getAttribute && node.getAttribute('value')) || '';
+                                            if (v && v.toString().trim()) nodesParts.push(v.toString().trim());
+                                            else nodesParts.push('___');
+                                            return;
+                                        }
+                                        // For other elements prefer the image-aware extraction when available
+                                        const t = hasContentImageHandler ? window.tailieuContentImageHandler.getElementVisibleTextWithImages(node) : (node.textContent || '');
+                                        if (t && t.trim()) nodesParts.push(t.trim());
+                                    }
+                                });
+                                return nodesParts.join(' ').replace(/\s+/g, ' ').trim();
+                            }
+
+                            // Default behavior: prefer strong/b inside each <p>
                             const strongEls = p.querySelectorAll('strong, b');
                             if (strongEls && strongEls.length > 0) {
                                 const strongTexts = Array.from(strongEls).map(se => hasContentImageHandler ?
@@ -982,7 +1016,6 @@ if (window.tailieuExtensionLoaded) {
                                 let rest = fullPText;
                                 strongTexts.forEach(st => {
                                     if (st) {
-                                        // Use simple replace of first occurrence; this is safe since we want the remaining text
                                         rest = rest.replace(st, '').trim();
                                     }
                                 });
@@ -995,6 +1028,9 @@ if (window.tailieuExtensionLoaded) {
                             }
                             return (p.textContent || '').trim();
                         } catch (e) {
+                            if (usedFormulationFallback) {
+                                return (p.textContent || '').replace(/\s+/g, ' ').trim();
+                            }
                             return hasContentImageHandler ? window.tailieuContentImageHandler.getConcatenatedText(p) : (p.textContent || '').trim();
                         }
                     }).filter(Boolean);
@@ -1005,7 +1041,7 @@ if (window.tailieuExtensionLoaded) {
                         try { console.debug('[Tailieu Debug] qtext <p> parts:', parts); } catch (e) {}
                     }
                 } else {
-                    // Fallback to whole qtext
+                    // Fallback to whole qtext/formulation
                     questionText = hasContentImageHandler ?
                         window.tailieuContentImageHandler.getConcatenatedText(qtextElement) :
                         (qtextElement.textContent?.trim() || '');
@@ -1336,11 +1372,23 @@ if (window.tailieuExtensionLoaded) {
     // Normalize text for matching - Simple like Hỗ Trợ HT
     function normalizeTextForMatching(text) {
         if (!text) return '';
-        return text
-            .replace(/\n/g, ' ')
-            .replace(/[\s\t]+/g, ' ')
-            .replace(/[\s\xa0]{2,}/g, ' ')
-            .trim();
+        try {
+            let s = text.toString();
+            s = s.replace(/\n/g, ' ')
+                .replace(/[\s\t]+/g, ' ')
+                .replace(/[\s\xa0]{2,}/g, ' ')
+                .trim();
+
+            // Remove surrounding punctuation or symbol characters (including Unicode punctuation)
+            // and strip trailing punctuation like dots, ellipsis, dashes etc.
+            s = s.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, '').trim();
+            s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+
+            return s;
+        } catch (e) {
+            // Fallback simple normalization
+            return ('' + text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim().replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+        }
     }
 
     // Clean question text for better matching - Enhanced for accuracy
@@ -1584,6 +1632,82 @@ if (window.tailieuExtensionLoaded) {
         }
         // ==================== END FILL-BLANK PROCESSING ====================
 
+        // Additional fallback: highlight individual inputs inside .formulation/.que when their current
+        // value matches an answer in the extension DB. This ensures disabled inputs (like your example)
+        // still get visually highlighted even when sentence-level matching fails.
+        function highlightInputsMatchingDB() {
+            try {
+                // Collect candidate inputs inside question area
+                const inputSelectors = '.que input[type="text"], .que input:not([type]), .que textarea, .formulation input[type="text"], .formulation input:not([type]), .formulation textarea';
+                const inputs = Array.from(document.querySelectorAll(inputSelectors));
+                if (!inputs || inputs.length === 0) return;
+
+                // Precompute normalized answers map for quick lookup
+                const normalizedAnswerSet = new Map(); // map from normalizedAnswer -> array of ext questions
+                extensionQuestions.forEach(q => {
+                    const rawAns = (q.answer || '').toString();
+                    const normAns = normalizeForExactMatch(rawAns);
+                    if (!normAns) return;
+                    if (!normalizedAnswerSet.has(normAns)) normalizedAnswerSet.set(normAns, []);
+                    normalizedAnswerSet.get(normAns).push(q);
+
+                    // Also attempt to split numbered answers and index them individually (e.g., "1. THEIR")
+                    try {
+                        const parts = rawAns.split(/\s*[,;\n]\s*/).map(s => s.trim()).filter(Boolean);
+                        parts.forEach(p => {
+                            const pn = normalizeForExactMatch(p);
+                            if (pn && !normalizedAnswerSet.has(pn)) normalizedAnswerSet.set(pn, []);
+                            if (pn) normalizedAnswerSet.get(pn).push(q);
+                        });
+                    } catch (e) { /* ignore */ }
+                });
+
+                inputs.forEach(input => {
+                    try {
+                        const val = (input.value || input.getAttribute && input.getAttribute('value') || '').toString().trim();
+                        if (!val) return;
+                        const normVal = normalizeForExactMatch(val);
+                        if (!normVal) return;
+
+                        // Direct match against normalized answers
+                        if (normalizedAnswerSet.has(normVal)) {
+                            // Avoid double-highlighting
+                            const p = input.closest('p') || input.parentElement || input.closest('.formulation') || input;
+                            if (p && !p.classList.contains('tailieu-fillblank-highlighted')) {
+                                p.classList.add('tailieu-fillblank-highlighted');
+                                // Style input for visibility
+                                input.style.border = '2px solid #4CAF50';
+                                input.style.backgroundColor = '#f1f8e9';
+
+                                // Add a small badge (if not exists)
+                                if (!input.dataset.tailieuBadgeAdded) {
+                                    const badge = document.createElement('span');
+                                    badge.className = 'tailieu-answer-badge';
+                                    badge.textContent = val;
+                                    badge.style.cssText = `display:inline-block;margin-left:6px;padding:2px 6px;background:#4CAF50;color:#fff;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;vertical-align:middle;`;
+                                    badge.title = 'Nhấn để sao chép/điền đáp án';
+                                    badge.addEventListener('click', (e) => {
+                                        e.preventDefault();
+                                        try { navigator.clipboard.writeText(val); } catch (e) {}
+                                    });
+                                    input.parentNode.insertBefore(badge, input.nextSibling);
+                                    input.dataset.tailieuBadgeAdded = 'true';
+                                }
+
+                                // Record for analytics/debug
+                                highlightedQA.push({ type: 'input-match', questionSnippet: p.textContent?.substring(0, 120), value: val });
+                            }
+                        }
+                    } catch (e) { /* ignore per-input errors */ }
+                });
+
+            } catch (e) {
+                console.warn('[Tailieu Extension] highlightInputsMatchingDB error', e);
+            }
+        }
+
+        // Run the input-level highlight fallback
+        highlightInputsMatchingDB();
         // if (matched.length > 0) {
         //     // Log average confidence
         //     const avgConfidence = matched.reduce((sum, m) => sum + (m.confidence || 0), 0) / matched.length;
