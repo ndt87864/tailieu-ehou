@@ -23,9 +23,29 @@
      * @param {Element} element - DOM element cần kiểm tra
      * @returns {boolean}
      */
+    // Helper: return only images inside question text or answer regions when present
+    function getRelevantImagesWithinElement(root) {
+        if (!root) return [];
+        const questionSelectors = '.qtext, .questiontext, .question-content, .question-text';
+        const answerSelectors = '.answer, .answers, .choices, .options, .answer-container, .qanswers';
+
+        const images = [];
+        const qEls = root.querySelectorAll(questionSelectors);
+        const aEls = root.querySelectorAll(answerSelectors);
+
+        if (qEls.length > 0 || aEls.length > 0) {
+            qEls.forEach(node => node.querySelectorAll('img').forEach(img => images.push(img)));
+            aEls.forEach(node => node.querySelectorAll('img').forEach(img => images.push(img)));
+            // Deduplicate
+            return images.filter((v, i, a) => a.indexOf(v) === i);
+        }
+
+        // Fallback: return all images inside root
+        return Array.from(root.querySelectorAll('img'));
+    }
+
     function hasImages(element) {
-        if (!element) return false;
-        return element.querySelector('img') !== null;
+        return getRelevantImagesWithinElement(element).length > 0;
     }
 
     /**
@@ -39,8 +59,8 @@
         // Clone element để không ảnh hưởng đến DOM gốc
         const clone = element.cloneNode(true);
 
-        // Tìm tất cả các thẻ img trong clone
-        const images = clone.querySelectorAll('img');
+        // Only consider images inside .qtext/.questiontext or .answer sections to avoid unrelated icons
+        const images = getRelevantImagesWithinElement(clone);
 
         let firstFullUrlFound = null;
         images.forEach(img => {
@@ -142,7 +162,7 @@
     function extractImageUrls(element) {
         if (!element) return [];
 
-        const images = element.querySelectorAll('img');
+        const images = getRelevantImagesWithinElement(element);
         const urls = [];
 
         images.forEach(img => {

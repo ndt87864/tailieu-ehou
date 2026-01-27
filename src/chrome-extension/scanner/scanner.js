@@ -184,11 +184,39 @@
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
 
-                // Prefer the <p> inside .qtext when present (more precise question text)
-                const pEl = qtextElement.querySelector('p');
-                // XỬ LÝ HÌNH ẢNH TRƯỚC KHI EXTRACT TEXT
-                // Sử dụng getElementVisibleText đã được cập nhật để xử lý cả text và image URLs
-                const questionText = getElementVisibleText(pEl || qtextElement);
+                // If multiple <p> tags exist inside .qtext, concatenate their texts
+                const pEls = qtextElement.querySelectorAll('p');
+                let questionText = '';
+                if (pEls && pEls.length > 0) {
+                    questionText = Array.from(pEls).map(p => {
+                        try {
+                            const strongEls = p.querySelectorAll('strong, b');
+                            if (strongEls && strongEls.length > 0) {
+                                const strongTexts = Array.from(strongEls).map(se => (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                                window.tailieuContentImageHandler.getConcatenatedText(se) :
+                                getElementVisibleText(se)).filter(Boolean);
+                                const strongText = strongTexts.join(' ');
+                                const fullPText = getElementVisibleText(p);
+                                let rest = fullPText;
+                                strongTexts.forEach(st => {
+                                    if (st) rest = rest.replace(st, '').trim();
+                                });
+                                return [strongText, rest].filter(Boolean).join(' ');
+                            }
+                            return getElementVisibleText(p);
+                        } catch (e) {
+                            return getElementVisibleText(p);
+                        }
+                    }).filter(Boolean).join(' ');
+
+                    // Debug: show p parts when in debug mode (shared via window.debugMode)
+                    if (window.debugMode && questionText) {
+                        try { console.debug('[Tailieu Debug] qtext <p> parts (scanner):', Array.from(pEls).map(p => p.innerText)); } catch (e) {}
+                    }
+                } else {
+                    // Fallback to whole qtext
+                    questionText = getElementVisibleText(qtextElement);
+                }
                 if (questionText.length < 5) return;
 
                 // Tìm các đáp án (do dedupe phải bao gồm đáp án)
@@ -874,7 +902,7 @@
 
                 // Keep the part until the end of the marker (the instruction)
                 const afterMarker = processedText.substring(endOfMarker);
-                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const firstSentenceMatch = afterMarker.match(/^[.\s:\n\r-]*/);
                 const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
                 const instruction = processedText.substring(0, instructionEnd).trim();
 
@@ -1133,13 +1161,22 @@
         answerElements.forEach(el => {
             if (!el || isExtensionElement(el)) return;
 
-            // Sử dụng getElementVisibleText đã được cập nhật (hỗ trợ bảo toàn URL ảnh)
-            let text = getElementVisibleText(el);
+            // If this element contains a nested <label>, prefer its content for text extraction
+            let textSourceEl = el;
+            const nestedLabel = (el.tagName && el.tagName.toUpperCase() !== 'LABEL') ? el.querySelector('label') : null;
+            if (nestedLabel) {
+                textSourceEl = nestedLabel;
+            }
+
+            // Sử dụng concatenated text helper to correctly join multiple spans/strongs inside labels
+            let text = textSourceEl && typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function'
+                ? window.tailieuContentImageHandler.getConcatenatedText(textSourceEl)
+                : getElementVisibleText(textSourceEl || el);
 
             if (!text || text.length > 500) return;
 
-            // Detect label inside (e.g., A., B.)
-            const explicitLabelEl = el.querySelector('.answernumber');
+            // Detect label inside (e.g., A., B.) from the preferred source element
+            const explicitLabelEl = (textSourceEl && textSourceEl.querySelector) ? textSourceEl.querySelector('.answernumber') : null;
             let label = '';
             let answerText = text;
 
@@ -1147,10 +1184,10 @@
                 label = normalizeText(explicitLabelEl.textContent || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
                 answerText = text.replace(explicitLabelEl.textContent || '', '').trim();
             } else {
-                const labelMatch = text.match(/^([A-Da-d])[\.\):\s]+/);
+                const labelMatch = text.match(/^([A-Da-d])(?:[.\)\s:\-])+/);
                 if (labelMatch) {
                     label = labelMatch[1].toUpperCase();
-                    answerText = text.replace(/^([A-Da-d])[\.\):\s]+/, '').trim();
+                    answerText = text.replace(/^([A-Da-d])(?:[.\)\s:\-])+/g, '').trim();
                 }
             }
 
@@ -1161,9 +1198,13 @@
             if (seen.has(answerText)) return;
             seen.add(answerText);
 
-            const input = el.querySelector('input[type="radio"], input[type="checkbox"]');
-            const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
-            const isIncorrect = el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
+            // Find input flexibly: inside the chosen text source or nearby in the element
+            const input = (textSourceEl && textSourceEl.querySelector && textSourceEl.querySelector('input[type="radio"], input[type="checkbox"]'))
+                || el.querySelector('input[type="radio"], input[type="checkbox"]')
+                || (el.closest && el.closest('div') ? el.closest('div').querySelector('input[type="radio"], input[type="checkbox"]') : null);
+
+            const isCorrect = (textSourceEl && textSourceEl.classList && textSourceEl.classList.contains('correct')) || el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+            const isIncorrect = (textSourceEl && textSourceEl.classList && textSourceEl.classList.contains('incorrect')) || el.classList.contains('incorrect') || el.classList.contains('wrong') || !!el.querySelector('.incorrect') || !!el.closest('.incorrect');
 
             const isTicked = (() => {
                 try {
@@ -1257,7 +1298,8 @@
             inputs.forEach((input, idx) => {
                 if (!input) return;
                 const labelEl = input.closest('label') || container.querySelector(`label[for="${input.id}"]`);
-                const text = labelEl ? getElementVisibleText(labelEl) : normalizeText(input.nextSibling?.textContent || input.value || '');
+                const text = labelEl ? ((typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                    window.tailieuContentImageHandler.getConcatenatedText(labelEl) : getElementVisibleText(labelEl)) : normalizeText(input.nextSibling?.textContent || input.value || '');
                 if (!text || seenFallback.has(text)) return;
                 seenFallback.add(text);
                 answers.push({
@@ -1276,11 +1318,15 @@
             const fallbackEls = answerContainer.querySelectorAll('label, li, .option, .answer, .choice, .choice-text, .answertext, div');
             fallbackEls.forEach((el) => {
                 if (!el || isExtensionElement(el) || !isVisible(el)) return;
-                const text = getElementVisibleText(el);
+                    // Prefer nested <label> if present for clearer text extraction
+                const textSourceEl = el.querySelector && el.querySelector('label') ? el.querySelector('label') : el;
+                const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                    window.tailieuContentImageHandler.getConcatenatedText(textSourceEl) :
+                    getElementVisibleText(textSourceEl);
                 if (!text || text.length > 500) return;
 
                 // Extract label if present
-                const labelMatch = text.match(/^([A-Da-d])[\.\)\:\s]+/);
+                const labelMatch = text.match(/^([A-Da-d])(?:[.\)\s:\-])+/);
                 let label = '';
                 let answerText = text;
                 if (labelMatch) {
@@ -1293,10 +1339,12 @@
                 if (seen.has(answerText)) return;
                 seen.add(answerText);
 
-                // Try to find input state if exists
-                const input = el.querySelector('input[type="radio"], input[type="checkbox"]') || el.closest('label')?.querySelector('input[type="radio"], input[type="checkbox"]');
+                // Try to find input state if exists: check within element, within label, or nearby
+                const input = (textSourceEl && textSourceEl.querySelector && textSourceEl.querySelector('input[type="radio"], input[type="checkbox"]'))
+                    || el.querySelector('input[type="radio"], input[type="checkbox"]')
+                    || el.closest && el.closest('div') ? el.closest('div').querySelector('input[type="radio"], input[type="checkbox"]') : null;
                 const isSelected = !!(input?.checked || el.classList.contains('checked') || el.querySelector('input:checked'));
-                const isCorrect = el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
+                const isCorrect = (textSourceEl && textSourceEl.classList && textSourceEl.classList.contains('correct')) || el.classList.contains('correct') || !!el.querySelector('.correct') || !!el.closest('.correct');
                 const isTicked = (() => {
                     try {
                         if (isSelected) return true;
@@ -1335,16 +1383,18 @@
 
         candidates.forEach((el, idx) => {
             if (!el || el === questionElement || isExtensionElement(el)) return;
-            const text = getElementVisibleText(el);
+const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                    window.tailieuContentImageHandler.getConcatenatedText(el) :
+                    getElementVisibleText(el);
             if (!text || text.length > 500) return;
 
             // Accept patterns like 'A. text' or other visible answer lines
-            const labelMatch = text.match(/^([A-Da-d])[\.\):\s]+/);
+            const labelMatch = text.match(/^([A-Da-d])(?:[.\)\s:\-])+/);
             let label = '';
             let answerText = text;
             if (labelMatch) {
                 label = labelMatch[1].toUpperCase();
-                answerText = text.replace(/^([A-Da-d])[\.\):\s]+/, '').trim();
+                answerText = text.replace(/^([A-Da-d])(?:[.\)\s:\-])+/g, '').trim();
             }
 
             answerText = normalizeText(answerText);
@@ -1408,15 +1458,17 @@
             const fallbackEls = container.querySelectorAll('label, li, .option, .answer, .choice, [role="option"], div');
             fallbackEls.forEach((el, idx) => {
                 if (!el || el === questionElement || isExtensionElement(el)) return;
-                const text = getElementVisibleText(el);
+                const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                    window.tailieuContentImageHandler.getConcatenatedText(el) :
+                    getElementVisibleText(el);
                 if (!text || text.length > 500) return;
 
-                const labelMatch = text.match(/^([A-Da-d])[\.\)\:\s]+/);
+                const labelMatch = text.match(/^([A-Da-d])(?:[.\)\s:\-])+/);
                 let label = '';
                 let answerText = text;
                 if (labelMatch) {
                     label = labelMatch[1].toUpperCase();
-                    answerText = text.replace(labelMatch[0], '').trim();
+                    answerText = text.replace(/^([A-Da-d])(?:[.\)\s:\-])+/g, '').trim();
                 }
 
                 answerText = normalizeText(answerText);

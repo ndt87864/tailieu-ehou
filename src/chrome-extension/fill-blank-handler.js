@@ -497,7 +497,7 @@
 
                 // Keep the part until the end of the marker (the instruction)
                 const afterMarker = processedText.substring(endOfMarker);
-                const firstSentenceMatch = afterMarker.match(/^[\.\\s\:\-\n\r]*/);
+                const firstSentenceMatch = afterMarker.match(/^[.\s:\n\r-]*/);
                 const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
                 const instruction = processedText.substring(0, instructionEnd).trim();
 
@@ -639,12 +639,39 @@
 
                     if (src && src.trim() !== '') {
                         const hasCIH = typeof window.tailieuContentImageHandler !== 'undefined';
-                        const fullUrl = hasCIH ?
-                            window.tailieuContentImageHandler.getElementVisibleTextWithImages(node) : // Trích xuất URL đã lọc từ helper
-                            '';
 
-                        if (fullUrl) {
-                            text += ` ${fullUrl} `;
+                        // Avoid cloning the <img> node (cloneNode can trigger network loads).
+                        // Use attribute-based absolute URL helper instead.
+                        const fullUrl = hasCIH ?
+                            window.tailieuContentImageHandler.makeAbsoluteUrlFallback(src) :
+                            (src.startsWith('http://') || src.startsWith('https://') ? src : (function () {
+                                try { return new URL(src, window.location.origin).href; } catch (e) { return src; }
+                            })());
+
+                        // Lọc chỉ lấy ảnh nội dung
+                        const isContentImage = fullUrl && fullUrl.includes('pluginfile.php') &&
+                            (fullUrl.includes('/question/answer/') ||
+                                fullUrl.includes('/question/questiontext/') ||
+                                fullUrl.includes('/question/'));
+
+                        if (isContentImage) {
+                            let processedUrl = fullUrl;
+
+                            // LOGIC RÚT GỌN: Chỉ giữ link đầu tiên đầy đủ
+                            if (!firstFullUrlFound) {
+                                firstFullUrlFound = fullUrl;
+                            } else {
+                                try {
+                                    const parts = fullUrl.split('/');
+                                    const filename = parts[parts.length - 1];
+                                    processedUrl = `..../${filename}`;
+                                } catch (e) {
+                                    processedUrl = `..../image.png`;
+                                }
+                            }
+
+                            // Thêm URL (wrapped in quotes) vào kết quả text
+                            text += ` "${processedUrl}" `;
                         }
                     }
                     return;

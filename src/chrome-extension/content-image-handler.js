@@ -24,8 +24,24 @@
         try {
             const clone = el.cloneNode(true);
 
-            // Xử lý thay thế <img> bằng URL
-            const images = clone.querySelectorAll('img');
+            // Only process images that are inside question text or answer sections to avoid unrelated icons
+            const questionSelectors = '.qtext, .questiontext, .question-content, .question-text';
+            const answerSelectors = '.answer, .answers, .choices, .options, .answer-container, .qanswers';
+
+            // Collect images from qtext and answer if present; otherwise fall back to all imgs
+            let images = [];
+            const qEls = clone.querySelectorAll(questionSelectors);
+            const aEls = clone.querySelectorAll(answerSelectors);
+
+            if (qEls.length > 0 || aEls.length > 0) {
+                qEls.forEach(node => node.querySelectorAll('img').forEach(i => images.push(i)));
+                aEls.forEach(node => node.querySelectorAll('img').forEach(i => images.push(i)));
+                // Deduplicate
+                images = images.filter((v, i, a) => a.indexOf(v) === i);
+            } else {
+                images = Array.from(clone.querySelectorAll('img'));
+            }
+
             images.forEach(img => {
                 const src = img.getAttribute('src') ||
                     img.getAttribute('data-src') ||
@@ -136,8 +152,53 @@
         return /"https?:\/\/[^"]+"/.test(text);
     }
 
+    /**
+     * Concatenate text from an element by joining meaningful child nodes in order.
+     * - If multiple <strong>/<b> exist, their texts are joined first and followed by remaining text.
+     * - Otherwise, joins child element texts (e.g., multiple <span>) and text nodes in document order.
+     */
+    function getConcatenatedText(el) {
+        if (!el) return '';
+        try {
+            // Prefer using base image handler normalization when available
+            const normalize = (txt) => (txt || '').toString().replace(/\s+/g, ' ').trim();
+
+            // If strong/b elements exist, join them first
+            const strongEls = el.querySelectorAll('strong, b');
+            if (strongEls && strongEls.length > 0) {
+                const strongTexts = Array.from(strongEls).map(se => normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(se) : (se.textContent || ''))).filter(Boolean);
+                const full = normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(el) : (el.textContent || ''));
+                let rest = full;
+                strongTexts.forEach(st => { rest = rest.replace(st, '').trim(); });
+                return ([strongTexts.join(' '), rest].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
+            }
+
+            // Otherwise, collect child nodes in order
+            const parts = [];
+            el.childNodes.forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const t = normalize(node.textContent);
+                    if (t) parts.push(t);
+                    return;
+                }
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tag = node.tagName && node.tagName.toUpperCase();
+                    // Skip purely decorative or input elements
+                    if (tag === 'IMG' || tag === 'SVG' || tag === 'INPUT' || tag === 'BUTTON') return;
+                    const t = normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(node) : (node.textContent || ''));
+                    if (t) parts.push(t);
+                }
+            });
+
+            return parts.join(' ').replace(/\s+/g, ' ').trim();
+        } catch (e) {
+            return (el.textContent || '').replace(/\s+/g, ' ').trim();
+        }
+    }
+
     window.tailieuContentImageHandler = {
         getElementVisibleTextWithImages,
+        getConcatenatedText,
         areTextsWithImagesEqual,
         containsImageUrls,
         // Export fallback absolute URL helper for scanner compatibility

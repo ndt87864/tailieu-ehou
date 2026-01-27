@@ -45,5 +45,16 @@
       "urlFilter": "*small_logo.png*",
       "resourceTypes": ["image"]
     }
+  },
+  {
+    "id": 5,
+    "priority": 2,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "*account.ehou.edu.vn/avatar/*",
+      "resourceTypes": ["image"]
+    }
   }
 ]

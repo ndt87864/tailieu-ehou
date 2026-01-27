@@ -28,6 +28,8 @@ if (window.tailieuExtensionLoaded) {
     const COMPARE_DEBOUNCE_MS = 1000; // 1 second (reduced from 2 seconds for better UX)
     const MANUAL_COMPARE_DEBOUNCE_MS = 500; // 0.5 second for manual clicks (faster response)
     let debugMode = true; // Enable debug mode for troubleshooting
+    // Expose debug flag to other content scripts (scanner etc.)
+    window.debugMode = debugMode;
 
     // Debug logging function
     // function debugLog(...args) {
@@ -185,7 +187,7 @@ if (window.tailieuExtensionLoaded) {
 
                 // Keep the part until the end of the marker (the instruction)
                 const afterMarker = processedText.substring(endOfMarker);
-                const firstSentenceMatch = afterMarker.match(/^[\.\s\:\-\n\r]*/);
+                const firstSentenceMatch = afterMarker.match(/^[.\s:\n\r-]*/);
                 const instructionEnd = endOfMarker + (firstSentenceMatch ? firstSentenceMatch[0].length : 0);
                 const instruction = processedText.substring(0, instructionEnd).trim();
 
@@ -952,13 +954,63 @@ if (window.tailieuExtensionLoaded) {
                 // Find question text in .qtext and prefer the <p> child when present
                 const qtextElement = queContainer.querySelector('.qtext');
                 if (!qtextElement) return;
-                const pEl = qtextElement.querySelector('p');
 
-                // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh
+                // If multiple <p> tags exist, concatenate their texts in order before comparing
+                const pEls = qtextElement.querySelectorAll('p');
                 const hasContentImageHandler = typeof window.tailieuContentImageHandler !== 'undefined';
-                const questionText = hasContentImageHandler ?
-                    window.tailieuContentImageHandler.getElementVisibleTextWithImages(pEl || qtextElement) :
-                    ((pEl && pEl.textContent) ? pEl.textContent.trim() : (qtextElement.textContent?.trim() || ''));
+
+                let questionText = '';
+                if (pEls && pEls.length > 0) {
+                    // Prefer text inside <strong> or <b> if present, append remaining text from the <p>
+                    const parts = Array.from(pEls).map(p => {
+                        try {
+                            // Collect all strong/b nodes inside this <p>
+                            const strongEls = p.querySelectorAll('strong, b');
+                            if (strongEls && strongEls.length > 0) {
+                                const strongTexts = Array.from(strongEls).map(se => hasContentImageHandler ?
+                                    window.tailieuContentImageHandler.getConcatenatedText(se) :
+                                    (se.textContent || '').trim()).filter(Boolean);
+
+                                const strongText = strongTexts.join(' ');
+
+                                // Get full p text
+                                const fullPText = hasContentImageHandler ?
+                                    window.tailieuContentImageHandler.getConcatenatedText(p) :
+                                    (p.textContent || '').trim();
+
+                                // Remove all strong occurrences from fullPText to get the rest
+                                let rest = fullPText;
+                                strongTexts.forEach(st => {
+                                    if (st) {
+                                        // Use simple replace of first occurrence; this is safe since we want the remaining text
+                                        rest = rest.replace(st, '').trim();
+                                    }
+                                });
+
+                                return ([strongText, rest].filter(Boolean).join(' ')).trim();
+                            }
+
+                            if (hasContentImageHandler) {
+                                return window.tailieuContentImageHandler.getConcatenatedText(p) || '';
+                            }
+                            return (p.textContent || '').trim();
+                        } catch (e) {
+                            return hasContentImageHandler ? window.tailieuContentImageHandler.getConcatenatedText(p) : (p.textContent || '').trim();
+                        }
+                    }).filter(Boolean);
+                    questionText = parts.join(' ');
+
+                    // Debug: show p parts when in debugMode
+                    if (debugMode && questionText) {
+                        try { console.debug('[Tailieu Debug] qtext <p> parts:', parts); } catch (e) {}
+                    }
+                } else {
+                    // Fallback to whole qtext
+                    questionText = hasContentImageHandler ?
+                        window.tailieuContentImageHandler.getConcatenatedText(qtextElement) :
+                        (qtextElement.textContent?.trim() || '');
+                }
+
                 // Clean text (remove reading passages) using helper
                 const finalQuestionText = cleanQuestionContent(questionText, qtextElement) || questionText;
 
@@ -992,9 +1044,15 @@ if (window.tailieuExtensionLoaded) {
                         const labels = Array.from(answerContainer.querySelectorAll('label'));
                         if (labels.length > 0) {
                             pageOptions = labels.map(l => {
-                                const txt = hasContentImageHandler ? window.tailieuContentImageHandler.getElementVisibleTextWithImages(l) : (l.textContent || '').trim();
-                                return normalizeTextForMatching(txt.replace(/^[a-z0-9][\.\)]\s*/i, '').trim());
+                                const txt = hasContentImageHandler ? window.tailieuContentImageHandler.getConcatenatedText(l) : (l.textContent || '').trim();
+                                // Robustly strip leading option markers (e.g., "a.", "A)", "1.") with optional spaces
+                                const cleaned = txt.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/u, '').trim();
+                                return normalizeTextForMatching(cleaned);
                             }).filter(Boolean);
+
+                            if (debugMode) {
+                                try { console.debug('[Tailieu Debug] pageOptions:', pageOptions); } catch (e) {}
+                            }
                         }
                     }
                 } catch (e) { }
@@ -1262,11 +1320,11 @@ if (window.tailieuExtensionLoaded) {
                 if (label) {
                     const hasCImgH = typeof window.tailieuContentImageHandler !== 'undefined';
                     let text = hasCImgH ?
-                        window.tailieuContentImageHandler.getElementVisibleTextWithImages(label) :
+                        window.tailieuContentImageHandler.getConcatenatedText(label) :
                         label.textContent.trim();
 
-                    // Remove input related text if any (like markers 'a.', 'b.')
-                    return text.replace(/^[a-z0-9][\.\)]\s*/i, '').trim();
+                    // Remove input related text if any (like markers 'a.', 'b.'), allow optional spaces
+                    return text.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/i, '').trim();
                 }
             }
         } catch (e) {
@@ -2379,7 +2437,7 @@ if (window.tailieuExtensionLoaded) {
             // Sử dụng ContentImageHandler để lấy text bao gồm cả URL ảnh cho đáp án
             const hasCImgH = typeof window.tailieuContentImageHandler !== 'undefined';
             let optionText = hasCImgH ?
-                window.tailieuContentImageHandler.getElementVisibleTextWithImages(option) :
+                window.tailieuContentImageHandler.getConcatenatedText(option) :
                 (option.textContent?.trim() || '');
 
             let normalizedOption = normalizeTextForMatching(optionText);
