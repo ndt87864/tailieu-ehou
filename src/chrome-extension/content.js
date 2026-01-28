@@ -75,16 +75,35 @@ if (window.tailieuExtensionLoaded) {
             s = s.replace(/[''`´]/g, ' ');
             // Remove common leading answer labels like "a.", "b)", "c -" etc.
             // Strictly limited to a-d and 0-9 followed by a separator and SPACE to protect proper nouns like "With" or "Nicole's"
-            s = s.replace(/^[a-dA-D0-9]\s*[\.\)\-:\/]\s+/u, '');
+            s = s.replace(/^[a-dA-D0-9]\s*[\.)\-:\/]\s+/u, '');
             // Remove any characters that are not letters, numbers, whitespace or ESSENTIAL math symbols
             // Bảo tồn các ký tự toán học và dấu chấm (.) trong tên file ảnh sau khi đã xử lý ở trên
             s = s.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/gu, ' ');
+
+            // CHUẨN HÓA MATHML/CÔNG THỨC TOÁN
+            s = s.replace(/\b([a-z0-9])\s+([a-z0-9])\s+([a-z0-9])(?:\s+([a-z0-9]))*/gi, (match) => {
+                // Loại bỏ tất cả khoảng trắng trong pattern này
+                return match.replace(/\s+/g, '');
+            });
+
             // Collapse whitespace
             s = s.replace(/\s+/g, ' ').trim();
             return s;
         } catch (e) {
             return '';
         }
+    }
+
+    // Helper: So sánh 2 chuỗi đã normalize, bao gồm fallback loại bỏ tất cả khoảng trắng
+    // Hữu ích cho các câu hỏi có MathML (công thức toán) với khoảng trắng không nhất quán
+    function compareNormalized(s1, s2) {
+        if (!s1 || !s2) return false;
+        // Lần 1: So sánh bình thường
+        if (s1 === s2) return true;
+        // Lần 2: Loại bỏ tất cả khoảng trắng và so sánh lại
+        const s1NoSpace = s1.replace(/\s+/g, '');
+        const s2NoSpace = s2.replace(/\s+/g, '');
+        return s1NoSpace === s2NoSpace && s1NoSpace.length > 0;
     }
 
     // Helper to clean question text (strip reading passages and prefixes)
@@ -1678,7 +1697,10 @@ if (window.tailieuExtensionLoaded) {
                     // LENIENT: Strip 'Listen' prompt and compare normalized forms
                     const vStrip = stripListen(variant);
                     const eStrip = stripListen(cleanExtQuestion);
-                    if (vStrip && eStrip && normalizeForExactMatch(vStrip) === normalizeForExactMatch(eStrip)) {
+                    const normVStrip = normalizeForExactMatch(vStrip);
+                    const normEStrip = normalizeForExactMatch(eStrip);
+                    // So sánh bình thường hoặc sau khi loại bỏ tất cả khoảng trắng (MathML)
+                    if (vStrip && eStrip && (normVStrip === normEStrip || normVStrip.replace(/\s+/g, '') === normEStrip.replace(/\s+/g, ''))) {
                         debugLog('[Compare] Matched after stripping Listen prompt:', vStrip, '==', eStrip);
                         matchedVariant = variant;
                         matchedFinalValidation = { isValid: true, confidence: 0.92 };
@@ -1700,7 +1722,10 @@ if (window.tailieuExtensionLoaded) {
 
                         // If either side contains a negation word, require exact normalized equality to avoid flips (e.g., 'đúng' vs 'không đúng')
                         if (hasNegation) {
-                            if (nVar && nExt && nVar === nExt) {
+                            // So sánh bình thường hoặc sau khi loại bỏ tất cả khoảng trắng (MathML)
+                            const nVarNoSpace = nVar.replace(/\s+/g, '');
+                            const nExtNoSpace = nExt.replace(/\s+/g, '');
+                            if (nVar && nExt && (nVar === nExt || nVarNoSpace === nExtNoSpace)) {
                                 matchedVariant = variant;
                                 matchedFinalValidation = { isValid: true, confidence: 1 };
                                 break;
@@ -2075,7 +2100,21 @@ if (window.tailieuExtensionLoaded) {
         try {
             const n1 = normalizeForExactMatch(q1 || '');
             const n2 = normalizeForExactMatch(q2 || '');
-            return n1 === n2 && n1.length > 0; // only accept non-empty exact matches
+
+            // Lần 1: So sánh bình thường (đã collapse whitespace)
+            if (n1 === n2 && n1.length > 0) {
+                return true;
+            }
+
+            // Lần 2: FALLBACK - Loại bỏ TẤT CẢ khoảng trắng và so sánh lại
+            // Điều này giúp match các câu hỏi có công thức MathML như "QS2QS" vs "Q S 2 Q S"
+            const n1NoSpace = n1.replace(/\s+/g, '');
+            const n2NoSpace = n2.replace(/\s+/g, '');
+            if (n1NoSpace === n2NoSpace && n1NoSpace.length > 0) {
+                return true;
+            }
+
+            return false;
         } catch (e) {
             return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
         }

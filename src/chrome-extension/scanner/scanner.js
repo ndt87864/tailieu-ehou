@@ -1269,8 +1269,46 @@
         if (typeof window.tailieuContentImageHandler !== 'undefined') {
             return window.tailieuContentImageHandler.getElementVisibleTextWithImages(el);
         }
-        // Fallback if module not loaded
-        return (el.textContent || '').replace(/\s+/g, ' ').trim();
+        // Fallback if module not loaded - bao gồm xử lý MathML cơ bản
+        try {
+            const clone = el.cloneNode(true);
+
+            // XỬ LÝ MATHML: Thêm khoảng trắng xung quanh các phần tử MathML
+            try {
+                const mathElements = clone.querySelectorAll('math, [xmlns*="MathML"], mml\\:math');
+                mathElements.forEach(mathEl => {
+                    // Thêm khoảng trắng trước và sau MathML element
+                    if (mathEl.parentNode) {
+                        const spaceBefore = document.createTextNode(' ');
+                        const spaceAfter = document.createTextNode(' ');
+                        mathEl.parentNode.insertBefore(spaceBefore, mathEl);
+                        if (mathEl.nextSibling) {
+                            mathEl.parentNode.insertBefore(spaceAfter, mathEl.nextSibling);
+                        } else {
+                            mathEl.parentNode.appendChild(spaceAfter);
+                        }
+                    }
+
+                    // Thêm khoảng trắng vào các leaf nodes
+                    const mathChildren = mathEl.querySelectorAll('*');
+                    mathChildren.forEach(child => {
+                        if (child.childNodes.length === 0 ||
+                            (child.childNodes.length === 1 && child.childNodes[0].nodeType === Node.TEXT_NODE)) {
+                            const txt = child.textContent || '';
+                            if (txt.trim()) {
+                                child.textContent = ' ' + txt.trim() + ' ';
+                            }
+                        }
+                    });
+                });
+            } catch (mathErr) {
+                // Ignore MathML processing errors
+            }
+
+            return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+        } catch (e) {
+            return (el.textContent || '').replace(/\s+/g, ' ').trim();
+        }
     }
 
     function extractAnswersFromContainer(container) {

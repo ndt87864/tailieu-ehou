@@ -145,6 +145,44 @@
                 }
             });
 
+            // XỬ LÝ MATHML: Thêm khoảng trắng xung quanh các phần tử MathML
+            // MathML tags có thể là mml:math hoặc math (với namespace)
+            // Khi textContent được lấy, các ký tự bên trong bị nối liền không có khoảng trắng
+            try {
+                // Tìm tất cả các MathML containers
+                const mathElements = clone.querySelectorAll('math, [xmlns*="MathML"], mml\\:math, *[*|math]');
+                mathElements.forEach(mathEl => {
+                    // Thêm khoảng trắng trước và sau MathML element
+                    // bằng cách chèn text node
+                    if (mathEl.parentNode) {
+                        const spaceBefore = document.createTextNode(' ');
+                        const spaceAfter = document.createTextNode(' ');
+                        mathEl.parentNode.insertBefore(spaceBefore, mathEl);
+                        if (mathEl.nextSibling) {
+                            mathEl.parentNode.insertBefore(spaceAfter, mathEl.nextSibling);
+                        } else {
+                            mathEl.parentNode.appendChild(spaceAfter);
+                        }
+                    }
+
+                    // Tìm tất cả các phần tử con của MathML và thêm khoảng trắng
+                    // để tránh nối các ký tự như Q, S, 2 thành QS2
+                    const mathChildren = mathEl.querySelectorAll('*');
+                    mathChildren.forEach(child => {
+                        if (child.childNodes.length === 0 ||
+                            (child.childNodes.length === 1 && child.childNodes[0].nodeType === Node.TEXT_NODE)) {
+                            // Đây là leaf node - thêm khoảng trắng sau
+                            const txt = child.textContent || '';
+                            if (txt.trim()) {
+                                child.textContent = ' ' + txt.trim() + ' ';
+                            }
+                        }
+                    });
+                });
+            } catch (mathErr) {
+                // Ignore MathML processing errors
+            }
+
             // Loại bỏ các thành phần không mong muốn (giống scanner)
             const toRemove = 'input, svg, button, script, style, audio, source, iframe, noscript, .answernumber, .bullet, .icon, .audioplayer, .audio';
             clone.querySelectorAll(toRemove).forEach(n => n.remove());
