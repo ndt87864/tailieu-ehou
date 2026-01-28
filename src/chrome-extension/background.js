@@ -1,6 +1,17 @@
 // Polyfill window for libraries that rely on it
 self.window = self;
 
+// Global debug flag to toggle logs
+const debugMode = false;
+if (!debugMode) {
+    const noop = () => { };
+    console.log = noop;
+    console.warn = noop;
+    console.error = noop;
+    console.info = noop;
+    console.debug = noop;
+}
+
 // Load Firebase Compat Libraries and Helpers
 try {
     importScripts(

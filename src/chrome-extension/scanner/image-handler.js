@@ -5,6 +5,17 @@
 (function () {
     'use strict';
 
+    // Global debug toggle for the entire extension content script context
+    const debugMode = false;
+    if (!debugMode) {
+        const noop = () => { };
+        console.log = noop;
+        console.warn = noop;
+        console.error = noop;
+        console.debug = noop;
+        console.info = noop;
+    }
+
     // Tránh load nhiều lần
     if (window.tailieuImageHandlerLoaded) return;
     window.tailieuImageHandlerLoaded = true;

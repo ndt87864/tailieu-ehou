@@ -27,14 +27,25 @@ if (window.tailieuExtensionLoaded) {
     let lastCompareTime = 0;
     const COMPARE_DEBOUNCE_MS = 1000; // 1 second (reduced from 2 seconds for better UX)
     const MANUAL_COMPARE_DEBOUNCE_MS = 500; // 0.5 second for manual clicks (faster response)
-    let debugMode = true; // Enable debug mode for troubleshooting
+    let debugMode = false; // Set to true to enable logs for debugging
     // Expose debug flag to other content scripts (scanner etc.)
     window.debugMode = debugMode;
+
+    // Override console methods if NOT in debug mode to silent the extension
+    if (!debugMode) {
+        const noop = () => { };
+        console.log = noop;
+        console.warn = noop;
+        console.error = noop;
+        console.debug = noop;
+        console.info = noop;
+    }
 
     // Debug logging function
     function debugLog(...args) {
         if (debugMode) {
-            console.log('[Tailieu Extension]', ...args);
+            // Use the original console.log if we want to log during debug
+            (window._originalConsoleLog || console.log)('[Tailieu Extension]', ...args);
         }
     }
 

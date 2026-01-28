@@ -16,6 +16,16 @@ let highlightAnswersEnabled = true;
 let autoSelectEnabled = false;
 let debugMode = false;
 
+// Override console methods if NOT in debug mode to silent the extension
+if (!debugMode) {
+  const noop = () => { };
+  console.log = noop;
+  console.warn = noop;
+  console.error = noop;
+  console.debug = noop;
+  console.info = noop;
+}
+
 // Cache keys for persistent storage
 const CACHE_KEYS = {
   CATEGORIES: 'tailieu_categories',
