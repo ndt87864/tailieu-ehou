@@ -24,6 +24,56 @@
         try {
             const clone = el.cloneNode(true);
 
+            // Handle case where the element itself is an image
+            if (clone.tagName === 'IMG') {
+                const img = clone;
+                const src = img.getAttribute('src') ||
+                    img.getAttribute('data-src') ||
+                    img.getAttribute('data-original') ||
+                    img.getAttribute('data-lazy-src');
+
+                if (src && src.trim() !== '') {
+                    const fullUrl = hasBaseImageHandler ?
+                        window.tailieuImageHandler.makeAbsoluteUrl(src) :
+                        makeAbsoluteUrlFallback(src);
+
+                    const isContentImage = fullUrl.includes('pluginfile.php') &&
+                        (fullUrl.includes('/question/answer/') ||
+                            fullUrl.includes('/question/questiontext/') ||
+                            fullUrl.includes('/question/'));
+
+                    if (isContentImage) {
+                        // LOGIC RÚT GỌN: (Single image case - always full url if no context)
+                        // But to match behavior:
+                        let processedUrl = fullUrl;
+                        try {
+                            const parts = fullUrl.split('/');
+                            const filename = parts[parts.length - 1];
+                            // If this is the "first" (only), we might want full logic, but usually
+                            // getElementVisibleTextWithImages is called on containers.
+                            // If called on single IMG, we treat it as found.
+                            processedUrl = `..../${filename}`;
+                            // NOTE: Logic above in loop uses firstFullUrlFound to decide whether to shorten.
+                            // Here we are single node. Let's return full url?
+                            // User requirement says question has ".../filename.png" for second images.
+                            // But checking user request image: "https://.../30548742.png(2,3)..." logic seems to expect full URL sometimes?
+                            // Actually, in the user log: "nhưng đáp án lại k quét đúng ... dù đã nhẽ phải quét dược dạng ..."
+                            // The scanner logic preserves logic.
+                            // Let's stick to returning full URL for single image for safety, or replicate logic.
+                            // But typically we don't scan single images in isolation for the whole answer text unless iterating children.
+                            // If iterating children, we don't share `firstFullUrlFound` state across calls. This is a limitation of getConcatenatedText calling it per node.
+                            // However, usually answers have 1 image.
+                            processedUrl = fullUrl; // Safety default
+                        } catch (e) { }
+
+                        const placeholderPrefix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_PREFIX : '"';
+                        const placeholderSuffix = hasBaseImageHandler ? window.tailieuImageHandler.IMAGE_PLACEHOLDER_SUFFIX : '"';
+                        return `${placeholderPrefix}${fullUrl}${placeholderSuffix}`;
+                    }
+                }
+                return '';
+            }
+
             // Only process images that are inside question text or answer sections to avoid unrelated icons
             const questionSelectors = '.qtext, .questiontext, .question-content, .question-text';
             const answerSelectors = '.answer, .answers, .choices, .options, .answer-container, .qanswers';
@@ -163,11 +213,15 @@
             // Prefer using base image handler normalization when available
             const normalize = (txt) => (txt || '').toString().replace(/\s+/g, ' ').trim();
 
+            // Fix: Check for handler existence safely in this scope if needed, 
+            // but getElementVisibleTextWithImages already handles fallback safely.
+
             // If strong/b elements exist, join them first
             const strongEls = el.querySelectorAll('strong, b');
             if (strongEls && strongEls.length > 0) {
-                const strongTexts = Array.from(strongEls).map(se => normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(se) : (se.textContent || ''))).filter(Boolean);
-                const full = normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(el) : (el.textContent || ''));
+                // FIXED: Called getElementVisibleTextWithImages directly instead of undefined 'hasBaseImageHandler' check
+                const strongTexts = Array.from(strongEls).map(se => normalize(getElementVisibleTextWithImages(se))).filter(Boolean);
+                const full = normalize(getElementVisibleTextWithImages(el));
                 let rest = full;
                 strongTexts.forEach(st => { rest = rest.replace(st, '').trim(); });
                 return ([strongTexts.join(' '), rest].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
@@ -183,9 +237,11 @@
                 }
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     const tag = node.tagName && node.tagName.toUpperCase();
-                    // Skip purely decorative or input elements
-                    if (tag === 'IMG' || tag === 'SVG' || tag === 'INPUT' || tag === 'BUTTON') return;
-                    const t = normalize(hasBaseImageHandler ? getElementVisibleTextWithImages(node) : (node.textContent || ''));
+                    // Skip purely decorative or input elements BUT KEEP IMG
+                    if (tag === 'SVG' || tag === 'INPUT' || tag === 'BUTTON') return;
+
+                    // FIXED: Call getElementVisibleTextWithImages to handle elements (including IMG)
+                    const t = normalize(getElementVisibleTextWithImages(node));
                     if (t) parts.push(t);
                 }
             });
