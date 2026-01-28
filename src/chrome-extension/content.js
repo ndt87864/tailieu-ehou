@@ -1228,30 +1228,84 @@ if (window.tailieuExtensionLoaded) {
                     reason: 'moodle .que structure',
                     userAnswer: getSelectedAnswer(queContainer)
                 });
-                // Attach hover listeners to show DB answers tooltip
+                // Attach a persistent icon inside the question text that opens the DB answers popup on click
                 try {
-                    if (!qtextElement.dataset.tailieuHoverAttached) {
-                        qtextElement.dataset.tailieuHoverAttached = '1';
-                        qtextElement.addEventListener('mouseenter', () => {
-                            // small debounce to avoid frequent DB scans when moving mouse
-                            if (qtextElement._tailieuHoverTimer) clearTimeout(qtextElement._tailieuHoverTimer);
-                            qtextElement._tailieuHoverTimer = setTimeout(async () => {
-                                try {
-                                    const answers = findAllCorrectAnswersForQuestion(finalQuestionText);
-                                    if (answers && answers.length > 0) {
-                                        createAnswerTooltip(qtextElement, answers);
-                                    }
-                                } catch (e) {
-                                    // ignore
-                                }
-                            }, 120);
-                        });
-                        qtextElement.addEventListener('mouseleave', () => {
-                            if (qtextElement._tailieuHoverTimer) {
-                                clearTimeout(qtextElement._tailieuHoverTimer);
-                                qtextElement._tailieuHoverTimer = null;
+                    if (!qtextElement.dataset.tailieuIconAttached) {
+                        qtextElement.dataset.tailieuIconAttached = '1';
+
+                        // Create icon element and append to qtext (keeps it inside question element)
+                        const icon = document.createElement('span');
+                        icon.className = 'tailieu-answer-icon';
+                        icon.title = 'Show suggested answer(s)';
+                        icon.tabIndex = 0;
+                        icon.setAttribute('role', 'button');
+
+                        // Simple inline SVG magnifier icon for clarity
+                        icon.innerHTML = `
+                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                                <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 15a5 5 0 110-10 5 5 0 010 10z"></path>
+                            </svg>
+                        `;
+
+                        // Keep icon visually inline: append at end of qtext but still inside
+                        try { qtextElement.appendChild(icon); } catch (e) { /* ignore */ }
+
+                        // Click handler toggles the tooltip popup; use the icon as anchor
+                        icon.addEventListener('click', async (ev) => {
+                            ev.stopPropagation(); ev.preventDefault();
+                            // If tooltip already open, close it
+                            const existing = document.querySelector('.tailieu-answer-tooltip');
+                            if (existing) {
+                                hideAnswerTooltip(qtextElement);
+                                return;
                             }
-                            hideAnswerTooltip(qtextElement);
+                            try {
+                                // First try answers stored on the element (fast and reliable if highlighted earlier)
+                                let answers = null;
+                                try {
+                                    if (qtextElement && qtextElement.dataset && qtextElement.dataset.tailieuAnswers) {
+                                        answers = JSON.parse(qtextElement.dataset.tailieuAnswers);
+                                    }
+                                } catch (e) { answers = null; }
+
+                                // Ensure we have cached questions loaded; try to load if empty (only if no dataset answers)
+                                if ((!answers || answers.length === 0) && (!extensionQuestions || extensionQuestions.length === 0)) {
+                                    try {
+                                        await loadCachedQuestions();
+                                    } catch (e) { /* ignore */ }
+                                }
+
+                                if (!answers) answers = findAllCorrectAnswersForQuestion(finalQuestionText);
+
+                                // Fallback: directly read storage in case extensionQuestions isn't populated yet
+                                if ((!answers || answers.length === 0) && chrome?.storage?.local) {
+                                    try {
+                                        const res = await chrome.storage.local.get(QUESTIONS_CACHE_KEY);
+                                        const cached = res[QUESTIONS_CACHE_KEY] || [];
+                                        if (cached && cached.length > 0) {
+                                            const prev = extensionQuestions;
+                                            extensionQuestions = cached;
+                                            answers = findAllCorrectAnswersForQuestion(finalQuestionText);
+                                            extensionQuestions = prev;
+                                        }
+                                    } catch (e) { /* ignore */ }
+                                }
+
+                                if (answers && answers.length > 0) {
+                                    // Use icon as anchor so tooltip appears near it
+                                    createAnswerTooltip(icon, answers);
+                                } else {
+                                    // No suggestion found — brief user feedback
+                                    try { showNotification('Không có đề xuất đáp án cho câu này', 'warning', 2500); } catch (e) { }
+                                }
+                            } catch (e) { /* ignore */ }
+                        });
+
+                        // Keyboard accessibility: Enter / Space open popup
+                        icon.addEventListener('keydown', (ev) => {
+                            if (ev.key === 'Enter' || ev.key === ' ') {
+                                ev.preventDefault(); icon.click();
+                            }
                         });
                     }
                 } catch (e) {
@@ -2489,6 +2543,16 @@ if (window.tailieuExtensionLoaded) {
                 //console.log('[Tailieu Extension] Không có đáp án hoặc highlight bị tắt');
                 return;
             }
+
+            // Store matched answers on the question element for fast lookup when user clicks the icon
+            try {
+                if (element && allCorrectAnswers && allCorrectAnswers.length > 0) {
+                    element.dataset.tailieuAnswers = JSON.stringify(allCorrectAnswers);
+                    if (extensionQuestion && (extensionQuestion.id || extensionQuestion._id)) {
+                        element.dataset.tailieuQuestionId = extensionQuestion.id || extensionQuestion._id;
+                    }
+                }
+            } catch (e) { /* ignore dataset write errors */ }
 
             // Use the array of all answers instead of just one
             const correctAnswer = allCorrectAnswers; // This will be an array

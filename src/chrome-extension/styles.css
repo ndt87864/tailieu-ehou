@@ -11,6 +11,23 @@
     z-index: 10001 !important;
 }
 
+/* Persistent answer icon shown inside question text */
+.tailieu-answer-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: 8px !important;
+    color: #2a7ae2 !important;
+    opacity: 0.85 !important;
+    cursor: pointer !important;
+    width: 18px !important;
+    height: 18px !important;
+    vertical-align: middle !important;
+}
+.tailieu-answer-icon svg { display: block; }
+.tailieu-answer-icon:hover { color: #1a5ca2 !important; transform: scale(1.05); }
+.tailieu-answer-icon:focus { outline: 2px solid rgba(42,122,226,0.18); border-radius: 3px; }
+
 /* Animations */
 @keyframes highlightPulse {
     0% {
