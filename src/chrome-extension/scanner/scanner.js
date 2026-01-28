@@ -229,8 +229,8 @@
                             const strongEls = p.querySelectorAll('strong, b');
                             if (strongEls && strongEls.length > 0) {
                                 const strongTexts = Array.from(strongEls).map(se => (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
-                                window.tailieuContentImageHandler.getConcatenatedText(se) :
-                                getElementVisibleText(se)).filter(Boolean);
+                                    window.tailieuContentImageHandler.getConcatenatedText(se) :
+                                    getElementVisibleText(se)).filter(Boolean);
                                 const strongText = strongTexts.join(' ');
                                 const fullPText = getElementVisibleText(p);
                                 let rest = fullPText;
@@ -247,7 +247,7 @@
 
                     // Debug: show p parts when in debug mode (shared via window.debugMode)
                     if (window.debugMode && questionText) {
-                        try { console.debug('[Tailieu Debug] qtext <p> parts (scanner):', Array.from(pEls).map(p => p.innerText)); } catch (e) {}
+                        try { console.debug('[Tailieu Debug] qtext <p> parts (scanner):', Array.from(pEls).map(p => p.innerText)); } catch (e) { }
                     }
                 } else {
                     // Fallback to whole qtext
@@ -1071,31 +1071,41 @@
 
         processedText = processedText.trim();
 
-        // Handle Case: Passage + Question with blank at end (e.g. "The purpose is to ...")
-        if (processedText.length > 300) {
+        // 3. Handle Case: Passage + Question (Long text)
+        // Chỉ áp dụng logic rút trích khi văn bản thực sự dài (> 1200 ký tự)
+        if (processedText.length > 1200) {
             const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
-            // Count total blanks in the whole text
-            const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
-            const totalBlanks = matches ? matches.length : 0;
 
-            // If only 1-2 blanks and one is near the end, isolate the trailing question segment
-            const lastPart = processedText.substring(Math.max(0, processedText.length - 200));
-            if (totalBlanks > 0 && totalBlanks <= 2 && blankRegex.test(lastPart)) {
-                // Try to take the last line if it exists and contains the blank
-                const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-                if (lines.length >= 2) {
+            // Ưu tiên: Nếu có element, tìm câu hỏi chính trong thẻ bold ở cuối
+            if (element) {
+                const boldEls = element.querySelectorAll('strong, b');
+                if (boldEls.length > 0) {
+                    const lastBold = boldEls[boldEls.length - 1];
+                    const lastBoldText = lastBold.textContent.trim();
+                    // Nếu thẻ bold nằm ở cuối và đủ dài để là một câu hỏi (>15 ký tự)
+                    if (lastBoldText.length > 15 && processedText.endsWith(lastBoldText)) {
+                        return lastBoldText;
+                    }
+                }
+            }
+
+            // Fallback: Tìm câu hỏi ở đoạn cuối theo logic tương đương content.js
+            const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
+            if (segments.length >= 2) {
+                const lastSegment = segments[segments.length - 1].trim();
+                if (lastSegment.length > 20 && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.3) {
+                    const qKeywords = /^(Which|What|Who|When|Where|Why|How|Is|Are|Do|Does|Did|Can|Could|It is probable|According to|In paragraph|The passage|The author|The word|The purpose)/i;
+                    if (qKeywords.test(lastSegment) || /[?？]/.test(lastSegment)) {
+                        processedText = lastSegment;
+                    }
+                }
+            } else {
+                const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
+                if (matches && matches.length <= 3) {
+                    const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
                     const lastLine = lines[lines.length - 1];
                     if (blankRegex.test(lastLine) && lastLine.length < 500) {
                         processedText = lastLine;
-                    }
-                } else {
-                    // Otherwise try splitting by sentence-like punctuation
-                    const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+/);
-                    if (segments.length >= 2) {
-                        const lastSegment = segments[segments.length - 1];
-                        if (blankRegex.test(lastSegment) && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.5) {
-                            processedText = lastSegment;
-                        }
                     }
                 }
             }
@@ -1153,7 +1163,12 @@
             processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s"]+\s*$/, '').trim();
         }
 
-        return processedText;
+        // Final integrity check: Nếu làm sạch xong mà quá ngắn, hoặc không còn chữ, thì trả về bản gốc (đã được làm sạch cơ bản)
+        if (processedText.length < 5 && originalText.length > 5) {
+            return originalText.replace(/<\/?(CDATA|audio)[^>]*>/gi, '').trim();
+        }
+
+        return processedText || originalText.trim();
     }
 
     // Normalize and extract visible text from an element
@@ -1354,7 +1369,7 @@
             const fallbackEls = answerContainer.querySelectorAll('label, li, .option, .answer, .choice, .choice-text, .answertext, div');
             fallbackEls.forEach((el) => {
                 if (!el || isExtensionElement(el) || !isVisible(el)) return;
-                    // Prefer nested <label> if present for clearer text extraction
+                // Prefer nested <label> if present for clearer text extraction
                 const textSourceEl = el.querySelector && el.querySelector('label') ? el.querySelector('label') : el;
                 const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
                     window.tailieuContentImageHandler.getConcatenatedText(textSourceEl) :
@@ -1419,9 +1434,9 @@
 
         candidates.forEach((el, idx) => {
             if (!el || el === questionElement || isExtensionElement(el)) return;
-const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
-                    window.tailieuContentImageHandler.getConcatenatedText(el) :
-                    getElementVisibleText(el);
+            const text = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function') ?
+                window.tailieuContentImageHandler.getConcatenatedText(el) :
+                getElementVisibleText(el);
             if (!text || text.length > 500) return;
 
             // Accept patterns like 'A. text' or other visible answer lines

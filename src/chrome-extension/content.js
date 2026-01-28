@@ -231,30 +231,45 @@ if (window.tailieuExtensionLoaded) {
             }
         }
 
-        // Handle Case: Passage + Question with blank at end (e.g. "The purpose is to ...")
-        if (processedText.length > 300) {
+        // 3. Handle Case: Passage + Question (Long text)
+        // Chỉ áp dụng logic rút trích khi văn bản thực sự dài (> 1200 ký tự) để tránh quá tải DB
+        if (processedText.length > 1200) {
             const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
-            // Count total blanks in the whole text
+
+            // Ưu tiên: Nếu có element, tìm câu hỏi chính trong thẻ bold ở cuối
+            if (element) {
+                const boldEls = element.querySelectorAll('strong, b');
+                if (boldEls.length > 0) {
+                    const lastBold = boldEls[boldEls.length - 1];
+                    const lastBoldText = lastBold.textContent.trim();
+                    // Nếu thẻ bold nằm ở cuối và đủ dài để là một câu hỏi (>15 ký tự)
+                    if (lastBoldText.length > 15 && processedText.endsWith(lastBoldText)) {
+                        return lastBoldText;
+                    }
+                }
+            }
+
+            // Fallback: Tìm câu hỏi ở đoạn cuối theo logic cũ nhưng khắt khe hơn
             const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
             const totalBlanks = matches ? matches.length : 0;
 
-            // If only 1-2 blanks and one is near the end, isolate the trailing question segment
-            const lastPart = processedText.substring(Math.max(0, processedText.length - 200));
-            if (totalBlanks > 0 && totalBlanks <= 2 && blankRegex.test(lastPart)) {
-                // Try to take the last line if it exists and contains the blank
-                const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-                if (lines.length >= 2) {
+            if (totalBlanks > 0 && totalBlanks <= 3) {
+                const lastPart = processedText.substring(Math.max(0, processedText.length - 250));
+                if (blankRegex.test(lastPart)) {
+                    const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
                     const lastLine = lines[lines.length - 1];
                     if (blankRegex.test(lastLine) && lastLine.length < 500) {
                         processedText = lastLine;
                     }
-                } else {
-                    // Otherwise try splitting by sentence-like punctuation
-                    // Improved regex to handle quotes after punctuation
-                    const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
-                    if (segments.length >= 2) {
-                        const lastSegment = segments[segments.length - 1];
-                        if (blankRegex.test(lastSegment) && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.5) {
+                }
+            } else {
+                const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
+                if (segments.length >= 2) {
+                    const lastSegment = segments[segments.length - 1].trim();
+                    // Chỉ lấy fragment cuối nếu nó đủ dài và mang tính câu hỏi
+                    if (lastSegment.length > 20 && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.3) {
+                        const qKeywords = /^(Which|What|Who|When|Where|Why|How|Is|Are|Do|Does|Did|Can|Could|It is probable|According to|In paragraph|The passage|The author|The word|The purpose)/i;
+                        if (qKeywords.test(lastSegment) || /[?？]/.test(lastSegment)) {
                             processedText = lastSegment;
                         }
                     }
@@ -323,7 +338,12 @@ if (window.tailieuExtensionLoaded) {
             processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s]+\s*$/, '').trim();
         }
 
-        return processedText;
+        // Final integrity check: Nếu làm sạch xong mà quá ngắn, hoặc không còn chữ, thì trả về bản gốc (đã được làm sạch cơ bản)
+        if (processedText.length < 5 && originalText.length > 5) {
+            return originalText.replace(/<\/?(CDATA|audio)[^>]*>/gi, '').trim();
+        }
+
+        return processedText || originalText.trim();
     }
 
     // Generate candidate question variants (handles audio prompts like Track*.mp3 and 'Listen' instructions)
@@ -1067,7 +1087,7 @@ if (window.tailieuExtensionLoaded) {
 
                     // Debug: show p parts when in debugMode
                     if (debugMode && questionText) {
-                        try { console.debug('[Tailieu Debug] qtext <p> parts:', parts); } catch (e) {}
+                        try { console.debug('[Tailieu Debug] qtext <p> parts:', parts); } catch (e) { }
                     }
                 } else {
                     // Fallback to whole qtext/formulation
@@ -1081,7 +1101,7 @@ if (window.tailieuExtensionLoaded) {
 
                 // Debug: show raw concatenated question text vs cleaned final text to detect feedback being picked up
                 if (debugMode) {
-                    try { console.debug('[Tailieu Debug] qtext raw vs final:', { raw: questionText && questionText.slice(0,200), final: finalQuestionText && finalQuestionText.slice(0,200) }); } catch (e) {}
+                    try { console.debug('[Tailieu Debug] qtext raw vs final:', { raw: questionText && questionText.slice(0, 200), final: finalQuestionText && finalQuestionText.slice(0, 200) }); } catch (e) { }
                 }
 
                 // DEBUG: If question contains image URLs, log extraction details for troubleshooting
@@ -1121,7 +1141,7 @@ if (window.tailieuExtensionLoaded) {
                             }).filter(Boolean);
 
                             if (debugMode) {
-                                try { console.debug('[Tailieu Debug] pageOptions:', pageOptions); } catch (e) {}
+                                try { console.debug('[Tailieu Debug] pageOptions:', pageOptions); } catch (e) { }
                             }
                         }
                     }
@@ -1742,7 +1762,7 @@ if (window.tailieuExtensionLoaded) {
                                     badge.title = 'Nhấn để sao chép/điền đáp án';
                                     badge.addEventListener('click', (e) => {
                                         e.preventDefault();
-                                        try { navigator.clipboard.writeText(val); } catch (e) {}
+                                        try { navigator.clipboard.writeText(val); } catch (e) { }
                                     });
                                     input.parentNode.insertBefore(badge, input.nextSibling);
                                     input.dataset.tailieuBadgeAdded = 'true';
@@ -2659,8 +2679,8 @@ if (window.tailieuExtensionLoaded) {
         // Debug: show extracted web options and DB answers when in debugMode
         if (debugMode) {
             try {
-                const webSummary = webOptions.map(o => ({ index: o.index, normalized: o.normalizedText, original: o.originalText && o.originalText.slice(0,200) }));
-                const answersSummary = normalizedAnswers.slice(0,10);
+                const webSummary = webOptions.map(o => ({ index: o.index, normalized: o.normalizedText, original: o.originalText && o.originalText.slice(0, 200) }));
+                const answersSummary = normalizedAnswers.slice(0, 10);
                 console.debug('[Tailieu Debug] highlightMatchingOptions - webOptions:', webSummary);
                 console.debug('[Tailieu Debug] highlightMatchingOptions - normalizedAnswers:', answersSummary);
             } catch (e) { /* ignore logging errors */ }
@@ -2848,7 +2868,7 @@ if (window.tailieuExtensionLoaded) {
         // Debug: If nothing was highlighted, log candidates for troubleshooting
         if (debugMode && highlightedCount === 0) {
             try {
-                console.debug('[Tailieu Debug] highlightMatchingOptions: NO HIGHLIGHTS. webOptions:', webOptions.map(o=>({i:o.index,n:o.normalizedText,orig:(o.originalText||'').slice(0,120)})), 'normalizedAnswers:', normalizedAnswers);
+                console.debug('[Tailieu Debug] highlightMatchingOptions: NO HIGHLIGHTS. webOptions:', webOptions.map(o => ({ i: o.index, n: o.normalizedText, orig: (o.originalText || '').slice(0, 120) })), 'normalizedAnswers:', normalizedAnswers);
             } catch (e) { /* ignore */ }
         }
 
