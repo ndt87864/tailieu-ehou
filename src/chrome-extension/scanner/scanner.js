@@ -194,10 +194,7 @@
                     }
                 }
 
-                // KIỂM TRA LOẠI CÂU HỎI: 
-                // Nếu container này chứa các ô input/select bên trong phần nội dung (.qtext),
-                // thì nó là loại điền từ (Cloze/Fill-blank) và đã được scanFillBlankWithInputs xử lý.
-                // Chúng ta bỏ qua ở đây để tránh việc gộp tất cả thành 1 câu trắc nghiệm rác.
+                // KIỂM TRA LOẠI CÂU HỎI
                 const hasInlineInputs = qtextElement.querySelectorAll('input[type="text"], input:not([type]), select').length > 0;
                 if (hasInlineInputs) {
                     // console.log('[Scanner] Bỏ qua container điền từ vì đã được xử lý riêng');
@@ -1256,8 +1253,16 @@
     // Normalize and extract visible text from an element
     function normalizeText(text) {
         if (!text) return '';
-        // Collapse whitespace and trim punctuation/bullets around
-        return text.replace(/\s+/g, ' ').replace(/^[\s\u2022\-\.|•]+|[\s\u2022\-\.|•]+$/g, '').trim();
+        // Collapse whitespace
+        let s = text.replace(/\s+/g, ' ').trim();
+        // Remove standard bullet points and whitespace at start/end
+        // But PROTECT dots/underscores if they appear in sequence (e.g. .. or __) representing blanks
+        s = s.replace(/^[\s\u2022•|]+|[\s\u2022•|]+$/g, '').trim();
+        // Only strip leading dots/dashes if they are single characters and NOT part of a blank sequence
+        if (/^[.\-](?![.\-_])/.test(s)) {
+            s = s.substring(1).trim();
+        }
+        return s;
     }
 
     function getElementVisibleText(el) {

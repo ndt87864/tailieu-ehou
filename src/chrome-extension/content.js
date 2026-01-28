@@ -32,11 +32,11 @@ if (window.tailieuExtensionLoaded) {
     window.debugMode = debugMode;
 
     // Debug logging function
-    // function debugLog(...args) {
-    //     if (debugMode) {
-    //         //console.log('[Tailieu Extension]', ...args);
-    //     }
-    // }
+    function debugLog(...args) {
+        if (debugMode) {
+            console.log('[Tailieu Extension]', ...args);
+        }
+    }
 
     // Enforce strict exact-match for answers when true.
     // This makes the extension require answers to match 100% (ignoring punctuation)
@@ -63,7 +63,8 @@ if (window.tailieuExtensionLoaded) {
             // Replace apostrophes and similar characters with space FIRST
             s = s.replace(/[''`´]/g, ' ');
             // Remove common leading answer labels like "a.", "b)", "c -" etc.
-            s = s.replace(/^[a-dA-D]\s*[\.\)\-:\/]\s*/u, '');
+            // Strictly limited to a-d and 0-9 followed by a separator and SPACE to protect proper nouns like "With" or "Nicole's"
+            s = s.replace(/^[a-dA-D0-9]\s*[\.\)\-:\/]\s+/u, '');
             // Remove any characters that are not letters, numbers, whitespace or ESSENTIAL math symbols
             // Bảo tồn các ký tự toán học và dấu chấm (.) trong tên file ảnh sau khi đã xử lý ở trên
             s = s.replace(/[^\p{L}\p{N}\s<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/gu, ' ');
@@ -1193,7 +1194,8 @@ if (window.tailieuExtensionLoaded) {
                             pageOptions = labels.map(l => {
                                 const txt = hasContentImageHandler ? window.tailieuContentImageHandler.getConcatenatedText(l) : (l.textContent || '').trim();
                                 // Robustly strip leading option markers (e.g., "a.", "A)", "1.") with optional spaces
-                                const cleaned = txt.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/u, '').trim();
+                                // Strictly limited to A-D or digits followed by separator and SPACE
+                                const cleaned = txt.replace(/^\s*[A-Da-d0-9]\s*(?:[.\)\-:])\s+/u, '').trim();
                                 return normalizeTextForMatching(cleaned);
                             }).filter(Boolean);
 
@@ -1471,13 +1473,14 @@ if (window.tailieuExtensionLoaded) {
                         label.textContent.trim();
 
                     // Remove input related text if any (like markers 'a.', 'b.'), allow optional spaces
-                    return text.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/i, '').trim();
+                    // Strictly limited to A-D or digits followed by separator and SPACE
+                    return text.replace(/^\s*[A-Za-d0-9]\s*(?:[.\)\-:])\s+/i, '').trim();
                 }
             }
         } catch (e) {
             console.warn('[Tailieu Extension] Error getting selected answer:', e);
+            return null;
         }
-        return null;
     }
 
     // Normalize text for matching - Simple like Hỗ Trợ HT
@@ -1490,10 +1493,13 @@ if (window.tailieuExtensionLoaded) {
                 .replace(/[\s\xa0]{2,}/g, ' ')
                 .trim();
 
-            // Remove surrounding punctuation or symbol characters (including Unicode punctuation)
-            // and strip trailing punctuation like dots, ellipsis, dashes etc.
-            s = s.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, '').trim();
-            s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+            // Remove surrounding symbols/bullets but PRESERVE leading dots/underscores for blanks
+            s = s.replace(/^[\s\u2022•|]+|[\s\u2022•|]+$/g, '').trim();
+
+            // Only strip trailing junk if it's NOT a sequence of dots/underscores (blanks)
+            if (!/[._\u2026]{2,}\s*$/.test(s)) {
+                s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+            }
 
             return s;
         } catch (e) {
