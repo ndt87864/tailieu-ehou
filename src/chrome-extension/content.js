@@ -97,10 +97,40 @@ if (window.tailieuExtensionLoaded) {
             'Are the following sentences true or false',
             'True or False',
             'True \\(T\\) or false \\(F\\)',
-            'Read the text and do the activities that follow'
+            'Read the text and do the activities that follow',
+            'Choose A, B, C or D to complete the following sentence:',
+            'Choose A, B, C or D to complete the sentence:',
+            'Choose A, B, C, or D to complete the following sentence:',
+            'Choose the lettered word or phrase'
         ];
 
         let processedText = text;
+
+        // New logic: Ưu tiên <ol> hoặc <ul> nếu có (dạng list sub-questions/cloze)
+        // Nếu có list, thường các paragraph <p> bên ngoài là đoạn văn đọc hiểu (passage)
+        if (element) {
+            const listEls = element.querySelectorAll('ol, ul');
+            if (listEls.length > 0) {
+                const liTexts = [];
+                listEls.forEach(list => {
+                    const lis = list.querySelectorAll('li');
+                    lis.forEach(li => {
+                        // Sử dụng image handler để lấy text và ảnh đầy đủ trong li
+                        const liText = (typeof window.tailieuContentImageHandler !== 'undefined') ?
+                            window.tailieuContentImageHandler.getElementVisibleTextWithImages(li) :
+                            (li.textContent || '').trim();
+                        if (liText) liTexts.push(liText);
+                    });
+                });
+
+                if (liTexts.length > 0) {
+                    const joinedLiText = liTexts.join(' . ').trim();
+                    if (joinedLiText.length > 10) {
+                        processedText = joinedLiText;
+                    }
+                }
+            }
+        }
 
         // 0. Remove audio player scripts / CDATA
         if (processedText.includes('//]]>')) {

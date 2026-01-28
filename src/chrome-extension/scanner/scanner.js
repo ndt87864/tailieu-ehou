@@ -194,10 +194,38 @@
                     }
                 }
 
-                // If multiple <p> tags exist inside .qtext/.formulation, concatenate their texts
+                // KIỂM TRA LOẠI CÂU HỎI: 
+                // Nếu container này chứa các ô input/select bên trong phần nội dung (.qtext),
+                // thì nó là loại điền từ (Cloze/Fill-blank) và đã được scanFillBlankWithInputs xử lý.
+                // Chúng ta bỏ qua ở đây để tránh việc gộp tất cả thành 1 câu trắc nghiệm rác.
+                const hasInlineInputs = qtextElement.querySelectorAll('input[type="text"], input:not([type]), select').length > 0;
+                if (hasInlineInputs) {
+                    // console.log('[Scanner] Bỏ qua container điền từ vì đã được xử lý riêng');
+                    return;
+                }
+
+                // New logic: Ưu tiên <ol> hoặc <ul> nếu có (dạng list các lựa chọn bổ trợ)
+                // Nếu có list, thường các paragraph <p> bên ngoài là đoạn văn đọc hiểu (passage)
+                const listEls = qtextElement.querySelectorAll('ol, ul');
                 const pEls = qtextElement.querySelectorAll('p');
+
                 let questionText = '';
-                if (pEls && pEls.length > 0) {
+
+                if (listEls.length > 0) {
+                    const liTexts = [];
+                    listEls.forEach(list => {
+                        list.querySelectorAll('li').forEach(li => {
+                            const t = (typeof window.tailieuContentImageHandler !== 'undefined') ?
+                                window.tailieuContentImageHandler.getElementVisibleTextWithImages(li) :
+                                (li.textContent || '').trim();
+                            if (t) liTexts.push(t);
+                        });
+                    });
+                    if (liTexts.length > 0) questionText = liTexts.join(' . ');
+                }
+
+                // Nếu không có list hoặc list rỗng, mới dùng Paragraphs
+                if (!questionText && pEls && pEls.length > 0) {
                     questionText = Array.from(pEls).map(p => {
                         try {
                             if (usedFormulationFallback) {
@@ -249,10 +277,13 @@
                     if (window.debugMode && questionText) {
                         try { console.debug('[Tailieu Debug] qtext <p> parts (scanner):', Array.from(pEls).map(p => p.innerText)); } catch (e) { }
                     }
-                } else {
-                    // Fallback to whole qtext
+                }
+
+                // Final fallback if still empty
+                if (!questionText) {
                     questionText = getElementVisibleText(qtextElement);
                 }
+
                 if (questionText.length < 5) return;
 
                 // Tìm các đáp án (do dedupe phải bao gồm đáp án)
@@ -306,11 +337,17 @@
 
             // Tìm các đáp án gần đó
             const answers = findNearbyAnswers(element);
-            if (!answers || answers.length === 0) return;
+            if (!answers || answers.length === 0) {
+                // console.warn('[Scanner Generic] Bỏ qua vì không tìm thấy đáp án gần:', text.substring(0, 50));
+                return;
+            }
 
-            // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích
+            // Chỉ thêm câu hỏi nếu có ít nhất 1 đáp án được tích (dữ liệu quét cần có đáp án đúng/đã chọn)
             const hasTickedAnswer = answers.some(a => a.isTicked || a.isSelected || a.isCorrect);
-            if (!hasTickedAnswer) return;
+            if (!hasTickedAnswer) {
+                // console.warn('[Scanner Generic] Bỏ qua vì không có đáp án nào được chọn:', text.substring(0, 50));
+                return;
+            }
 
             // Build signature and dedupe by full signature
             const signature = cleanQuestionText(text, element) + '||' + answers.map(a => normalizeText(a.text)).join('||');
@@ -908,7 +945,11 @@
             'Chọn một câu trả lời',
             'Chọn câu trả lời',
             'Choose one answer',
-            'Read the text and do the activities that follow'
+            'Read the text and do the activities that follow',
+            'Choose A, B, C or D to complete the following sentence:',
+            'Choose A, B, C or D to complete the sentence:',
+            'Choose A, B, C, or D to complete the following sentence:',
+            'Choose the lettered word or phrase'
         ];
 
         let processedText = text;
