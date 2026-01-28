@@ -209,9 +209,41 @@
                 const listEls = qtextElement.querySelectorAll('ol, ul');
                 const pEls = qtextElement.querySelectorAll('p');
 
+                // XỬ LÝ CÂU HỎI CÓ AUDIO:
+                // Nếu có audio, thường câu hỏi thực sự nằm ở các thẻ PHÍA SAU thẻ chứa audio.
+                const audioEl = qtextElement.querySelector('.mediaplugin, audio, .mediafallbacklink');
                 let questionText = '';
 
-                if (listEls.length > 0) {
+                if (audioEl) {
+                    // Tìm node con trực tiếp của qtextElement mà chứa audioEl
+                    let audioNode = audioEl;
+                    while (audioNode && audioNode.parentElement !== qtextElement) {
+                        audioNode = audioNode.parentElement;
+                    }
+
+                    if (audioNode) {
+                        // Lấy tất cả các thẻ nằm sau audioNode
+                        const followingNodes = [];
+                        let next = audioNode.nextSibling;
+                        while (next) {
+                            if (next.nodeType === Node.ELEMENT_NODE || (next.nodeType === Node.TEXT_NODE && next.textContent.trim())) {
+                                followingNodes.push(next);
+                            }
+                            next = next.nextSibling;
+                        }
+
+                        if (followingNodes.length > 0) {
+                            questionText = followingNodes.map(node => {
+                                if (node.nodeType === Node.TEXT_NODE) return node.textContent.trim();
+                                return (typeof window.tailieuContentImageHandler !== 'undefined') ?
+                                    window.tailieuContentImageHandler.getElementVisibleTextWithImages(node) :
+                                    getElementVisibleText(node);
+                            }).filter(Boolean).join(' ').trim();
+                        }
+                    }
+                }
+
+                if (!questionText && listEls.length > 0) {
                     const liTexts = [];
                     listEls.forEach(list => {
                         list.querySelectorAll('li').forEach(li => {
@@ -764,7 +796,7 @@
         result = result
             .replace(/[✓✗×✕✔❌]/g, '')  // Remove check/cross marks
             .replace(/\s+/g, ' ')         // Collapse whitespace
-            .replace(/^\s*[a-z0-9][\.\)]\s*/i, ''); // Remove label prefix like "a." or "1."
+            .replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim(); // Remove standard label prefix
 
         // ===== GIỮ NGUYÊN "..." CHO Ô TRỐNG =====
         // "..." đại diện cho input field (ô trống) trong câu hỏi điền từ
@@ -1112,46 +1144,6 @@
 
         processedText = processedText.trim();
 
-        // 3. Handle Case: Passage + Question (Long text)
-        // Chỉ áp dụng logic rút trích khi văn bản thực sự dài (> 1200 ký tự)
-        if (processedText.length > 1200) {
-            const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
-
-            // Ưu tiên: Nếu có element, tìm câu hỏi chính trong thẻ bold ở cuối
-            if (element) {
-                const boldEls = element.querySelectorAll('strong, b');
-                if (boldEls.length > 0) {
-                    const lastBold = boldEls[boldEls.length - 1];
-                    const lastBoldText = lastBold.textContent.trim();
-                    // Nếu thẻ bold nằm ở cuối và đủ dài để là một câu hỏi (>15 ký tự)
-                    if (lastBoldText.length > 15 && processedText.endsWith(lastBoldText)) {
-                        return lastBoldText;
-                    }
-                }
-            }
-
-            // Fallback: Tìm câu hỏi ở đoạn cuối theo logic tương đương content.js
-            const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
-            if (segments.length >= 2) {
-                const lastSegment = segments[segments.length - 1].trim();
-                if (lastSegment.length > 20 && lastSegment.length < 400 && lastSegment.length < processedText.length * 0.3) {
-                    const qKeywords = /^(Which|What|Who|When|Where|Why|How|Is|Are|Do|Does|Did|Can|Could|It is probable|According to|In paragraph|The passage|The author|The word|The purpose)/i;
-                    if (qKeywords.test(lastSegment) || /[?？]/.test(lastSegment)) {
-                        processedText = lastSegment;
-                    }
-                }
-            } else {
-                const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
-                if (matches && matches.length <= 3) {
-                    const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-                    const lastLine = lines[lines.length - 1];
-                    if (blankRegex.test(lastLine) && lastLine.length < 500) {
-                        processedText = lastLine;
-                    }
-                }
-            }
-        }
-
         // Tìm marker xuất hiện cuối cùng (gần câu hỏi nhất)
         for (const marker of markers) {
             // Sử dụng regex để match case-insensitive
@@ -1192,16 +1184,65 @@
             }
         }
 
+        // 3. Handle Case: Passage + Question (Long text)
+        // Chỉ áp dụng logic rút trích khi văn bản thực sự dài (> 800 ký tự)
+        // Đặt sau markers loop để xử lý phần text đã được lọc bớt instruction
+        if (processedText.length > 800) {
+            const blankRegex = /([_.‥…\u2026]{2,}|_{2,}|(\.\s*){3,}|\[\s*\]|\(\s*\))/;
+
+            // Ưu tiên 1: Thẻ bold ở cuối container (Thường là câu hỏi chính)
+            if (element) {
+                const boldEls = element.querySelectorAll('strong, b');
+                if (boldEls.length > 0) {
+                    const lastBold = boldEls[boldEls.length - 1];
+                    // Chuẩn hóa text: xóa non-breaking spaces và khoảng trắng thừa
+                    const boldTextRaw = (lastBold.textContent || '').replace(/[\u00A0\s]+/g, ' ').trim();
+                    const pTextRaw = processedText.replace(/[\u00A0\s]+/g, ' ').trim();
+
+                    // Nếu thẻ bold nằm ở cuối (hoặc rất gần cuối) và đủ dài
+                    if (boldTextRaw.length > 15 && pTextRaw.endsWith(boldTextRaw)) {
+                        return lastBold.textContent.trim();
+                    }
+                }
+            }
+
+            // Ưu tiên 2: Phân tách câu và tìm từ khóa câu hỏi ở đoạn cuối
+            const segments = processedText.split(/(?<=[.!?]['"”’]*)\s+(?=[A-Z])/);
+            if (segments.length >= 2) {
+                const lastSegment = segments[segments.length - 1].trim();
+                // Nới lỏng giới hạn: chiếm tới 40% độ dài cũng được (vì câu hỏi có thể đi kèm 1 phần nhỏ context)
+                if (lastSegment.length > 15 && lastSegment.length < 500 && lastSegment.length < processedText.length * 0.4) {
+                    const qKeywords = /^(Which|What|Who|When|Where|Why|How|Is|Are|Do|Does|Did|Can|Could|It is probable|According to|In paragraph|The passage|The author|The word|The purpose|From|Based on|It can be|The statement|The phrase)/i;
+                    if (qKeywords.test(lastSegment) || /[?？]/.test(lastSegment) || blankRegex.test(lastSegment)) {
+                        processedText = lastSegment;
+                    }
+                }
+            } else {
+                // Fallback: Nếu không tách được câu, tìm dòng cuối có chứa ô trống
+                const matches = processedText.match(new RegExp(blankRegex.source, 'g'));
+                if (matches && matches.length <= 3) {
+                    const lines = processedText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                    if (lines.length > 1) {
+                        const lastLine = lines[lines.length - 1];
+                        if (blankRegex.test(lastLine) && lastLine.length < 500) {
+                            processedText = lastLine;
+                        }
+                    }
+                }
+            }
+        }
+
+
         // 2. Loại bỏ prefix (Câu 1:, Question 1:, ...)
         processedText = processedText.replace(/^(Câu\s*\d+[:\.\)\s]*|Bài\s*\d+[:\.\)\s]*|Question\s*\d+[:\.\)\s]*|\d+[\.\)]\s*)/i, '').trim();
 
         // Final sanitization: remove leading/trailing code-like fragments and stray punctuation
-        // Thêm " vào danh sách bảo vệ để tránh mất dấu nháy của link ảnh
-        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF"]+/, '').trim();
+        // BẢO VỆ các ký tự ô trống (underscores, dots, ellipsis) và dấu nháy ở đầu câu
+        processedText = processedText.replace(/^\s*[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?!\u2026"\[\(\s]+/, '').trim();
 
-        // Preserve potential blanks (dots, underscores, ellipsis) AND quotes
+        // Preserve potential blanks (dots, underscores, ellipsis) AND quotes AND basic punctuation
         if (!/[\._\u2026]{2,}\s*$/.test(processedText)) {
-            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?\u2026\s"]+\s*$/, '').trim();
+            processedText = processedText.replace(/[^A-Za-z0-9À-ʯ\u0400-\u04FF\._\?!,;:\u2026\s"]+\s*$/, '').trim();
         }
 
         // Final integrity check: Nếu làm sạch xong mà quá ngắn, hoặc không còn chữ, thì trả về bản gốc (đã được làm sạch cơ bản)
@@ -1274,12 +1315,28 @@
 
             if (explicitLabelEl) {
                 label = normalizeText(explicitLabelEl.textContent || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-                answerText = text.replace(explicitLabelEl.textContent || '', '').trim();
+
+                try {
+                    // CLONE STRATEGY: Create a clone and remove the label element to get pure answer text
+                    const clone = textSourceEl.cloneNode(true);
+                    const labelInClone = clone.querySelector('.answernumber');
+                    if (labelInClone) {
+                        labelInClone.remove();
+                        // Get text from the clone (which no longer has the label)
+                        answerText = (typeof window.tailieuContentImageHandler !== 'undefined' && typeof window.tailieuContentImageHandler.getConcatenatedText === 'function')
+                            ? window.tailieuContentImageHandler.getConcatenatedText(clone)
+                            : getElementVisibleText(clone);
+                    }
+                } catch (e) {
+                    // Safest fallback if cloning fails
+                    const escapedLabel = (explicitLabelEl.textContent || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    answerText = text.replace(new RegExp('^\\s*' + escapedLabel + '\\s*(?![a-zA-Z0-9])'), '').trim();
+                }
             } else {
-                const labelMatch = text.match(/^([A-Da-d])(?:[.\)\s:\-])+/);
+                const labelMatch = text.match(/^([A-Da-d])\s*[.\)\s:\-]\s+/);
                 if (labelMatch) {
                     label = labelMatch[1].toUpperCase();
-                    answerText = text.replace(/^([A-Da-d])(?:[.\)\s:\-])+/g, '').trim();
+                    answerText = text.replace(/^([A-Da-d])\s*[.\)\s:\-]\s+/g, '').trim();
                 }
             }
 
@@ -2284,17 +2341,27 @@
         if (!text) return '';
         try {
             let s = text.toString().trim();
-            // Remove leading option markers like 'a.', 'A) ', '1.'
-            s = s.replace(/^\s*[A-Za-z0-9]\s*(?:[.\)\-:])?\s*/u, '');
+            // Remove leading option markers ONLY if clearly followed by a marker like '.', ')', '-', ':' AND a space
+            // Strictly limit single-character markers to [A-Da-d] or digits to avoid cutting off words like "Nicole's" or "have"
+            s = s.replace(/^\s*([A-Da-d0-9])\s*[.\)\-:]\s+/u, '');
+            // For other characters (e.g. choice E, F...), only remove if clearly separated and followed by space
+            s = s.replace(/^\s*[A-Za-z]\s*[.\)\-:]\s+/u, (match) => {
+                // If the marker is a letter like 'N', check if it's potentially part of the next word
+                // (Very conservative fallback)
+                return match.match(/^[A-Da-d0-9]/i) ? '' : match;
+            });
             // Collapse spaces
             s = s.replace(/\s+/g, ' ').trim();
-            // Remove trailing punctuation and symbols (dots, ellipsis, dashes)
-            s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
-            // Remove surrounding punctuation
-            s = s.replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, '').trim();
+
+            // Remove trailing junk but preserve intentional trailing dots/underscores if short
+            // Only remove if it's clearly a separator or redundant punctuation
+            if (s.length > 5) {
+                s = s.replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+            }
+
             return s;
         } catch (e) {
-            return ('' + text).replace(/\s+/g, ' ').trim().replace(/[\.\u2026\-–—\s]+$/g, '').trim();
+            return ('' + text).replace(/\s+/g, ' ').trim();
         }
     }
 
