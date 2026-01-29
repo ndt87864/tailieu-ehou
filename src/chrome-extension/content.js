@@ -810,11 +810,31 @@ if (window.tailieuExtensionLoaded) {
         });
     }
 
+    // Helper: Pre-process questions to add normalized keys for fast lookup
+    function preProcessQuestions(questions) {
+        if (!Array.isArray(questions)) return [];
+        return questions.map(q => {
+            if (q._key) return q; // Already processed
+            const cleaned = cleanQuestionText(q.question || '');
+            return {
+                ...q,
+                _cleaned: cleaned,
+                _key: normalizeForExactMatch(cleaned)
+            };
+        });
+    }
+
     // Helper: Load and cache document questions
     async function loadAndCacheDocumentAndNotify(documentId) {
+        // If we already have this document cached and not empty, skip fetch
+        if (detectedDocumentId === documentId && extensionQuestions.length > 0) {
+            debugLog('[Tailieu Extension] Document already cached, skipping redundant fetch.');
+            return true;
+        }
+
         const questions = await loadQuestionsFromDocument(documentId);
         if (questions && questions.length > 0) {
-            extensionQuestions = questions;
+            extensionQuestions = preProcessQuestions(questions);
             detectedDocumentId = documentId;
 
             // Fetch document name for display
@@ -951,19 +971,25 @@ if (window.tailieuExtensionLoaded) {
         if (!pageQs || pageQs.length === 0) return false; // Can't judge
         if (!extQs || extQs.length === 0) return true; // Empty cache is invalid
 
-        // Check intersection of first few questions
-        // If the first page question matches NOTHING in cache, likely wrong document
-        const firstQ = pageQs[0];
-        const cleanFirst = normalizeForExactMatch(cleanQuestionText(firstQ.text));
+        // Check first 3 questions instead of just 1 to be more robust
+        const candidates = pageQs.slice(0, 3);
+        let matchCount = 0;
 
-        // Quick check: does strict key exist in cache?
-        // Optimization: just check raw text includes or something fast
-        const match = extQs.some(eq => {
-            const cleanEq = normalizeForExactMatch(cleanQuestionText(eq.question));
-            return compareNormalized(cleanFirst, cleanEq);
-        });
+        for (const pQ of candidates) {
+            const cleanP = normalizeForExactMatch(cleanQuestionText(pQ.text));
+            if (!cleanP) continue;
 
-        return !match;
+            const match = extQs.some(eq => {
+                const cleanEq = eq._key || normalizeForExactMatch(cleanQuestionText(eq.question));
+                return compareNormalized(cleanP, cleanEq);
+            });
+
+            if (match) matchCount++;
+        }
+
+        // If we checked multiple, require at least one match
+        // (If page has 3 Qs and 0 match, it's definitely invalid)
+        return matchCount === 0;
     }
 
     // Helper: Scan questions (extracted from compareAndHighlightQuestions)
@@ -1395,7 +1421,8 @@ if (window.tailieuExtensionLoaded) {
             const result = await chrome.storage.local.get([QUESTIONS_CACHE_KEY, 'tailieu_detected_doc_id', 'tailieu_detected_doc_name']);
             if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
                 // Filter cached questions to remove any scanner_extension entries
-                extensionQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
+                const rawQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
+                extensionQuestions = preProcessQuestions(rawQuestions);
                 detectedDocumentId = result['tailieu_detected_doc_id'] || null;
                 detectedDocumentName = result['tailieu_detected_doc_name'] || null;
             } else {
@@ -2047,6 +2074,13 @@ if (window.tailieuExtensionLoaded) {
         // Update compare button to show comparing state
         updateCompareButtonProgress();
 
+        // Build a Map for fast O(1) exact lookup
+        const extensionQuestionsMap = new Map();
+        extensionQuestions.forEach(eq => {
+            const key = eq._key || normalizeForExactMatch(cleanQuestionText(eq.question));
+            if (key) extensionQuestionsMap.set(key, eq);
+        });
+
         const pageQuestions = extractQuestionsFromPage();
         const matched = [];
 
@@ -2228,73 +2262,68 @@ if (window.tailieuExtensionLoaded) {
             if (!hasMatchedThisPageQuestion) {
                 try {
                     const cleanText = cleanQuestionText(pageQ.text);
-                    // Only query if text is long enough to be unique
-                    if (cleanText.length > 15) {
-                        const foundQ = await findQuestionInDB(cleanText);
+                    const keyP = normalizeForExactMatch(cleanText);
 
-                        if (foundQ) {
-                            debugLog('[Tailieu Extension] Individual DB lookup found match:', foundQ.id);
+                    // SEARCHING IN LOCAL CACHE FIRST (Safety check for performance)
+                    let foundQ = extensionQuestionsMap.get(keyP);
 
-                            // Highlight the question
-                            highlightMatchedQuestion(pageQ, foundQ);
-                            hasMatchedThisPageQuestion = true;
+                    // Only query DB if NOT in cache and text is long enough to be unique
+                    if (!foundQ && cleanText.length > 15) {
+                        foundQ = await findQuestionInDB(cleanText);
+                    }
 
-                            // Record match
-                            matched.push({
-                                pageQuestion: pageQ.text,
-                                extensionQuestion: foundQ.question,
-                                answer: foundQ.answer,
-                                userAnswer: pageQ.userAnswer,
-                                similarity: 1.0,
-                                confidence: 1.0,
-                                source: 'individual-lookup'
-                            });
+                    if (foundQ) {
+                        debugLog('[Tailieu Extension] Individual DB lookup found match:', foundQ.id);
 
-                            // CHECK FOR CACHE UPDATE / DOCUMENT LOADING
-                            // If this question belongs to a document, load all questions for that document
-                            if (foundQ.documentId) {
-                                // If we don't have a document currently detected, or it's different
-                                if (!detectedDocumentId || detectedDocumentId !== foundQ.documentId) {
-                                    debugLog('[Tailieu Extension] Question belongs to a document. Loading full document questions into cache...');
-                                    const newQuestions = await loadQuestionsFromDocument(foundQ.documentId);
-                                    if (newQuestions && newQuestions.length > 0) {
-                                        extensionQuestions = newQuestions;
-                                        detectedDocumentId = foundQ.documentId;
-                                        saveCachedQuestions();
-                                        showCachedQuestionsIndicator(); // Update banner
+                        // Highlight the question
+                        highlightMatchedQuestion(pageQ, foundQ);
+                        hasMatchedThisPageQuestion = true;
 
-                                        // Update popup to reflect new count
-                                        try {
-                                            if (chrome?.runtime?.sendMessage) {
-                                                chrome.runtime.sendMessage({ action: 'updateQuestionsPopup', questions: extensionQuestions });
-                                            }
-                                        } catch (e) { }
+                        // Record match
+                        matched.push({
+                            pageQuestion: pageQ.text,
+                            extensionQuestion: foundQ.question,
+                            answer: foundQ.answer,
+                            userAnswer: pageQ.userAnswer,
+                            similarity: 1.0,
+                            confidence: 1.0,
+                            source: 'individual-lookup'
+                        });
+
+                        // CHECK FOR CACHE UPDATE / DOCUMENT LOADING
+                        // If this question belongs to a document, load all questions for that document
+                        if (foundQ.documentId) {
+                            // If we don't have a document currently detected, or it's different
+                            if (!detectedDocumentId || detectedDocumentId !== foundQ.documentId) {
+                                debugLog('[Tailieu Extension] Question belongs to a document. Loading full document questions into cache...');
+                                await loadAndCacheDocumentAndNotify(foundQ.documentId);
+
+                                // Update popup to reflect new count
+                                try {
+                                    if (chrome?.runtime?.sendMessage) {
+                                        chrome.runtime.sendMessage({ action: 'updateQuestionsPopup', questions: extensionQuestions });
                                     }
-                                } else {
-                                    // Already in this document, but question was missing from cache (updated DB?)
-                                    const isCached = extensionQuestions.some(eq => eq.id === foundQ.id);
-                                    if (!isCached) {
-                                        debugLog('[Tailieu Extension] Question missing from current document cache. Refreshing...');
-                                        const newQuestions = await loadQuestionsFromDocument(detectedDocumentId);
-                                        if (newQuestions && newQuestions.length > 0) {
-                                            extensionQuestions = newQuestions;
-                                            saveCachedQuestions();
-                                        }
-                                    }
+                                } catch (e) { }
+                            } else {
+                                // Already in this document, but question was missing from cache (updated DB?)
+                                const isCached = extensionQuestions.some(eq => eq.id === foundQ.id);
+                                if (!isCached) {
+                                    debugLog('[Tailieu Extension] Question missing from current document cache. Refreshing...');
+                                    await loadAndCacheDocumentAndNotify(detectedDocumentId);
                                 }
                             }
-                        } else {
-                            // Still no match - log candidates debug info
-                            if (debugMode) {
-                                const scores = extensionQuestions.map(eq => ({
-                                    question: eq.question,
-                                    score: calculateEnhancedSimilarity(cleanText, cleanQuestionText(eq.question))
-                                }));
-                                scores.sort((a, b) => b.score - a.score);
-                                const top = scores.slice(0, 3).filter(s => s.score > 0.4);
-                                if (top.length > 0) {
-                                    //console.log('[Tailieu Extension] No exact match & no DB match -- top candidates:', pageQ.text, top);
-                                }
+                        }
+                    } else {
+                        // Still no match - log candidates debug info
+                        if (debugMode) {
+                            const scores = extensionQuestions.map(eq => ({
+                                question: eq.question,
+                                score: calculateEnhancedSimilarity(cleanText, cleanQuestionText(eq.question))
+                            }));
+                            scores.sort((a, b) => b.score - a.score);
+                            const top = scores.slice(0, 3).filter(s => s.score > 0.4);
+                            if (top.length > 0) {
+                                //console.log('[Tailieu Extension] No exact match & no DB match -- top candidates:', pageQ.text, top);
                             }
                         }
                     }
