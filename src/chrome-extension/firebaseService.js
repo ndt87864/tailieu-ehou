@@ -435,6 +435,81 @@ async function deleteQuestion(questionId) {
   }
 }
 
+// ==================== AUTO-DETECTION ====================
+
+/**
+ * Tìm câu hỏi theo text (question field) - Dùng cho auto-document detection
+ * @param {string} questionText - Text của câu hỏi cần tìm
+ * @returns {Promise<Object|null>} Câu hỏi tìm thấy hoặc null
+ */
+async function findQuestionByText(questionText) {
+  try {
+    if (!questionText || !questionText.trim()) return null;
+
+    const db = getDb();
+    const querySnapshot = await db.collection('questions')
+      .where('question', '==', questionText.trim())
+      .limit(1)
+      .get();
+
+    if (querySnapshot.empty) return null;
+
+    const doc = querySnapshot.docs[0];
+    return { id: doc.id, ...doc.data() };
+  } catch (error) {
+    console.error('Error finding question by text:', error);
+    throw error;
+  }
+}
+
+/**
+ * Tìm câu hỏi theo text đã được chuẩn hóa (normalized) - fuzzy search
+ * Dùng khi exact match không tìm được
+ * @param {string} questionText - Text của câu hỏi cần tìm
+ * @param {number} limit - Số lượng kết quả tối đa
+ * @returns {Promise<Array>} Danh sách câu hỏi có thể khớp
+ */
+async function findQuestionsByTextFuzzy(questionText, limit = 10) {
+  try {
+    if (!questionText || !questionText.trim()) return [];
+
+    const db = getDb();
+    // Lấy một số câu hỏi để so sánh client-side
+    // Không thể full-text search trong Firestore, nên lấy sample
+    const querySnapshot = await db.collection('questions')
+      .limit(500)
+      .get();
+
+    if (querySnapshot.empty) return [];
+
+    const searchLower = questionText.toLowerCase().trim();
+    const searchWords = searchLower.split(/\s+/).filter(w => w.length > 3);
+
+    const results = [];
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const qText = (data.question || '').toLowerCase();
+
+      // Simple match: check if question contains key words
+      let matchScore = 0;
+      searchWords.forEach(word => {
+        if (qText.includes(word)) matchScore++;
+      });
+
+      if (matchScore >= Math.min(3, searchWords.length * 0.5)) {
+        results.push({ id: doc.id, ...data, matchScore });
+      }
+    });
+
+    // Sort by match score descending
+    results.sort((a, b) => b.matchScore - a.matchScore);
+    return results.slice(0, limit);
+  } catch (error) {
+    console.error('Error finding questions fuzzy:', error);
+    return [];
+  }
+}
+
 // ==================== BATCH OPERATIONS ====================
 
 /**

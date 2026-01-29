@@ -284,19 +284,58 @@ async function restoreFromCache() {
     // KHÔNG restore documents - sẽ load khi user chọn category
     // documents = []; // Keep empty
 
-    // Restore questions và selected documents (nếu có session trước đó)
+    // Restore questions và selected documents (nếu có session trước đó hoặc auto-detected)
     const cachedQuestions = await getFromCache(CACHE_KEYS.QUESTIONS);
     const selectedDocumentIds = await getFromCache(CACHE_KEYS.SELECTED_DOCUMENTS);
 
-    if (cachedQuestions && cachedQuestions.length > 0 && selectedDocumentIds && selectedDocumentIds.length > 0) {
+    // Lenient check: Just questions is enough to show the valid state
+    if (cachedQuestions && cachedQuestions.length > 0) {
       questions = cachedQuestions;
-      selectedDocuments = selectedDocumentIds;
+      selectedDocuments = selectedDocumentIds || [];
       hasUsefulCache = true;
-      console.log(' Restored session:', {
+      console.log('Restored session (Auto/Manual):', {
         questions: questions.length,
         selectedDocuments: selectedDocuments.length
       });
+
+      // Update UI
+      // Update UI using existing helper
+      if (typeof showQuestionsStatus === 'function') {
+        showQuestionsStatus(questions.length);
+      }
+
+      // Ensure selection form is hidden if we have questions
+      if (typeof toggleSelectionForm === 'function') {
+        toggleSelectionForm(false);
+      } else {
+        if (selectionSection) selectionSection.style.display = 'none';
+      }
+
+      // Notify content script
       sendQuestionsToContentScript(questions);
+    } else {
+      // No cache, default to showing empty state or manual selection if needed
+      // But for Auto-Detect, we might just show "Ready to detect"
+      if (selectionSection) selectionSection.style.display = 'none'; // START HIDDEN to avoid clutter
+      // Show questions section but empty?
+      if (questionsSection) {
+        questionsSection.style.display = 'block';
+        if (questionsList) {
+          questionsList.innerHTML = `
+                <div style="text-align:center; padding: 20px; color: #666;">
+                   <p>Chưa có câu hỏi nào.</p>
+                   <p style="font-size: 0.9em">Extension sẽ tự động phát hiện tài liệu khi bạn ấn "So sánh" trên trang web.</p>
+                   <button id="manualSelectBtn" style="margin-top:10px; background:none; border:none; color:#0d6efd; text-decoration:underline; cursor:pointer;">
+                      Chọn thủ công
+                   </button>
+                </div>
+             `;
+          setTimeout(() => {
+            const btn = document.getElementById('manualSelectBtn');
+            if (btn) btn.onclick = () => { toggleSelectionForm(true); };
+          }, 100);
+        }
+      }
     }
 
     const highlightAnswersSetting = await getFromCache(CACHE_KEYS.HIGHLIGHT_ANSWERS);

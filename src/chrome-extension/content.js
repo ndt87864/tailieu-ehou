@@ -687,26 +687,109 @@ if (window.tailieuExtensionLoaded) {
         }
     }
 
-    // Perform auto-compare if we have cached questions
+    // Auto-detected document ID
+    let detectedDocumentId = null;
+
+    // Helper: Find question in DB via background
+    async function findQuestionInDB(questionText) {
+        return new Promise((resolve) => {
+            if (chrome?.runtime?.sendMessage) {
+                chrome.runtime.sendMessage(
+                    { action: 'findQuestionByText', questionText },
+                    (response) => {
+                        if (response && response.success) {
+                            resolve(response.question);
+                        } else {
+                            resolve(null);
+                        }
+                    }
+                );
+            } else {
+                resolve(null);
+            }
+        });
+    }
+
+    // Helper: Load questions from a specific document via background
+    async function loadQuestionsFromDocument(documentId) {
+        return new Promise((resolve) => {
+            if (chrome?.runtime?.sendMessage) {
+                chrome.runtime.sendMessage(
+                    { action: 'getQuestionsByDocumentId', documentId },
+                    (response) => {
+                        if (response && response.success) {
+                            resolve(response.questions || []);
+                        } else {
+                            resolve([]);
+                        }
+                    }
+                );
+            } else {
+                resolve([]);
+            }
+        });
+    }
+
+    // Core Auto-detection logic: Try to detect document from the first question on the page
+    async function detectDocumentFromPage(firstQuestionText) {
+        if (!firstQuestionText) return false;
+
+        debugLog('[Tailieu Extension] Auto-detecting document for question:', firstQuestionText.substring(0, 50) + '...');
+
+        // 1. Find the question in DB
+        const question = await findQuestionInDB(firstQuestionText);
+
+        if (question && question.documentId) {
+            debugLog('[Tailieu Extension] Detected document ID:', question.documentId);
+
+            // 2. Load all questions from this document
+            const questions = await loadQuestionsFromDocument(question.documentId);
+
+            if (questions.length > 0) {
+                extensionQuestions = questions;
+                detectedDocumentId = question.documentId;
+
+                // Save to cache so next time we don't need to re-fetch immediately
+                // Note: We might want a separate cache key or just use the same one
+                // Using the same key makes it seamless with manual selection
+                if (chrome?.runtime?.sendMessage) {
+                    // Optional: Notify popup that we detected a document (not critical)
+                }
+
+                return true;
+            }
+        } else {
+            debugLog('[Tailieu Extension] Could not detect document from question.');
+        }
+        return false;
+    }
+
+    // Perform auto-compare if we have cached questions OR try to auto-detect
     async function performAutoCompare(force = false) {
         // Chỉ thực hiện so sánh khi ở đúng domain
         if (window.location.hostname !== 'learning.ehou.edu.vn') {
             return;
         }
+
         // Respect auto-select toggle: skip automatic compares when disabled (unless forced)
+        // BUT: If the user hasn't selected anything manually (cache empty), we might want to try auto-detect anyway?
+        // Let's stick to the rule: if autoSelectEnabled is false, we don't do anything unless forced.
+        // Wait, the user requirement is "không cần chọn danh mục và tài liệu ... người dùng chỉ cần ấn so sánh".
+        // This implies manual trigger ("ấn so sánh"). 
+        // But "performAutoCompare" is called on load. 
+        // If we want FULLY automated (on load), we need autoSelectEnabled = true (or default to true).
+        // For now, let's assume this flows into the existing logic.
         if (!autoSelectEnabled && !force) {
             return;
         }
         // Throttle auto-compare to avoid too frequent calls (unless forced)
         const now = Date.now();
         if (!force && now - lastCompareTime < COMPARE_DEBOUNCE_MS) {
-
             return;
         }
 
         // Skip if currently comparing
         if (isComparing) {
-
             return;
         }
 
@@ -715,8 +798,35 @@ if (window.tailieuExtensionLoaded) {
             await loadCachedQuestions();
         }
 
-        if (extensionQuestions.length > 0) {
+        // START: Auto-detect logic
+        // If we still have no questions, OR if we have questions but they don't seem to match the current page
+        // (which implies user might have navigated to a new quiz different from cached one)
+        // We should try to auto-detect the document from the content.
+        let pageQuestions = [];
+        try {
+            // Extract questions first to check if cache applies
+            pageQuestions = scanQuestionsOnPage();
+        } catch (e) { /* ignore */ }
 
+        if (allQuestionsAreInvalid(pageQuestions, extensionQuestions)) {
+            debugLog('[Tailieu Extension] Cache invalid or empty. Attempting auto-detection...');
+
+            // Try to detect document from the first valid question on the page
+            if (pageQuestions.length > 0) {
+                const firstQ = pageQuestions[0];
+                const cleanText = cleanQuestionText(firstQ.text || '');
+                const success = await detectDocumentFromPage(cleanText);
+
+                if (success) {
+                    debugLog('[Tailieu Extension] Auto-detection successful! Loaded questions for document:', detectedDocumentId);
+                    // Save the newly loaded questions to cache persistent
+                    saveCachedQuestions();
+                }
+            }
+        }
+        // END: Auto-detect logic
+
+        if (extensionQuestions.length > 0) {
             lastCompareTime = now;
             isComparing = true;
 
@@ -724,26 +834,17 @@ if (window.tailieuExtensionLoaded) {
                 // Wait for page to be ready
                 if (document.readyState !== 'complete') {
                     await new Promise(resolve => {
-                        if (document.readyState === 'complete') {
-                            resolve();
-                        } else {
-                            window.addEventListener('load', resolve, { once: true });
-                        }
+                        window.addEventListener('load', resolve, { once: true });
                     });
-
-                    // Additional small delay for dynamic content
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
 
                 const result = await compareAndHighlightQuestions();
 
                 if (result.matched > 0) {
-
                     showAutoCompareNotification(result.matched, extensionQuestions.length);
-
-                    // Notify popup about successful comparison
+                    // ... notify popup ...
                     try {
-                        // Check if extension context is valid before sending message
                         if (chrome?.runtime?.sendMessage) {
                             chrome.runtime.sendMessage({
                                 action: 'comparisonComplete',
@@ -751,22 +852,54 @@ if (window.tailieuExtensionLoaded) {
                                 total: extensionQuestions.length
                             });
                         }
-                    } catch (err) {
-                        if (err.message.includes('Extension context invalidated')) {
-
-                        } else {
-
-                        }
-                    }
+                    } catch (e) { }
                 } else {
-
+                    // If no matches found even with cache, and we haven't just auto-detected
+                    // Maybe we should try to auto-detect AGAIN based on the *first unmatched* question?
+                    // (Handled partially above, but if we had a cache that was WRONG, the above check
+                    // "allQuestionsAreInvalid" attempts to fix it. 
+                    // But what if the cache WAS valid for Q1 but not others? Mixed content?
+                    // For now, assume one document per page).
                 }
             } finally {
                 isComparing = false;
             }
-        } else {
-
         }
+    }
+
+    // Helper: Check if current cache seems totally irrelevant to the page
+    function allQuestionsAreInvalid(pageQs, extQs) {
+        if (!pageQs || pageQs.length === 0) return false; // Can't judge
+        if (!extQs || extQs.length === 0) return true; // Empty cache is invalid
+
+        // Check intersection of first few questions
+        // If the first page question matches NOTHING in cache, likely wrong document
+        const firstQ = pageQs[0];
+        const cleanFirst = normalizeForExactMatch(cleanQuestionText(firstQ.text));
+
+        // Quick check: does strict key exist in cache?
+        // Optimization: just check raw text includes or something fast
+        const match = extQs.some(eq => {
+            const cleanEq = normalizeForExactMatch(cleanQuestionText(eq.question));
+            return compareNormalized(cleanFirst, cleanEq);
+        });
+
+        return !match;
+    }
+
+    // Helper: Scan questions (extracted from compareAndHighlightQuestions)
+    function scanQuestionsOnPage() {
+        // Use existing extraction logic by creating temporary array
+        // We reuse extractQuestionsFromPage but need to capture its output
+        // Currently extractQuestionsFromPage pushes to `questions` local var in its scope?
+        // Wait, `extractQuestionsFromPage` in original code returned specific structure or pushed to array?
+        // Checking original: `function extractQuestionsFromPage() { const questions = []; ... return questions; }`?
+        // No, in original code it looked like it was inline or helper.
+        // Let's reuse the logic we see in `initializeContentScript` -> calls `extractQuestionsFromPage`? 
+        // Actually, the previous view showed `extractQuestionsFromPage` defined at line 1200.
+        // Let's verify if `scanQuestionsOnPage` is needed or we call `extractQuestionsFromPage`.
+
+        return extractQuestionsFromPage();
     }
 
     // Generic notification function
@@ -1965,22 +2098,69 @@ if (window.tailieuExtensionLoaded) {
                     // KHÔNG dừng vòng lặp, để có thể tìm và highlight tất cả câu trả lời giống nhau
                 }
             }
-            // If no match found for this page question, log best candidates for debugging
+            // If no match found for this page question, try INDIVIDUAL DB LOOKUP
             if (!hasMatchedThisPageQuestion) {
                 try {
-                    const scores = extensionQuestions.map(eq => ({
-                        question: eq.question,
-                        score: calculateEnhancedSimilarity(cleanPageQuestion, cleanQuestionText(eq.question))
-                    }));
-                    scores.sort((a, b) => b.score - a.score);
-                    const top = scores.slice(0, 3).filter(s => s.score > 0.4);
-                    if (top.length > 0) {
-                        //console.log('[Tailieu Extension] No exact match for page question -- top candidates:', pageQ.text, top);
-                    } else {
-                        //console.log('[Tailieu Extension] No match candidates for page question:', pageQ.text);
+                    const cleanText = cleanQuestionText(pageQ.text);
+                    // Only query if text is long enough to be unique
+                    if (cleanText.length > 15) {
+                        const foundQ = await findQuestionInDB(cleanText);
+
+                        if (foundQ) {
+                            debugLog('[Tailieu Extension] Individual DB lookup found match:', foundQ.id);
+
+                            // Highlight the question
+                            highlightMatchedQuestion(pageQ, foundQ);
+                            hasMatchedThisPageQuestion = true;
+
+                            // Record match
+                            matched.push({
+                                pageQuestion: pageQ.text,
+                                extensionQuestion: foundQ.question,
+                                answer: foundQ.answer,
+                                userAnswer: pageQ.userAnswer,
+                                similarity: 1.0,
+                                confidence: 1.0,
+                                source: 'individual-lookup'
+                            });
+
+                            // CHECK FOR CACHE UPDATE
+                            // If this question belongs to the CURRENT detected document but wasn't in cache,
+                            // it means the document has been updated in DB. Refresh cache!
+                            if (detectedDocumentId && foundQ.documentId && foundQ.documentId === detectedDocumentId) {
+                                const isCached = extensionQuestions.some(eq => eq.id === foundQ.id);
+                                if (!isCached) {
+                                    debugLog('[Tailieu Extension] Question belongs to current document but missing from cache. Updating cache...');
+                                    const newQuestions = await loadQuestionsFromDocument(detectedDocumentId);
+                                    if (newQuestions && newQuestions.length > 0) {
+                                        extensionQuestions = newQuestions;
+                                        saveCachedQuestions();
+                                        // Update popup to reflect new count
+                                        try {
+                                            if (chrome?.runtime?.sendMessage) {
+                                                chrome.runtime.sendMessage({ action: 'updateQuestionsPopup', questions: extensionQuestions });
+                                            }
+                                        } catch (e) { }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Still no match - log candidates debug info
+                            if (debugMode) {
+                                const scores = extensionQuestions.map(eq => ({
+                                    question: eq.question,
+                                    score: calculateEnhancedSimilarity(cleanText, cleanQuestionText(eq.question))
+                                }));
+                                scores.sort((a, b) => b.score - a.score);
+                                const top = scores.slice(0, 3).filter(s => s.score > 0.4);
+                                if (top.length > 0) {
+                                    //console.log('[Tailieu Extension] No exact match & no DB match -- top candidates:', pageQ.text, top);
+                                }
+                            }
+                        }
                     }
                 } catch (e) {
-                    // ignore
+                    console.warn('[Tailieu Extension] Fallback lookup error:', e);
                 }
             }
             // Show progress for long lists

@@ -140,6 +140,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
+
+    // ==================== AUTO-DETECTION HANDLERS ====================
+
+    if (request.action === 'findQuestionByText') {
+        findQuestionByText(request.questionText)
+            .then(question => sendResponse({ success: true, question }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (request.action === 'findQuestionsByTextFuzzy') {
+        findQuestionsByTextFuzzy(request.questionText, request.limit || 10)
+            .then(questions => sendResponse({ success: true, questions }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    if (request.action === 'getQuestionsByDocumentId') {
+        getQuestionsByDocument(request.documentId)
+            .then(questions => sendResponse({ success: true, questions }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
 });
 
 // Batch Add Logic
