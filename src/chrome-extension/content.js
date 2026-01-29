@@ -1722,6 +1722,12 @@ if (window.tailieuExtensionLoaded) {
             s = s.replace(/"(?:https?:\/\/[^"]+\/|(?:\.){3,}\/)([^"?]+)(?:\?[^"]*)?"/gi, ' $1 ');
         } catch (e) { }
 
+        // Remove specific long instruction which causes mismatches
+        s = s.replace(/Choose A,\s*B,\s*C,?\s*or\s*D\s*to\s*complete\s*the\s*(following\s*)?sentence[:\s]*/gi, '');
+        // Remove other common instructions
+        s = s.replace(/(Choose|Select)\s*the\s*(best|correct|most\s*suitable)\s*(answer|title|option|response)[:\s]*/gi, '');
+        s = s.replace(/(Chọn|Trả lời)\s*(câu\s*trả\s*lời|đáp\s*án|câu\s*hỏi)(\s*đúng\s*nhất|\s*phù\s*hợp\s*nhất|\s*đúng)?[:\s]*/gi, '');
+
         return s
             .replace(/Câu\s*(hỏi\s*)?\d+[:\.\)\s]*/gi, '')
             .replace(/Bài\s*(tập\s*)?\d+[:\.\)\s]*/gi, '')
