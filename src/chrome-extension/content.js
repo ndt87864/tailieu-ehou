@@ -4732,16 +4732,6 @@ if (window.tailieuExtensionLoaded) {
                 }
 
                 // Create highlighted span for answer
-                const highlightSpan = document.createElement('span');
-                highlightSpan.style.cssText = `
-                background: linear-gradient(135deg, #4CAF50, #8BC34A) !important;
-                color: white !important;
-                border-radius: 4px !important;
-                padding: 3px 6px !important;
-                font-weight: bold !important;
-                box-shadow: 0 2px 4px rgba(76, 175, 80, 0.4) !important;
-                border: 2px solid #2E7D32 !important;
-            `;
                 highlightSpan.className = 'tailieu-answer-highlight';
                 highlightSpan.textContent = matchedText;
                 fragment.appendChild(highlightSpan);
@@ -5149,82 +5139,88 @@ if (window.tailieuExtensionLoaded) {
         const countText = extensionQuestions.length > 0 ? extensionQuestions.length + ' câu hỏi sẵn sàng' : 'Sẵn sàng nhận diện';
 
         indicator.innerHTML = `
-        <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 15px;">
-            <div style="display: flex; flex-direction: column;">
+        <div id="tailieu-indicator-header" style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
+            <div style="margin-right: auto; font-weight: bold; font-size: 13px; letter-spacing: 0.5px;">Tailieu</div>
+            <button id="tailieu-expand-indicator" title="Cài đặt" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer; display: flex; align-items: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="tailieu-hide-indicator" style="background: rgba(244, 67, 54, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕</button>
+        </div>
+
+        <div id="tailieu-indicator-body" style="display: flex; flex-direction: column; gap: 8px;">
+            <div id="tailieu-indicator-collapsed" style="display: flex; flex-direction: column; gap: 4px;">
                 <span id="tailieu-indicator-count" style="font-weight: bold; font-size: 14px;">${countText}</span>
-                <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
+                <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 5px;" title="${selectedDocNames}">
                     📄 ${selectedDocNames}
                 </span>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button id="tailieu-compare-now" style="background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
-                    So sánh
-                </button>
-                <button id="tailieu-next-page" style="display: none; background: linear-gradient(135deg, #2196F3, #b515c0ff); color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s ease;">
-                    Tiếp tục
-                </button>
-                <button id="tailieu-expand-indicator" title="Cài đặt" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-                <button id="tailieu-hide-indicator" style="background: rgba(244, 67, 54, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕</button>
+
+            <div id="tailieu-indicator-expanded" style="display: none; flex-direction: column; gap: 10px; padding-top: 5px; border-top: 1px dashed rgba(255,255,255,0.3); margin-top: 5px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 12px;">Cài đặt</span>
+                    <button id="tailieu-collapse-indicator" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; line-height: 1;">×</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 5px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 500; cursor: pointer; width: 100%;">
+                        <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
+                        <span>Tự động chọn đáp án</span>
+                    </label>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                    <label style="font-size: 10px; font-weight: 500;">Danh mục:</label>
+                    <select id="tailieu-panel-category" style="width: 100%; border-radius: 4px; border: none; padding: 4px; font-size: 11px; color: #333;"></select>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                    <label style="font-size: 10px; font-weight: 500;">Tìm tài liệu:</label>
+                    <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa..." style="width: 100%; border-radius: 4px; border: none; padding: 4px 8px; font-size: 11px; color: #333; outline: none;">
+                </div>
+
+                <div id="tailieu-panel-doc-container" style="display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow-y: auto; padding-right: 2px;">
+                    <label style="font-size: 10px; font-weight: 500;">Tài liệu:</label>
+                    <div id="tailieu-panel-documents" style="display: flex; flex-direction: column; gap: 3px;"></div>
+                </div>
+
+                <div style="display: flex; gap: 5px; margin-top: 2px;">
+                    <button id="tailieu-panel-clear-selection" style="flex: 1; background: #607D8B; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                        Xóa
+                    </button>
+                    <button id="tailieu-panel-save" style="flex: 1; background: #FFEE58; color: black; border: none; border-radius: 4px; padding: 5px; font-size: 10px; font-weight: bold; cursor: pointer;">
+                        Cập nhật
+                    </button>
+                </div>
+                <div id="tailieu-panel-status" style="font-size: 9px; color: #FFEE58; text-align: center; height: 11px;"></div>
             </div>
         </div>
 
-        <div id="tailieu-indicator-expanded" style="display: none; flex-direction: column; gap: 10px; min-width: 220px; padding-top: 5px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px; margin-bottom: 5px;">
-                <span style="font-weight: bold; font-size: 14px;">Cài đặt câu hỏi</span>
-                <button id="tailieu-collapse-indicator" style="background: none; border: none; color: white; cursor: pointer; font-size: 18px; line-height: 1;">×</button>
-            </div>
-
-            <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px dashed rgba(255,255,255,0.2);">
-                <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; cursor: pointer; width: 100%;">
-                    <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
-                    <span>Tự động chọn đáp án</span>
-                </label>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 11px; font-weight: 500;">Danh mục:</label>
-                <select id="tailieu-panel-category" style="width: 100%; border-radius: 4px; border: none; padding: 4px; font-size: 12px; color: #333;"></select>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 11px; font-weight: 500;">Tìm tài liệu:</label>
-                <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa..." style="width: 100%; border-radius: 4px; border: none; padding: 4px 8px; font-size: 12px; color: #333; outline: none;">
-            </div>
-
-            <div id="tailieu-panel-doc-container" style="display: flex; flex-direction: column; gap: 5px; max-height: 150px; overflow-y: auto; padding-right: 5px;">
-                <label style="font-size: 11px; font-weight: 500;">Tài liệu:</label>
-                <div id="tailieu-panel-documents" style="display: flex; flex-direction: column; gap: 3px;"></div>
-            </div>
-
-            <div style="display: flex; gap: 8px; margin-top: 5px;">
-                <button id="tailieu-panel-clear-selection" style="flex: 1; background: #607D8B; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
-                    Xóa lựa chọn
-                </button>
-                <button id="tailieu-panel-save" style="flex: 1; background: #16f18bff; color: black; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">
-                    Cập nhật
-                </button>
-            </div>
-            <div id="tailieu-panel-status" style="font-size: 10px; color: #FFEE58; text-align: center; height: 12px;"></div>
+        <div id="tailieu-indicator-footer" style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
+            <button id="tailieu-compare-now" style="width: 100%; height: 32px; background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                So sánh ngay
+            </button>
+            <button id="tailieu-next-page" style="display: none; width: 100%; height: 32px; background: linear-gradient(135deg, #2196F3, #1976D2); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                Tiếp tục
+            </button>
         </div>
     `;
 
         indicator.style.cssText = `
         position: fixed;
-        top: 50%;
-        right: 5px;
-        background: rgba(33, 150, 243, 0.95);
+        top: 60%;
+        right: 10px;
+        transform: translateY(-50%);
+        background: rgba(33, 150, 243, 0.98);
         color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
+        padding: 15px;
+        border-radius: 12px;
         z-index: 10000;
         font-size: 13px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        animation: slideInLeft 0.3s ease-out;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        animation: slideInRight 0.3s ease-out;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        max-width: 500px;
+        width: 200px;
     `;
 
         // Add CSS animation
@@ -5232,7 +5228,7 @@ if (window.tailieuExtensionLoaded) {
             const styles = document.createElement('style');
             styles.id = 'tailieu-indicator-styles';
             styles.textContent = `
-            @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes slideInRight { from { transform: translate(100%, -50%); opacity: 0; } to { transform: translate(0, -50%); opacity: 1; } }
             #tailieu-panel-doc-container::-webkit-scrollbar { width: 4px; }
             #tailieu-panel-doc-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
             #tailieu-panel-doc-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
@@ -5268,9 +5264,7 @@ if (window.tailieuExtensionLoaded) {
             // --- Toggle Functions ---
             const togglePanel = async (expand) => {
                 if (expand) {
-                    collapsedEl.style.display = 'none';
                     expandedEl.style.display = 'flex';
-                    indicator.style.padding = '15px';
                     loadPanelData();
 
                     // Auto-minimize questions popup when settings opened
@@ -5512,40 +5506,7 @@ if (window.tailieuExtensionLoaded) {
     function createFloatingButton() {
         const button = document.createElement('div');
         button.id = 'tailieu-floating-btn';
-        button.innerHTML = `<?xml version="1.0" encoding="utf-8"?>
-<!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-<svg 
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="#ffffff"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-</svg>`;
-        button.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 10px;
-        width: 50px;
-        height: 50px;
-        background: linear-gradient(135deg, #42A5F5, #1E88E5);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        z-index: 10000;
-        font-size: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
-    `;
+        button.innerHTML = window.TAILIEU_TEMPLATES.FLOATING_BUTTON;
 
         button.addEventListener('mouseenter', () => {
             button.style.transform = 'scale(1.1)';
@@ -5620,113 +5581,39 @@ if (window.tailieuExtensionLoaded) {
         // Create popup container
         const popup = document.createElement('div');
         popup.id = 'tailieu-questions-popup';
-        popup.style.cssText = `
-        position: fixed;
-        bottom: 85px;
-        left: 10px;
-        width: 270px;
-        max-height: 330px;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-        z-index: 999999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 14px;
-        display: block;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    `;
 
         // Create header
         const header = document.createElement('div');
-        header.style.cssText = `
-        background: linear-gradient(135deg, #42A5F5, #1E88E5);
-        color: white;
-        padding: 15px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-weight: 400;
-    `;
+        header.className = 'tailieu-popup-header';
 
         const title = document.createElement('div');
         title.textContent = 'Danh sách câu hỏi';
 
         const controls = document.createElement('div');
-        controls.style.cssText = `
-        display: flex;
-        gap: 10px;
-        align-items: center;
-    `;
+        controls.className = 'tailieu-popup-controls';
 
-        // Minimize button
         const minimizeBtn = document.createElement('button');
         minimizeBtn.id = 'tailieu-questions-minimize-btn';
+        minimizeBtn.className = 'tailieu-control-btn';
         minimizeBtn.innerHTML = '−';
-        minimizeBtn.style.cssText = `
-        background: rgba(255,255,255,0.2);
-        border: none;
-        color: white;
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 18px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
 
-        // Close button
         const closeBtn = document.createElement('button');
+        closeBtn.className = 'tailieu-control-btn';
         closeBtn.innerHTML = '×';
-        closeBtn.style.cssText = `
-        background: rgba(255,255,255,0.2);
-        border: none;
-        color: white;
-        width: 24px;
-        height: 24px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 18px;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    `;
 
         controls.appendChild(minimizeBtn);
         controls.appendChild(closeBtn);
         header.appendChild(title);
         header.appendChild(controls);
 
-        // Create Tab Bar
         const tabBar = document.createElement('div');
         tabBar.id = 'tailieu-popup-tabs';
-        tabBar.style.cssText = `
-            display: flex;
-            background: #f1f3f4;
-            border-bottom: 1px solid #ddd;
-        `;
 
         const createTab = (id, label, isActive = false) => {
             const tab = document.createElement('button');
+            tab.className = 'tailieu-tab-btn' + (isActive ? ' active' : '');
             tab.id = `tab-${id}`;
             tab.textContent = label;
-            tab.style.cssText = `
-                flex: 1;
-                padding: 10px;
-                border: none;
-                background: ${isActive ? 'white' : 'transparent'};
-                border-bottom: ${isActive ? '2px solid #1E88E5' : 'none'};
-                color: ${isActive ? '#1E88E5' : '#666'};
-                font-weight: ${isActive ? '600' : '400'};
-                cursor: pointer;
-                font-size: 13px;
-                transition: all 0.2s;
-            `;
             tab.onclick = () => {
                 currentPopupTab = id;
                 updateQuestionsPopup(extensionQuestions);
@@ -5741,44 +5628,12 @@ if (window.tailieuExtensionLoaded) {
         tabBar.appendChild(tabAll);
         tabBar.appendChild(tabMatched);
 
-        // Create content area
         const content = document.createElement('div');
         content.id = 'tailieu-questions-content';
-        content.style.cssText = `
-        max-height: 250px;
-        overflow-y: auto;
-        padding: 0;
-    `;
 
-        // Create empty state
         const emptyState = document.createElement('div');
-        emptyState.style.cssText = `
-        padding: 40px 20px;
-        text-align: center;
-        color: #666;
-    `;
-        emptyState.innerHTML = `
-        <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
-            <?xml version="1.0" encoding="utf-8"?>
-            <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-            <svg 
-              xmlns="http://www.w3.org/2000/svg"
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#666666"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-        </div>
-        <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
-        <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
-    `;
+        emptyState.className = 'tailieu-empty-state';
+        emptyState.innerHTML = window.TAILIEU_TEMPLATES.EMPTY_STATE;
         content.appendChild(emptyState);
 
         popup.appendChild(header);
@@ -5798,44 +5653,10 @@ if (window.tailieuExtensionLoaded) {
         let originalHeight = '330px';
         let originalMaxHeight = '330px';
 
-        // Tạo overlay icon để hiển thị khi thu nhỏ (thay vì thay thế innerHTML)
         const minimizedOverlay = document.createElement('div');
         minimizedOverlay.id = 'tailieu-minimized-overlay';
-        minimizedOverlay.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        background: linear-gradient(135deg, #42A5F5, #1E88E5);
-        border-radius: 50%;
-        font-size: 24px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        transition: transform 0.2s;
-        z-index: 999998; /* below scanner (1000001) but above popup content */
-    `;
         minimizedOverlay.title = 'Nhấn để mở rộng';
-        minimizedOverlay.innerHTML = `
-        <?xml version="1.0" encoding="utf-8"?>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#ffffff"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-    `;
+        minimizedOverlay.innerHTML = window.TAILIEU_TEMPLATES.MINIMIZED_ICON;
         popup.appendChild(minimizedOverlay);
 
         // Event listeners cho overlay
@@ -5867,6 +5688,7 @@ if (window.tailieuExtensionLoaded) {
                 popup.style.bottom = '20px';
                 popup.style.left = '10px';
                 popup.style.right = 'auto';
+                popup.style.setProperty('right', 'auto', 'important');
                 popup.style.top = 'auto';
 
                 // Ẩn content và header, hiển thị overlay
@@ -5882,6 +5704,7 @@ if (window.tailieuExtensionLoaded) {
                 popup.style.bottom = '85px';
                 popup.style.left = '10px';
                 popup.style.right = 'auto';
+                popup.style.setProperty('right', 'auto', 'important');
 
                 // Hiển thị content và header, ẩn overlay
                 content.style.display = 'block';
@@ -5978,30 +5801,8 @@ if (window.tailieuExtensionLoaded) {
             popup.style.display = 'none';
             localStorage.setItem('tailieu-questions-popup-visible', 'false');
 
-            content.innerHTML = `
-            <div style="padding: 40px 20px; text-align: center; color: #666;">
-                <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 16px;">
-                    <?xml version="1.0" encoding="utf-8"?>
-                    <!-- License: MIT. Made by Lucide Contributors: https://lucide.dev/ -->
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="48"
-                      height="48"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#666666"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                </div>
-                <div style="font-weight: 500; margin-bottom: 8px;">Chưa có câu hỏi</div>
-                <div style="font-size: 12px;">Vui lòng chọn tài liệu từ popup chính</div>
-            </div>
-        `;
+            content.className = 'tailieu-empty-state';
+            content.innerHTML = window.TAILIEU_TEMPLATES.EMPTY_STATE;
             return;
         }
 
@@ -6036,23 +5837,12 @@ if (window.tailieuExtensionLoaded) {
 
         // Add search bar
         const searchContainer = document.createElement('div');
-        searchContainer.style.cssText = `
-            padding: 15px 20px;
-            border-bottom: 1px solid #eee;
-            background: #f8f9fa;
-        `;
+        searchContainer.className = 'tailieu-search-container';
 
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
+        searchInput.className = 'tailieu-search-input';
         searchInput.placeholder = currentPopupTab === 'matched' ? 'Tìm trong kết quả so sánh...' : 'Tìm kiếm câu hỏi...';
-        searchInput.style.cssText = `
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 13px;
-            box-sizing: border-box;
-        `;
 
         searchContainer.appendChild(searchInput);
         content.appendChild(searchContainer);
@@ -6064,74 +5854,27 @@ if (window.tailieuExtensionLoaded) {
         displayQuestions.forEach((question, index) => {
             const questionItem = document.createElement('div');
             questionItem.className = 'question-item-popup';
-            questionItem.style.cssText = `
-                padding: 15px 20px;
-                border-bottom: 1px solid #eee;
-                cursor: pointer;
-                transition: background-color 0.2s;
-            `;
-
-            questionItem.addEventListener('mouseenter', () => {
-                questionItem.style.backgroundColor = '#f8f9fa';
-            });
 
             questionItem.addEventListener('mouseleave', () => {
-                questionItem.style.backgroundColor = 'white';
+                // Background color handled by CSS hover
             });
 
-            // Question number and text
-            const questionHeader = document.createElement('div');
-            questionHeader.style.cssText = `
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 8px;
-                font-size: 13px;
-                line-height: 1.4;
-            `;
             const renderedQ = (typeof window.tailieuImageRenderer !== 'undefined')
                 ? window.tailieuImageRenderer.renderImages(question.question)
                 : question.question;
-            questionHeader.innerHTML = `<span style="color: #667eea;">#${index + 1}</span> ${renderedQ}`;
 
-            // Answer
-            const answerDiv = document.createElement('div');
-            answerDiv.style.cssText = `
-                color: #666;
-                font-size: 12px;
-                background: #f0f8ff;
-                padding: 8px 12px;
-                border-radius: 6px;
-                border-left: 3px solid #667eea;
-                margin-top: 8px;
-                line-height: 1.4;
-            `;
-            const renderedA = (typeof window.tailieuImageRenderer !== 'undefined')
-                ? window.tailieuImageRenderer.renderImages(question.answer)
-                : question.answer;
-            answerDiv.innerHTML = `<strong>Đáp án:</strong> ${renderedA}`;
+            questionItem.innerHTML = window.TAILIEU_TEMPLATES.QUESTION_ITEM(index, renderedQ, (typeof window.tailieuImageRenderer !== 'undefined' ? window.tailieuImageRenderer.renderImages(question.answer) : question.answer));
 
-            questionItem.appendChild(questionHeader);
-            questionItem.appendChild(answerDiv);
 
             // User Answer (if in matched tab and has answer)
             if (currentPopupTab === 'matched' && question.userAnswer) {
-                const userAnsDiv = document.createElement('div');
-                userAnsDiv.style.cssText = `
-                    color: #555;
-                    font-size: 11.5px;
-                    background: #fff3e0;
-                    padding: 6px 10px;
-                    border-radius: 6px;
-                    border-left: 3px solid #ff9800;
-                    margin-top: 5px;
-                    line-height: 1.3;
-                    font-style: italic;
-                `;
                 const renderedUA = (typeof window.tailieuImageRenderer !== 'undefined')
                     ? window.tailieuImageRenderer.renderImages(question.userAnswer)
                     : question.userAnswer;
-                userAnsDiv.innerHTML = `<strong>Bạn chọn:</strong> ${renderedUA}`;
-                questionItem.appendChild(userAnsDiv);
+
+                const userAnsContainer = document.createElement('div');
+                userAnsContainer.innerHTML = window.TAILIEU_TEMPLATES.USER_ANSWER_DIV(renderedUA);
+                questionItem.appendChild(userAnsContainer.firstElementChild);
             }
 
             // Click to highlight on page
@@ -6178,7 +5921,7 @@ if (window.tailieuExtensionLoaded) {
                         if (!header.querySelector('#tailieu-outdated-warning-popup')) {
                             const warningEl = document.createElement('div');
                             warningEl.id = 'tailieu-outdated-warning-popup';
-                            warningEl.style.cssText = 'font-size: 11px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
+                            warningEl.className = 'tailieu-outdated-warning';
                             warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng cập nhật lại!';
                             header.style.flexDirection = 'column';
                             header.style.alignItems = 'flex-start';
@@ -6233,27 +5976,11 @@ if (window.tailieuExtensionLoaded) {
     // Show highlight notification
     function showHighlightNotification(questionText) {
         const notification = document.createElement('div');
-        notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        z-index: 10001;
-        font-size: 13px;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-        max-width: 400px;
-        text-align: center;
-    `;
-
-        notification.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 4px;"> Đã tìm thấy câu hỏi</div>
-        <div style="font-size: 11px; opacity: 0.9;">${questionText.substring(0, 60)}${questionText.length > 60 ? '...' : ''}</div>
-    `;
+        notification.className = 'tailieu-notification';
+        notification.innerHTML = window.TAILIEU_TEMPLATES.NOTIFICATION(
+            'Đã tìm thấy câu hỏi',
+            `${questionText.substring(0, 60)}${questionText.length > 60 ? '...' : ''}`
+        );
 
         safeAppendToBody(notification, () => {
             setTimeout(() => {

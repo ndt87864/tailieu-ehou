@@ -28,12 +28,14 @@
         "scanner/image-handler.js",
         "content-image-handler.js",
         "image-renderer.js",
+        "ui-templates.js",
         "content.js",
         "scanner/scanner.js",
         "fill-blank-handler.js"
       ],
       "css": [
-        "styles.css"
+        "styles.css",
+        "content.css"
       ],
       "run_at": "document_idle"
     }
