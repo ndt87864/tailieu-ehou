@@ -98,29 +98,112 @@ if (window.tailieuExtensionLoaded) {
     // Hữu ích cho các câu hỏi có MathML (công thức toán) với khoảng trắng không nhất quán
     function compareNormalized(s1, s2) {
         if (!s1 || !s2) return false;
-        // Lần 1: So sánh bình thường
-        if (s1 === s2) return true;
-        // Lần 2: Loại bỏ tất cả khoảng trắng và so sánh lại
-        const s1NoSpace = s1.replace(/\s+/g, '');
-        const s2NoSpace = s2.replace(/\s+/g, '');
-        if (s1NoSpace === s2NoSpace && s1NoSpace.length > 0) return true;
 
-        // Lần 3: So sánh không phân biệt dấu (strip diacritics)
-        try {
-            const stripDiacritics = (str) => {
-                if (!str) return '';
-                if (str.normalize) {
-                    // NFD -> remove combining marks
-                    return str.normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, '').toLowerCase();
-                }
-                return str.replace(/[^\u0000-\u007F]/g, '').replace(/\s+/g, '').toLowerCase();
-            };
-            const a = stripDiacritics(s1);
-            const b = stripDiacritics(s2);
-            return a === b && a.length > 0;
-        } catch (e) {
-            return false;
+        // Normalize for compare: lower, NFKC, collapse spaces
+        function normalizeForCompare(str) {
+            let s = String(str || '');
+            try { if (s.normalize) s = s.normalize('NFKC'); } catch (e) { }
+            s = s.toLowerCase();
+            // collapse whitespace
+            s = s.replace(/\s+/g, ' ').trim();
+
+            // Make a diacritics-stripped, punctuation-removed key for robust compare
+            let key = s;
+            try {
+                // NFD + remove combining marks
+                if (key.normalize) key = key.normalize('NFD').replace(/\p{M}/gu, '');
+            } catch (e) { key = key.replace(/[\u0300-\u036f]/g, ''); }
+
+            // Remove punctuation but keep letters/numbers/space
+            try {
+                key = key.replace(/[^\p{L}\p{N}\s]/gu, '');
+            } catch (e) {
+                key = key.replace(/[^A-Za-z0-9\s]/g, '');
+            }
+
+            key = key.replace(/\s+/g, ' ').trim();
+            return { raw: s, key };
         }
+
+        const A = normalizeForCompare(s1);
+        const B = normalizeForCompare(s2);
+
+        if (!A.key || !B.key) return false;
+
+        // 1) exact (already normalized)
+        if (A.key === B.key) return true;
+
+        // 2) ignore ALL spaces
+        if (A.key.replace(/\s+/g, '') === B.key.replace(/\s+/g, '') && A.key.replace(/\s+/g, '').length > 0) return true;
+
+        // 3) substring containment (one contains other)
+        if (A.key.includes(B.key) || B.key.includes(A.key)) return true;
+
+        // 4) fuzzy match via Levenshtein distance (relative threshold)
+        function levenshtein(a, b) {
+            if (a === b) return 0;
+            const al = a.length, bl = b.length;
+            if (al === 0) return bl;
+            if (bl === 0) return al;
+            const v0 = new Array(bl + 1).fill(0);
+            const v1 = new Array(bl + 1).fill(0);
+            for (let j = 0; j <= bl; j++) v0[j] = j;
+            for (let i = 0; i < al; i++) {
+                v1[0] = i + 1;
+                for (let j = 0; j < bl; j++) {
+                    const cost = a[i] === b[j] ? 0 : 1;
+                    v1[j + 1] = Math.min(v1[j] + 1, v0[j + 1] + 1, v0[j] + cost);
+                }
+                for (let j = 0; j <= bl; j++) v0[j] = v1[j];
+            }
+            return v1[bl];
+        }
+
+        try {
+            const lev = levenshtein(A.key, B.key);
+            const maxLen = Math.max(A.key.length, B.key.length) || 1;
+            const ratio = lev / maxLen;
+            // Accept up to 15% difference (tunable). Also allow small absolute distance for short strings.
+            if (ratio <= 0.15 || lev <= 2) return true;
+        } catch (e) {
+            // ignore errors and fallback to false
+        }
+
+        return false;
+    }
+
+    // Create a strict key for answer comparison: remove all non-letter/number characters
+    // and collapse to a continuous lowercase string. This ensures answers only match
+    // when they are identical in content ignoring punctuation and whitespace.
+    function normalizeAnswerKey(text) {
+        const s = normalizeForExactMatch(text || '');
+        if (!s) return '';
+        try {
+            // Remove diacritics (unicode combining marks) to treat accents as equal
+            let key = s;
+            try {
+                if (key.normalize) key = key.normalize('NFD').replace(/\p{M}/gu, '');
+            } catch (e) {
+                key = key.replace(/[\u0300-\u036f]/g, '');
+            }
+            // Remove any non-letter/number characters and collapse
+            return key.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+        } catch (e) {
+            // Fallback for environments without Unicode property escapes
+            try {
+                let key = s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s.replace(/[\u0300-\u036f]/g, '');
+                return key.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+            } catch (e2) {
+                return s.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+            }
+        }
+    }
+
+    // For questions we apply the same strict key normalization as answers.
+    // This removes diacritics and all non-alphanumeric characters so that
+    // comparisons only consider the raw Vietnameses letters/numbers sequence.
+    function normalizeQuestionKey(text) {
+        return normalizeAnswerKey(text);
     }
 
     // Helper to clean question text (strip reading passages and prefixes)
@@ -959,6 +1042,24 @@ if (window.tailieuExtensionLoaded) {
                 // Filter out any questions inserted by the scanner extension to avoid proposing them
                 extensionQuestions = (request.questions || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
 
+                // Ensure questions are ordered newest->oldest so latest DB answers get priority
+                try {
+                    extensionQuestions.sort((a, b) => {
+                        const toMillis = (t) => {
+                            if (!t) return 0;
+                            if (typeof t.toDate === 'function') return t.toDate().getTime();
+                            if (t.seconds) return t.seconds * 1000 + (t.nanoseconds ? Math.floor(t.nanoseconds / 1e6) : 0);
+                            const n = new Date(t).getTime();
+                            return isNaN(n) ? 0 : n;
+                        };
+                        const ta = toMillis(a.updatedAt || a.createdAt);
+                        const tb = toMillis(b.updatedAt || b.createdAt);
+                        return tb - ta;
+                    });
+                } catch (e) {
+                    console.warn('Failed to sort extensionQuestions by date:', e);
+                }
+
                 // Save to cache
                 saveCachedQuestions();
                 // Clear the outdated-data flag: new questions pushed, data is fresh now
@@ -1623,6 +1724,8 @@ if (window.tailieuExtensionLoaded) {
             .replace(/\s+/g, ' ')
             // Giữ lại chuỗi dấu chấm liên tiếp (........ hoặc ...), thay vì loại bỏ
             .replace(/(\.{3,})/g, ' $1 ') // Đảm bảo dấu chấm được giữ lại và tách biệt
+            // Normalize various dash-like characters and soft hyphen to space
+            .replace(/[\u00AD\u2010\u2011\u2012\u2013\u2014\u2212]/g, ' ')
             .replace(/[^\w\sÀ-ỹ\?\.,!]/g, ' ') // Keep only letters, Vietnamese chars, basic punctuation
             .trim()
             .toLowerCase();
@@ -1692,6 +1795,17 @@ if (window.tailieuExtensionLoaded) {
                 // Safety: skip any question that originated from the scanner extension
                 if (extQ && extQ.source && extQ.source === 'scanner_extension') continue;
                 const cleanExtQuestion = cleanQuestionText(extQ.question);
+
+                // Debug trace for known problematic question phrases
+                try {
+                    if (debugMode && /cơ cấu xã hội/i.test(pageQ.text || '')) {
+                        const cp = cleanQuestionText(pageQ.text || '');
+                        const ce = cleanExtQuestion || '';
+                        const kPage = normalizeQuestionKey(cp || '');
+                        const kExt = normalizeQuestionKey(ce || '');
+                        console.debug('[Tailieu Debug][QA Compare]', { pageText: pageQ.text, extText: extQ.question, cleanPage: cp, cleanExt: ce, keyPage: kPage, keyExt: kExt });
+                    }
+                } catch (e) { /* ignore debug errors */ }
                 comparisons++;
 
                 // Try all variants (use first that matches)
@@ -1722,10 +1836,15 @@ if (window.tailieuExtensionLoaded) {
                     const normEStrip = normalizeForExactMatch(eStrip);
                     // So sánh bình thường hoặc sau khi loại bỏ tất cả khoảng trắng (MathML)
                     if (vStrip && eStrip && (normVStrip === normEStrip || normVStrip.replace(/\s+/g, '') === normEStrip.replace(/\s+/g, ''))) {
-                        debugLog('[Compare] Matched after stripping Listen prompt:', vStrip, '==', eStrip);
-                        matchedVariant = variant;
-                        matchedFinalValidation = { isValid: true, confidence: 0.92 };
-                        break;
+                        // Require question-key equality to avoid false positives from short variations
+                        const kVar = normalizeQuestionKey(vStrip);
+                        const kExt = normalizeQuestionKey(eStrip);
+                        if (kVar && kExt && kVar === kExt) {
+                            debugLog('[Compare] Matched after stripping Listen prompt:', vStrip, '==', eStrip);
+                            matchedVariant = variant;
+                            matchedFinalValidation = { isValid: true, confidence: 0.92 };
+                            break;
+                        }
                     }
                 }
 
@@ -1757,9 +1876,24 @@ if (window.tailieuExtensionLoaded) {
                         }
 
                         if (sim > 0.86) { // high threshold
-                            matchedVariant = variant;
-                            matchedFinalValidation = { isValid: true, confidence: sim };
-                            break;
+                            // Only accept high similarity if the strict question keys match
+                            try {
+                                const kVar = normalizeQuestionKey(variant || '');
+                                const kExt = normalizeQuestionKey(cleanExtQuestion || '');
+                                if (kVar && kExt && kVar === kExt) {
+                                    matchedVariant = variant;
+                                    matchedFinalValidation = { isValid: true, confidence: sim };
+                                    break;
+                                } else {
+                                    if (debugMode) console.debug('[Tailieu Debug] High similarity but question keys differ, skip', { variant, cleanExtQuestion, sim, kVar, kExt });
+                                    continue;
+                                }
+                            } catch (e) {
+                                // If key normalization fails unexpectedly, fallback to accepting sim
+                                matchedVariant = variant;
+                                matchedFinalValidation = { isValid: true, confidence: sim };
+                                break;
+                            }
                         }
                     }
 
@@ -2117,41 +2251,13 @@ if (window.tailieuExtensionLoaded) {
 
     // Check if two questions are similar - Enhanced for 100% accuracy
     function isQuestionSimilar(q1, q2) {
-        // Require exact normalized equality: strip punctuation/whitespace/special chars then compare
+        // Strict equality for questions: compare normalized question KEYs
         try {
-            const n1 = normalizeForExactMatch(q1 || '');
-            const n2 = normalizeForExactMatch(q2 || '');
-
-            // Lần 1: So sánh bình thường (đã collapse whitespace)
-            if (n1 === n2 && n1.length > 0) {
-                return true;
-            }
-
-            // Lần 2: FALLBACK - Loại bỏ TẤT CẢ khoảng trắng và so sánh lại
-            // Điều này giúp match các câu hỏi có công thức MathML như "QS2QS" vs "Q S 2 Q S"
-            const n1NoSpace = n1.replace(/\s+/g, '');
-            const n2NoSpace = n2.replace(/\s+/g, '');
-            if (n1NoSpace === n2NoSpace && n1NoSpace.length > 0) {
-                return true;
-            }
-
-            // Lần 3: FALLBACK - So sánh không phân biệt dấu (strip diacritics)
-            try {
-                const stripDiacritics = (str) => {
-                    if (!str) return '';
-                    if (str.normalize) return str.normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, '').toLowerCase();
-                    return str.replace(/[^\u0000-\u007F]/g, '').replace(/\s+/g, '').toLowerCase();
-                };
-                const s1 = stripDiacritics(n1);
-                const s2 = stripDiacritics(n2);
-                if (s1 && s2 && s1 === s2) return true;
-            } catch (e) {
-                // ignore
-            }
-
-            return false;
+            const k1 = normalizeQuestionKey(q1 || '');
+            const k2 = normalizeQuestionKey(q2 || '');
+            return (k1 && k2 && k1 === k2);
         } catch (e) {
-            return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
+            return false;
         }
     }
 
@@ -2241,12 +2347,15 @@ if (window.tailieuExtensionLoaded) {
 
     // Final validation to ensure 100% accuracy before accepting a match
     function performFinalValidation(pageQuestionRaw, dbQuestionRaw) {
-        // New strict rule: only accept if normalized strings are exactly equal
+        // New strict rule: only accept if question keys are exactly equal (ignore accents, punctuation, spaces)
         try {
-            const nPage = normalizeForExactMatch(pageQuestionRaw || '');
-            const nDb = normalizeForExactMatch(dbQuestionRaw || '');
-            if (nPage && nDb && compareNormalized(nPage, nDb)) {
-                return { isValid: true, reason: 'Exact normalized match', confidence: 1 };
+            // Clean both sides first to remove numbering/prefixes and normalize punctuation
+            const cleanPage = cleanQuestionText((pageQuestionRaw || '').toString());
+            const cleanDb = cleanQuestionText((dbQuestionRaw || '').toString());
+            const qKey = normalizeQuestionKey(cleanPage || '');
+            const dbKey = normalizeQuestionKey(cleanDb || '');
+            if (qKey && dbKey && qKey === dbKey) {
+                return { isValid: true, reason: 'Exact question key match', confidence: 1 };
             }
 
             // Fallback for image-only differences: if both contain image filenames, accept match when filenames intersect
@@ -2926,44 +3035,20 @@ if (window.tailieuExtensionLoaded) {
 
                     // STRICT EXACT MATCH (configurable)
                     if (STRICT_ANSWER_EXACT_MATCH) {
-                        // So sánh chính xác (dùng compareNormalized để cho phép fallback không phân biệt dấu)
-                        if (dbExact && webExact && compareNormalized(webExact, dbExact)) {
+                        // Strict answer equality: only accept when normalized answer KEYs are identical
+                        // (ignoring punctuation, whitespace and similar minor differences)
+                        const webKey = normalizeAnswerKey(webExact);
+                        const dbKey = normalizeAnswerKey(dbExact);
+                        if (dbKey && webKey && webKey === dbKey) {
                             applyHighlightStyle(webOpt.element);
                             const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
                             highlightedQA.push(qaExact);
                             highlightedCount++;
                             highlightedWebIndices.add(webOpt.index);
-                            break; // Thoát khỏi vòng lặp DB answers, tiếp tục với web option tiếp theo
+                            break; // Stop checking DB answers for this web option
                         }
 
-                        // PARTIAL MATCH: Kiểm tra xem text web có phải là phần cuối hoặc phần đầu của DB answer không
-                        // Điều này xử lý trường hợp đáp án trên web chỉ hiển thị một phần của đáp án đầy đủ
-                        if (dbExact && webExact && webExact.length >= 10) {
-                            // Kiểm tra nếu web text là phần cuối của DB answer (endsWith)
-                            if (dbExact.endsWith(webExact)) {
-                                applyHighlightStyle(webOpt.element);
-                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_END_WEB_TO_DB' };
-                                highlightedQA.push(qaPartial);
-                                highlightedCount++;
-                                highlightedWebIndices.add(webOpt.index);
-                                break;
-                            }
-                            // Kiểm tra nếu web text là phần đầu của DB answer (startsWith)
-                            if (dbExact.startsWith(webExact)) {
-                                applyHighlightStyle(webOpt.element);
-                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_START_WEB_TO_DB' };
-                                highlightedQA.push(qaPartial);
-                                highlightedCount++;
-                                highlightedWebIndices.add(webOpt.index);
-                                break;
-                            }
-                        }
-
-                        // Debug logging for strict mode mismatch (lightweight)
-                        if (debugMode && normalizedAnswers.indexOf(normalizedAns) === 0) {
-                            //console.log('[Tailieu Extension][STRICT_MATCH] Checking web option:', webOpt.index, webExact.substring(0, 50));
-                        }
-                        // If strict mode and not exact, do not fallback to fuzzy matches
+                        // Do NOT accept partial/startsWith/endsWith matches in strict mode to avoid false-positives
                         continue;
                     }
 
@@ -3018,103 +3103,53 @@ if (window.tailieuExtensionLoaded) {
             });
         } else {
             // Số đáp án trong DB <= 4: Lấy từng đáp án từ DB so sánh với web options
+            // Thay vì áp dụng các kiểm tra contains/substring đơn giản (dễ gây false-positive khi nhiều options chia sẻ tiền tố),
+            // ta tính điểm tương đồng cho từng option, chọn option tốt nhất và chỉ highlight khi đó là kết quả rõ ràng.
             normalizedAnswers.forEach((normalizedAns, ansIndex) => {
                 if (normalizedAns.length < 2) return;
 
-                // So sánh đáp án DB này với TẤT CẢ các options trên web
+                const dbExact = normalizeForExactMatch(normalizedAns || '');
+                if (!dbExact) return;
+
+                const scores = [];
                 for (const webOpt of webOptions) {
-                    // Bỏ qua nếu option này đã được highlight
                     if (highlightedWebIndices.has(webOpt.index)) continue;
 
-                    // Prepare strict-normalized forms for exact comparison (ignore punctuation)
                     const webExact = normalizeForExactMatch(webOpt.normalizedText || webOpt.originalText || '');
-                    const dbExact = normalizeForExactMatch(normalizedAns || '');
 
-                    // STRICT EXACT MATCH (configurable)
-                    if (STRICT_ANSWER_EXACT_MATCH) {
-                        // So sánh chính xác (dùng compareNormalized để cho phép fallback không phân biệt dấu)
-                        if (dbExact && webExact && compareNormalized(webExact, dbExact)) {
-                            applyHighlightStyle(webOpt.element);
-                            const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
-                            highlightedQA.push(qaExact);
-                            highlightedCount++;
-                            highlightedWebIndices.add(webOpt.index);
-                            // KHÔNG return, tiếp tục tìm thêm match khác trong web options
+                    // Highest priority: exact normalized match using strict answer key
+                    try {
+                        const webKey = normalizeAnswerKey(webExact);
+                        const dbKey = normalizeAnswerKey(dbExact);
+                        if (webKey && dbKey && webKey === dbKey) {
+                            scores.push({ webOpt, score: 1.0, reason: 'exact' });
+                            continue;
                         }
-
-                        // PARTIAL MATCH: Kiểm tra xem text web có phải là phần cuối hoặc phần đầu của DB answer không
-                        // Điều này xử lý trường hợp đáp án trên web chỉ hiển thị một phần của đáp án đầy đủ
-                        else if (dbExact && webExact && webExact.length >= 10) {
-                            // Kiểm tra nếu web text là phần cuối của DB answer (endsWith)
-                            if (dbExact.endsWith(webExact)) {
-                                applyHighlightStyle(webOpt.element);
-                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_END_DB_TO_WEB' };
-                                highlightedQA.push(qaPartial);
-                                highlightedCount++;
-                                highlightedWebIndices.add(webOpt.index);
-                                // Tiếp tục tìm thêm match khác
-                            }
-                            // Kiểm tra nếu web text là phần đầu của DB answer (startsWith)
-                            else if (dbExact.startsWith(webExact)) {
-                                applyHighlightStyle(webOpt.element);
-                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_START_DB_TO_WEB' };
-                                highlightedQA.push(qaPartial);
-                                highlightedCount++;
-                                highlightedWebIndices.add(webOpt.index);
-                                // Tiếp tục tìm thêm match khác
-                            }
-                        }
-
-                        // If strict mode and not exact, do not fallback to fuzzy matches
-                        continue;
-                    }
-
-                    // NON-STRICT: preserve existing heuristics (contains/reverse/similarity)
-                    let matched = false;
-
-                    // EXACT MATCH
-                    if (webOpt.normalizedText === normalizedAns) {
-                        applyHighlightStyle(webOpt.element);
-                        const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
-                        highlightedQA.push(qaExact);
-                        highlightedCount++;
-                        highlightedWebIndices.add(webOpt.index);
-                        matched = true;
-                    }
-
-                    // CONTAINS MATCH
-                    if (!matched && webOpt.normalizedText.includes(normalizedAns) && normalizedAns.length > 10) {
-                        applyHighlightStyle(webOpt.element);
-                        const qaContains = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'CONTAINS_DB_TO_WEB' };
-                        highlightedQA.push(qaContains);
-                        highlightedCount++;
-                        highlightedWebIndices.add(webOpt.index);
-                        matched = true;
-                    }
-
-                    // REVERSE CONTAINS
-                    if (!matched && normalizedAns.includes(webOpt.normalizedText) && webOpt.normalizedText.length > 10) {
-                        applyHighlightStyle(webOpt.element);
-                        const qaReverse = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'REVERSE_CONTAINS_DB_TO_WEB' };
-                        highlightedQA.push(qaReverse);
-                        highlightedCount++;
-                        highlightedWebIndices.add(webOpt.index);
-                        matched = true;
-                    }
-
-                    // SIMILARITY CHECK
-                    if (!matched && webOpt.normalizedText.length > 15 && normalizedAns.length > 15) {
-                        const similarity = calculateSimilarity(webOpt.normalizedText, normalizedAns);
-                        if (similarity > 0.90) {
-                            applyHighlightStyle(webOpt.element);
-                            const qaSim = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'SIMILARITY_DB_TO_WEB', similarity: similarity };
-                            highlightedQA.push(qaSim);
-                            highlightedCount++;
-                            highlightedWebIndices.add(webOpt.index);
-                            matched = true;
+                    } catch (e) {
+                        // fallback to previous compareNormalized if helper fails
+                        if (webExact && dbExact && compareNormalized(webExact, dbExact)) {
+                            scores.push({ webOpt, score: 1.0, reason: 'exact' });
+                            continue;
                         }
                     }
-                    // Tiếp tục vòng lặp để tìm thêm match khác (không dừng lại)
+
+                    // Compute combined similarity score
+                    const sim = calculateEnhancedSimilarity(webOpt.normalizedText || webOpt.originalText || '', normalizedAns || '');
+                    scores.push({ webOpt, score: sim, reason: 'similarity' });
+                }
+
+                if (scores.length === 0) return;
+                scores.sort((a, b) => b.score - a.score);
+                const best = scores[0];
+                const second = scores[1] || { score: 0 };
+
+                // Decision: accept if exact OR clear high-confidence winner
+                if (best.reason === 'exact' || (best.score >= 0.95 && (best.score - second.score) >= 0.03)) {
+                    applyHighlightStyle(best.webOpt.element);
+                    const qa = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: best.webOpt.originalText, matchType: best.reason === 'exact' ? 'EXACT_DB_TO_WEB' : 'BEST_SIMILARITY_DB_TO_WEB', similarity: best.score };
+                    highlightedQA.push(qa);
+                    highlightedCount++;
+                    highlightedWebIndices.add(best.webOpt.index);
                 }
             });
         }
