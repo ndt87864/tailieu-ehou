@@ -187,14 +187,15 @@ if (window.tailieuExtensionLoaded) {
                 key = key.replace(/[\u0300-\u036f]/g, '');
             }
             // Remove any non-letter/number characters and collapse
-            return key.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+            // Preserve math symbols to distinguish inequalities (e.g. < vs <=)
+            return key.replace(/[^\p{L}\p{N}<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/gu, '').toLowerCase();
         } catch (e) {
             // Fallback for environments without Unicode property escapes
             try {
                 let key = s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s.replace(/[\u0300-\u036f]/g, '');
-                return key.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+                return key.replace(/[^A-Za-z0-9<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/g, '').toLowerCase();
             } catch (e2) {
-                return s.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+                return s.replace(/[^A-Za-z0-9<>=≤≥≠±\+\-\*\/%^|{}\(\)\[\],.]/g, '').toLowerCase();
             }
         }
     }
@@ -1714,7 +1715,14 @@ if (window.tailieuExtensionLoaded) {
 
     // Clean question text for better matching - Enhanced for accuracy
     function cleanQuestionText(text) {
-        return text
+        // Pre-normalize image URLs to filenames to avoid path differences and stripping issues
+        let s = text || '';
+        try {
+            // Extract filename from URL (matches content-image-handler format)
+            s = s.replace(/"(?:https?:\/\/[^"]+\/|(?:\.){3,}\/)([^"?]+)(?:\?[^"]*)?"/gi, ' $1 ');
+        } catch (e) { }
+
+        return s
             .replace(/Câu\s*(hỏi\s*)?\d+[:\.\)\s]*/gi, '')
             .replace(/Bài\s*(tập\s*)?\d+[:\.\)\s]*/gi, '')
             .replace(/Question\s*\d+[:\.\)\s]*/gi, '')
