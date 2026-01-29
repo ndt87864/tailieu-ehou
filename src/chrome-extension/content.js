@@ -1039,46 +1039,77 @@ if (window.tailieuExtensionLoaded) {
         }
 
         if (request.action === 'setExtensionQuestions') {
-            try {
-                // Filter out any questions inserted by the scanner extension to avoid proposing them
-                extensionQuestions = (request.questions || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
-
-                // Ensure questions are ordered newest->oldest so latest DB answers get priority
+            (async () => {
                 try {
-                    extensionQuestions.sort((a, b) => {
-                        const toMillis = (t) => {
-                            if (!t) return 0;
-                            if (typeof t.toDate === 'function') return t.toDate().getTime();
-                            if (t.seconds) return t.seconds * 1000 + (t.nanoseconds ? Math.floor(t.nanoseconds / 1e6) : 0);
-                            const n = new Date(t).getTime();
-                            return isNaN(n) ? 0 : n;
-                        };
-                        const ta = toMillis(a.updatedAt || a.createdAt);
-                        const tb = toMillis(b.updatedAt || b.createdAt);
-                        return tb - ta;
-                    });
-                } catch (e) {
-                    console.warn('Failed to sort extensionQuestions by date:', e);
-                }
+                    // Filter out any questions inserted by the scanner extension to avoid proposing them
+                    extensionQuestions = (request.questions || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
 
-                // Save to cache
-                saveCachedQuestions();
-                // Clear the outdated-data flag: new questions pushed, data is fresh now
-                try {
-                    if (chrome && chrome.storage && chrome.storage.local) {
-                        chrome.storage.local.set({ tailieu_db_updated: false }, function () { });
+                    // Update documents and selected documents if provided
+                    if (request.documents && Array.isArray(request.documents)) {
+                        try {
+                            await chrome.storage.local.set({ 'tailieu_documents': request.documents });
+                        } catch (e) { console.warn('Failed to save documents to storage:', e); }
                     }
-                } catch (e) { }
-                showCachedQuestionsIndicator();
+                    if (request.selectedDocuments && Array.isArray(request.selectedDocuments)) {
+                        try {
+                            await chrome.storage.local.set({ 'tailieu_selected_documents': request.selectedDocuments });
+                        } catch (e) { console.warn('Failed to save selected documents to storage:', e); }
+                    }
 
-                // Update questions popup with new questions
-                updateQuestionsPopup(extensionQuestions);
+                    // Update selected document names
+                    if (request.selectedDocuments && request.documents) {
+                        const selectedIds = request.selectedDocuments;
+                        const allDocs = request.documents;
+                        if (selectedIds.length > 0 && allDocs.length > 0) {
+                            const names = allDocs.filter(d => selectedIds.includes(d.id)).map(d => d.title);
+                            if (names.length > 0) {
+                                selectedDocNames = names.join(', ');
+                                if (selectedDocNames.length > 40) selectedDocNames = selectedDocNames.substring(0, 37) + '...';
+                            } else {
+                                selectedDocNames = 'Chưa chọn';
+                            }
+                        } else {
+                            selectedDocNames = 'Chưa chọn';
+                        }
+                    }
 
-                sendResponse({ success: true });
-            } catch (error) {
+                    // Ensure questions are ordered newest->oldest so latest DB answers get priority
+                    try {
+                        extensionQuestions.sort((a, b) => {
+                            const toMillis = (t) => {
+                                if (!t) return 0;
+                                if (typeof t.toDate === 'function') return t.toDate().getTime();
+                                if (t.seconds) return t.seconds * 1000 + (t.nanoseconds ? Math.floor(t.nanoseconds / 1e6) : 0);
+                                const n = new Date(t).getTime();
+                                return isNaN(n) ? 0 : n;
+                            };
+                            const ta = toMillis(a.updatedAt || a.createdAt);
+                            const tb = toMillis(b.updatedAt || b.createdAt);
+                            return tb - ta;
+                        });
+                    } catch (e) {
+                        console.warn('Failed to sort extensionQuestions by date:', e);
+                    }
 
-                sendResponse({ error: error.message });
-            }
+                    // Save to cache
+                    saveCachedQuestions();
+                    // Clear the outdated-data flag: new questions pushed, data is fresh now
+                    try {
+                        if (chrome && chrome.storage && chrome.storage.local) {
+                            chrome.storage.local.set({ tailieu_db_updated: false }, function () { });
+                        }
+                    } catch (e) { }
+                    showCachedQuestionsIndicator();
+
+                    // Update questions popup with new questions
+                    updateQuestionsPopup(extensionQuestions);
+
+                    sendResponse({ success: true });
+                } catch (error) {
+
+                    sendResponse({ error: error.message });
+                }
+            })();
             return true;
         }
 
@@ -1108,6 +1139,9 @@ if (window.tailieuExtensionLoaded) {
             try {
                 // Clear extension questions
                 extensionQuestions = [];
+
+                // Reset selected document names
+                selectedDocNames = 'Chưa chọn';
 
                 // Clear localStorage cache
                 localStorage.removeItem(QUESTIONS_CACHE_KEY);

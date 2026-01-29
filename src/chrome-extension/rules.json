@@ -56,5 +56,16 @@
       "urlFilter": "*account.ehou.edu.vn/avatar/*",
       "resourceTypes": ["image"]
     }
+  },
+  {
+    "id": 6,
+    "priority": 3,
+    "action": {
+      "type": "allow"
+    },
+    "condition": {
+      "urlFilter": "https://learning.ehou.edu.vn/*",
+      "resourceTypes": ["image"]
+    }
   }
 ]

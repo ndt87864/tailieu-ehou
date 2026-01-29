@@ -413,6 +413,8 @@ async function loadDocuments(categoryId) {
     documents = await getDocumentsByCategory(categoryId);
     console.log(' Documents loaded from Firestore:', documents.length);
 
+    await saveToCache(CACHE_KEYS.DOCUMENTS, documents);
+
     // Reset selected documents khi đổi category
     selectedDocuments = [];
     filteredDocuments = [];
@@ -474,13 +476,9 @@ async function loadQuestions(documentIds) {
 
     showQuestionsStatus(questions.length);
 
-    if (questions.length > 0) {
-      await saveToCache(CACHE_KEYS.QUESTIONS, questions);
-      sendQuestionsToContentScript(questions);
-    } else {
-      console.log('No questions found for selected documents');
-      showQuestionsStatus(0);
-    }
+    // Always send to content script to update selectedDocNames, even if no questions
+    await saveToCache(CACHE_KEYS.QUESTIONS, questions);
+    sendQuestionsToContentScript(questions);
 
   } catch (err) {
     console.error('Failed to load questions:', err);
@@ -552,6 +550,8 @@ async function onDocumentsChange() {
     await loadQuestions(selectedDocuments);
   } else {
     questions = [];
+    // Send empty questions to content script to reset selectedDocNames
+    sendQuestionsToContentScript([]);
     questionsSection.style.display = 'none';
     toggleSelectionForm(true);
   }
@@ -585,6 +585,8 @@ function clearAllDocuments() {
   updateControlsState();
 
   saveToCache(CACHE_KEYS.SELECTED_DOCUMENTS, selectedDocuments);
+  // Send empty questions to content script to reset selectedDocNames
+  sendQuestionsToContentScript([]);
   questionsSection.style.display = 'none';
 }
 
@@ -861,10 +863,12 @@ async function compareQuestionsWithPage() {
 }
 
 async function sendQuestionsToContentScript(questionsData) {
-  // Send questions
+  // Send questions, documents, and selected documents
   const result = await safeSendToContentScript({
     action: 'setExtensionQuestions',
-    questions: questionsData
+    questions: questionsData,
+    documents: documents,
+    selectedDocuments: selectedDocuments
   });
 
   if (result.success) {
