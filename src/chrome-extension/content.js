@@ -1034,30 +1034,9 @@ if (window.tailieuExtensionLoaded) {
     // Generic notification function
     function showNotification(message, type = 'info', duration = 5000) {
         // Type can be: 'info', 'success', 'warning', 'error'
-        const colors = {
-            info: 'rgba(33, 150, 243, 0.95)',      // Blue
-            success: 'rgba(76, 175, 80, 0.95)',    // Green
-            warning: 'rgba(255, 152, 0, 0.95)',    // Orange
-            error: 'rgba(244, 67, 54, 0.95)'       // Red
-        };
-
         const notification = document.createElement('div');
+        notification.className = `tailieu-notification-toast ${type}`;
         notification.textContent = message;
-        notification.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        background: ${colors[type] || colors.info};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-size: 13px;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideInRight 0.3s ease-out;
-        max-width: 300px;
-    `;
 
         safeAppendToBody(notification, () => {
             setTimeout(() => {
@@ -1073,42 +1052,26 @@ if (window.tailieuExtensionLoaded) {
         const accuracy = total > 0 ? ((matched / total) * 100).toFixed(1) : 0;
 
         // Different notification styles based on accuracy
-        let backgroundColor, message;
+        let type, message;
         if (matched === 0) {
-            backgroundColor = 'rgba(255, 152, 0, 0.95)'; // Orange
+            type = 'warning';
             message = `Không tìm thấy câu hỏi phù hợp (0/${total})`;
         } else if (matched === total) {
-            backgroundColor = 'rgba(76, 175, 80, 0.95)'; // Green
+            type = 'success';
             message = `✓ Tìm thấy tất cả ${matched}/${total} câu hỏi (${accuracy}%)`;
         } else {
-            backgroundColor = 'rgba(33, 150, 243, 0.95)'; // Blue
+            type = 'info';
             message = `Tìm thấy ${matched}/${total} câu hỏi (${accuracy}%)`;
         }
 
         const notification = document.createElement('div');
+        notification.className = `tailieu-auto-compare-toast ${type}`;
         notification.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
              <span>${message}</span>
-             <div style="font-size: 10px; opacity: 0.8; margin-left: 8px;">
+             <div class="tailieu-toast-accuracy">
                 Độ chính xác cao
              </div>
-        </div>
-    `;
-
-        notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${backgroundColor};
-        color: white;
-        padding: 12px 16px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-size: 13px;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideInRight 0.3s ease-out;
-    `;
+        `;
 
         safeAppendToBody(notification, () => {
             // Auto-remove after 5 seconds
@@ -5110,8 +5073,6 @@ if (window.tailieuExtensionLoaded) {
             return;
         }
 
-        // REMOVED: if (extensionQuestions.length === 0) return;
-
         // Get display name: use memory variable first (for auto-detect), fallback to storage
         let selectedDocNames = detectedDocumentName || 'Chưa chọn';
 
@@ -5138,114 +5099,20 @@ if (window.tailieuExtensionLoaded) {
 
         const countText = extensionQuestions.length > 0 ? extensionQuestions.length + ' câu hỏi sẵn sàng' : 'Sẵn sàng nhận diện';
 
-        indicator.innerHTML = `
-        <div id="tailieu-indicator-header" style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-            <div style="margin-right: auto; font-weight: bold; font-size: 13px; letter-spacing: 0.5px;">Tailieu</div>
-            <button id="tailieu-expand-indicator" title="Cài đặt" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 4px; padding: 4px; cursor: pointer; display: flex; align-items: center;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-            <button id="tailieu-hide-indicator" style="background: rgba(244, 67, 54, 0.8); color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer;">✕</button>
-        </div>
-
-        <div id="tailieu-indicator-body" style="display: flex; flex-direction: column; gap: 8px;">
-            <div id="tailieu-indicator-collapsed" style="display: flex; flex-direction: column; gap: 4px;">
-                <span id="tailieu-indicator-count" style="font-weight: bold; font-size: 14px;">${countText}</span>
-                <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 5px;" title="${selectedDocNames}">
-                    📄 ${selectedDocNames}
-                </span>
-            </div>
-
-            <div id="tailieu-indicator-expanded" style="display: none; flex-direction: column; gap: 10px; padding-top: 5px; border-top: 1px dashed rgba(255,255,255,0.3); margin-top: 5px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; font-size: 12px;">Cài đặt</span>
-                    <button id="tailieu-collapse-indicator" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; line-height: 1;">×</button>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 8px; padding-bottom: 5px;">
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 500; cursor: pointer; width: 100%;">
-                        <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
-                        <span>Tự động chọn đáp án</span>
-                    </label>
-                </div>
-                
-                <div style="display: flex; flex-direction: column; gap: 3px;">
-                    <label style="font-size: 10px; font-weight: 500;">Danh mục:</label>
-                    <select id="tailieu-panel-category" style="width: 100%; border-radius: 4px; border: none; padding: 4px; font-size: 11px; color: #333;"></select>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 3px;">
-                    <label style="font-size: 10px; font-weight: 500;">Tìm tài liệu:</label>
-                    <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa..." style="width: 100%; border-radius: 4px; border: none; padding: 4px 8px; font-size: 11px; color: #333; outline: none;">
-                </div>
-
-                <div id="tailieu-panel-doc-container" style="display: flex; flex-direction: column; gap: 3px; max-height: 120px; overflow-y: auto; padding-right: 2px;">
-                    <label style="font-size: 10px; font-weight: 500;">Tài liệu:</label>
-                    <div id="tailieu-panel-documents" style="display: flex; flex-direction: column; gap: 3px;"></div>
-                </div>
-
-                <div style="display: flex; gap: 5px; margin-top: 2px;">
-                    <button id="tailieu-panel-clear-selection" style="flex: 1; background: #607D8B; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 10px; font-weight: bold; cursor: pointer;">
-                        Xóa
-                    </button>
-                    <button id="tailieu-panel-save" style="flex: 1; background: #FFEE58; color: black; border: none; border-radius: 4px; padding: 5px; font-size: 10px; font-weight: bold; cursor: pointer;">
-                        Cập nhật
-                    </button>
-                </div>
-                <div id="tailieu-panel-status" style="font-size: 9px; color: #FFEE58; text-align: center; height: 11px;"></div>
-            </div>
-        </div>
-
-        <div id="tailieu-indicator-footer" style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px;">
-            <button id="tailieu-compare-now" style="width: 100%; height: 32px; background: linear-gradient(135deg, #4caf50, #45A049); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                So sánh ngay
-            </button>
-            <button id="tailieu-next-page" style="display: none; width: 100%; height: 32px; background: linear-gradient(135deg, #2196F3, #1976D2); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                Tiếp tục
-            </button>
-        </div>
-    `;
-
-        indicator.style.cssText = `
-        position: fixed;
-        top: 60%;
-        right: 10px;
-        transform: translateY(-50%);
-        background: rgba(33, 150, 243, 0.98);
-        color: white;
-        padding: 15px;
-        border-radius: 12px;
-        z-index: 10000;
-        font-size: 13px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-        animation: slideInRight 0.3s ease-out;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        width: 200px;
-    `;
-
-        // Add CSS animation
-        if (!document.getElementById('tailieu-indicator-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'tailieu-indicator-styles';
-            styles.textContent = `
-            @keyframes slideInRight { from { transform: translate(100%, -50%); opacity: 0; } to { transform: translate(0, -50%); opacity: 1; } }
-            #tailieu-panel-doc-container::-webkit-scrollbar { width: 4px; }
-            #tailieu-panel-doc-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
-            #tailieu-panel-doc-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
-        `;
-            document.head.appendChild(styles);
-        }
+        indicator.innerHTML = window.TAILIEU_TEMPLATES.CACHED_INDICATOR(countText, selectedDocNames);
 
         safeAppendToBody(indicator, () => {
             // Check for outdated data
             try {
                 chrome.storage.local.get(['tailieu_db_updated'], (res) => {
                     if (res && res.tailieu_db_updated) {
-                        const warningEl = document.createElement('div');
-                        warningEl.id = 'tailieu-outdated-warning-indicator';
-                        warningEl.style.cssText = 'font-size: 10px; color: #FFEE58; margin-top: 4px; font-weight: bold; line-height: 1.2; width: 100%;';
-                        warningEl.textContent = 'Dữ liệu lỗi thời. Vui lòng cập nhật lại!';
-                        indicator.querySelector('#tailieu-indicator-collapsed > div:first-child').appendChild(warningEl);
+                        const collapsedInfo = indicator.querySelector('#tailieu-indicator-collapsed');
+                        if (collapsedInfo) {
+                            const warningEl = document.createElement('div');
+                            warningEl.id = 'tailieu-outdated-warning-indicator';
+                            warningEl.textContent = window.TAILIEU_TEMPLATES.OUTDATED_WARNING;
+                            collapsedInfo.appendChild(warningEl);
+                        }
                     }
                 });
             } catch (e) { }
@@ -5276,7 +5143,6 @@ if (window.tailieuExtensionLoaded) {
                 } else {
                     expandedEl.style.display = 'none';
                     collapsedEl.style.display = 'flex';
-                    indicator.style.padding = '12px 16px';
                 }
             };
 
@@ -5300,7 +5166,9 @@ if (window.tailieuExtensionLoaded) {
                             catSelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
                             currentCategories.forEach(cat => {
                                 const opt = document.createElement('option');
-                                opt.value = cat.id; opt.textContent = cat.title; opt.selected = cat.id === savedCatId;
+                                opt.value = cat.id;
+                                opt.textContent = cat.title;
+                                opt.selected = cat.id === savedCatId;
                                 catSelect.appendChild(opt);
                             });
                             if (savedCatId) loadDocsPanel(savedCatId);
@@ -5312,7 +5180,7 @@ if (window.tailieuExtensionLoaded) {
 
             const loadDocsPanel = (catId) => {
                 if (!catId) {
-                    docList.innerHTML = '<div style="font-size:10px; opacity:0.7; text-align:center;">Vui lòng chọn danh mục</div>';
+                    docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Vui lòng chọn danh mục');
                     return;
                 }
                 chrome.runtime.sendMessage({ action: 'getDocumentsByCategory', categoryId: catId }, (res) => {
@@ -5329,30 +5197,25 @@ if (window.tailieuExtensionLoaded) {
 
                 docList.innerHTML = '';
                 if (filtered.length === 0) {
-                    docList.innerHTML = '<div style="font-size:10px; opacity:0.7; text-align:center; padding: 10px 0;">Không tìm thấy tài liệu</div>';
+                    docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Không tìm thấy tài liệu');
                     return;
                 }
 
                 filtered.forEach(doc => {
-                    const item = document.createElement('label');
-                    item.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;';
-                    item.onmouseenter = () => item.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                    item.onmouseleave = () => item.style.backgroundColor = '';
+                    const isSelected = selectedDocIds.includes(doc.id);
+                    const docItem = document.createElement('div');
+                    docItem.innerHTML = window.TAILIEU_TEMPLATES.DOC_ITEM(doc.id, doc.title, isSelected);
+                    const itemEl = docItem.firstElementChild;
 
-                    const checked = selectedDocIds.includes(doc.id) ? 'checked' : '';
-                    item.innerHTML = `<input type="checkbox" value="${doc.id}" ${checked} class="tailieu-doc-cb" style="margin:0;"> <span style="flex:1;">${doc.title}</span>`;
-
-                    // Maintain selectedDocIds when checking/unchecking
-                    const cb = item.querySelector('input');
-                    cb.onclick = (e) => {
-                        if (cb.checked) {
-                            if (!selectedDocIds.includes(doc.id)) selectedDocIds.push(doc.id);
-                        } else {
+                    itemEl.onclick = () => {
+                        if (selectedDocIds.includes(doc.id)) {
                             selectedDocIds = selectedDocIds.filter(id => id !== doc.id);
+                        } else {
+                            selectedDocIds.push(doc.id);
                         }
+                        renderDocumentsList();
                     };
-
-                    docList.appendChild(item);
+                    docList.appendChild(itemEl);
                 });
             };
 
@@ -5508,22 +5371,8 @@ if (window.tailieuExtensionLoaded) {
         button.id = 'tailieu-floating-btn';
         button.innerHTML = window.TAILIEU_TEMPLATES.FLOATING_BUTTON;
 
-        button.addEventListener('mouseenter', () => {
-            button.style.transform = 'scale(1.1)';
-        });
-
-        button.addEventListener('mouseleave', () => {
-            button.style.transform = 'scale(1)';
-        });
-
         button.addEventListener('click', () => {
-            // Open extension popup programmatically (if possible)
-            // Note: In Manifest V3, you can't open popup programmatically
-            // This is just for visual feedback
-            button.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                button.style.transform = 'scale(1)';
-            }, 150);
+            // Visual feedback handled by CSS :active
         });
 
         safeAppendToBody(button);
@@ -5788,11 +5637,7 @@ if (window.tailieuExtensionLoaded) {
             // Cập nhật style cho các tab
             [tabAll, tabMatched].forEach(tab => {
                 const id = tab.id.replace('tab-', '');
-                const isActive = id === currentPopupTab;
-                tab.style.background = isActive ? 'white' : 'transparent';
-                tab.style.borderBottom = isActive ? '2px solid #1E88E5' : 'none';
-                tab.style.color = isActive ? '#1E88E5' : '#666';
-                tab.style.fontWeight = isActive ? '600' : '400';
+                tab.classList.toggle('active', id === currentPopupTab);
             });
         }
 
@@ -5801,7 +5646,6 @@ if (window.tailieuExtensionLoaded) {
             popup.style.display = 'none';
             localStorage.setItem('tailieu-questions-popup-visible', 'false');
 
-            content.className = 'tailieu-empty-state';
             content.innerHTML = window.TAILIEU_TEMPLATES.EMPTY_STATE;
             return;
         }
@@ -5883,9 +5727,9 @@ if (window.tailieuExtensionLoaded) {
                 highlightQuestionOnPage(question.question);
 
                 // Visual feedback
-                questionItem.style.backgroundColor = '#e3f2fd';
+                questionItem.classList.add('highlighted');
                 setTimeout(() => {
-                    questionItem.style.backgroundColor = '';
+                    questionItem.classList.remove('highlighted');
                 }, 1000);
             });
 
@@ -5923,16 +5767,14 @@ if (window.tailieuExtensionLoaded) {
                             warningEl.id = 'tailieu-outdated-warning-popup';
                             warningEl.className = 'tailieu-outdated-warning';
                             warningEl.textContent = ' Dữ liệu câu hỏi lỗi thời. Vui lòng cập nhật lại!';
-                            header.style.flexDirection = 'column';
-                            header.style.alignItems = 'flex-start';
+                            header.classList.add('has-warning');
                             header.appendChild(warningEl);
                         }
                     } else {
                         const warningEl = header.querySelector('#tailieu-outdated-warning-popup');
                         if (warningEl) {
                             warningEl.remove();
-                            header.style.flexDirection = '';
-                            header.style.alignItems = '';
+                            header.classList.remove('has-warning');
                         }
                     }
                 });
@@ -5954,11 +5796,7 @@ if (window.tailieuExtensionLoaded) {
             const cleanPageText = cleanQuestionText(pageQuestion.text);
             if (isQuestionSimilar(cleanTargetText, cleanPageText)) {
                 // Highlight this element
-                pageQuestion.element.style.cssText += `
-                box-shadow: inset 5px 0 0 0 #4CAF50, 0 2px 8px rgba(76, 175, 80, 0.2) !important;
-                border-radius: 4px !important;
-                animation: highlightPulse 2s ease-in-out !important;
-            `;
+                pageQuestion.element.classList.add('tailieu-highlight-pulse');
 
                 // Scroll to element
                 pageQuestion.element.scrollIntoView({
