@@ -446,6 +446,32 @@ async function loadQuestions(documentIds) {
     questions = await getQuestionsByDocuments(documentIds);
     console.log(' Questions loaded from Firestore:', questions.length);
 
+    // If any question was created by the scanner extension, remove it from DB immediately
+    try {
+      const scannerQuestions = questions.filter(q => q && q.source && q.source === 'scanner_extension');
+      if (scannerQuestions.length > 0) {
+        console.log(`Found ${scannerQuestions.length} question(s) with source="scanner_extension" - deleting from DB...`);
+        for (const sq of scannerQuestions) {
+          try {
+            if (sq.id) {
+              await deleteQuestion(sq.id);
+              console.log('Deleted scanner question from DB:', sq.id);
+            } else {
+              console.warn('Scanner question missing id, skipping delete:', sq);
+            }
+          } catch (e) {
+            console.error('Failed to delete scanner question', sq.id, e);
+          }
+        }
+
+        // Remove deleted items from local array so they are not sent to content script
+        questions = questions.filter(q => !(q && q.source && q.source === 'scanner_extension'));
+        console.log('Questions count after removing scanner entries:', questions.length);
+      }
+    } catch (e) {
+      console.error('Error while removing scanner_extension questions:', e);
+    }
+
     showQuestionsStatus(questions.length);
 
     if (questions.length > 0) {

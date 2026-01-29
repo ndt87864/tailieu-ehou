@@ -3,7 +3,7 @@
 
 // Global debug toggle to mute ALL logs in the extension
 (function () {
-  const debugMode = false; // Set to true to enable logs
+  const debugMode = true; // Set to true to enable logs
   if (!debugMode) {
     const noop = () => { };
     const originalConsole = {

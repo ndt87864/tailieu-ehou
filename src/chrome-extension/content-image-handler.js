@@ -241,50 +241,29 @@
     }
 
     /**
-     * Concatenate text from an element by joining meaningful child nodes in order.
-     * - If multiple <strong>/<b> exist, their texts are joined first and followed by remaining text.
-     * - Otherwise, joins child element texts (e.g., multiple <span>) and text nodes in document order.
+     * Concatenate text from an element accurately.
+     * - If priority reordering is needed (for question extraction), pulls strong/b tags to front.
+     * - Otherwise (for answers), returns the full visible text in order.
      */
-    function getConcatenatedText(el) {
+    function getConcatenatedText(el, priorityReorder = false) {
         if (!el) return '';
         try {
-            // Prefer using base image handler normalization when available
             const normalize = (txt) => (txt || '').toString().replace(/\s+/g, ' ').trim();
 
-            // Fix: Check for handler existence safely in this scope if needed, 
-            // but getElementVisibleTextWithImages already handles fallback safely.
-
-            // If strong/b elements exist, join them first
-            const strongEls = el.querySelectorAll('strong, b');
-            if (strongEls && strongEls.length > 0) {
-                // FIXED: Called getElementVisibleTextWithImages directly instead of undefined 'hasBaseImageHandler' check
-                const strongTexts = Array.from(strongEls).map(se => normalize(getElementVisibleTextWithImages(se))).filter(Boolean);
-                const full = normalize(getElementVisibleTextWithImages(el));
-                let rest = full;
-                strongTexts.forEach(st => { rest = rest.replace(st, '').trim(); });
-                return ([strongTexts.join(' '), rest].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
+            // Only use complex priority logic if requested (usually for questions)
+            if (priorityReorder) {
+                const strongEls = el.querySelectorAll('strong, b');
+                if (strongEls && strongEls.length > 0) {
+                    const strongTexts = Array.from(strongEls).map(se => normalize(getElementVisibleTextWithImages(se))).filter(Boolean);
+                    const full = normalize(getElementVisibleTextWithImages(el));
+                    let rest = full;
+                    strongTexts.forEach(st => { rest = rest.replace(st, '').trim(); });
+                    return ([strongTexts.join(' '), rest].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
+                }
             }
 
-            // Otherwise, collect child nodes in order
-            const parts = [];
-            el.childNodes.forEach(node => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const t = normalize(node.textContent);
-                    if (t) parts.push(t);
-                    return;
-                }
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const tag = node.tagName && node.tagName.toUpperCase();
-                    // Skip purely decorative or input elements BUT KEEP IMG
-                    if (tag === 'SVG' || tag === 'INPUT' || tag === 'BUTTON') return;
-
-                    // FIXED: Call getElementVisibleTextWithImages to handle elements (including IMG)
-                    const t = normalize(getElementVisibleTextWithImages(node));
-                    if (t) parts.push(t);
-                }
-            });
-
-            return parts.join(' ').replace(/\s+/g, ' ').trim();
+            // Default: Get the full text content in one go to preserve spacing between inline elements (like multiple spans)
+            return getElementVisibleTextWithImages(el);
         } catch (e) {
             return (el.textContent || '').replace(/\s+/g, ' ').trim();
         }

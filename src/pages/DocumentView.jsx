@@ -160,13 +160,27 @@ function DocumentView() {
 
   // Memoized Computations
   const filteredQuestions = useMemo(() => {
-    return questions.filter(
-      (q) =>
-        (q.question &&
-          q.question.toLowerCase().includes(search.toLowerCase())) ||
-        (q.answer && q.answer.toLowerCase().includes(search.toLowerCase())),
-    );
-  }, [questions, search]);
+    const searchLower = search.toLowerCase();
+
+    const matchesSearch = (q) =>
+      (q.question && q.question.toLowerCase().includes(searchLower)) ||
+      (q.answer && q.answer.toLowerCase().includes(searchLower));
+
+    const containsRestrictedLink = (q) => {
+      const text = `${q.question || ""} ${q.answer || ""}`.toLowerCase();
+      return text.includes("learning.ehou.edu.vn");
+    };
+
+    let result = questions.filter(matchesSearch);
+
+    // For regular users (not admin and not puser), remove any question
+    // whose question or answer contains the restricted domain.
+    if (!isAdmin && !isPuser) {
+      result = result.filter((q) => !containsRestrictedLink(q));
+    }
+
+    return result;
+  }, [questions, search, isAdmin, isPuser]);
 
   const excelButtonState = useMemo(() => {
     if (permissionLoading || excelPermission === null) {

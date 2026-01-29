@@ -27,7 +27,7 @@ if (window.tailieuExtensionLoaded) {
     let lastCompareTime = 0;
     const COMPARE_DEBOUNCE_MS = 1000; // 1 second (reduced from 2 seconds for better UX)
     const MANUAL_COMPARE_DEBOUNCE_MS = 500; // 0.5 second for manual clicks (faster response)
-    let debugMode = false; // Set to true to enable logs for debugging
+    let debugMode = true; // Set to true to enable logs for debugging
     // Expose debug flag to other content scripts (scanner etc.)
     window.debugMode = debugMode;
 
@@ -939,7 +939,8 @@ if (window.tailieuExtensionLoaded) {
 
         if (request.action === 'setExtensionQuestions') {
             try {
-                extensionQuestions = request.questions || [];
+                // Filter out any questions inserted by the scanner extension to avoid proposing them
+                extensionQuestions = (request.questions || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
 
                 // Save to cache
                 saveCachedQuestions();
@@ -1038,7 +1039,8 @@ if (window.tailieuExtensionLoaded) {
 
             const result = await chrome.storage.local.get(QUESTIONS_CACHE_KEY);
             if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
-                extensionQuestions = result[QUESTIONS_CACHE_KEY];
+                // Filter cached questions to remove any scanner_extension entries
+                extensionQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
                 try {
                     // Show cached questions indicator (safely)
                     showCachedQuestionsIndicator();
@@ -1670,6 +1672,8 @@ if (window.tailieuExtensionLoaded) {
 
             for (let extIndex = 0; extIndex < extensionQuestions.length; extIndex++) {
                 const extQ = extensionQuestions[extIndex];
+                // Safety: skip any question that originated from the scanner extension
+                if (extQ && extQ.source && extQ.source === 'scanner_extension') continue;
                 const cleanExtQuestion = cleanQuestionText(extQ.question);
                 comparisons++;
 
@@ -2817,6 +2821,10 @@ if (window.tailieuExtensionLoaded) {
 
             let normalizedOption = normalizeTextForMatching(optionText);
 
+            // IMPORTANT: Remove answer prefix (a., b., c., d.) to match DB format
+            // DB answers don't have these prefixes, so we need to strip them for comparison
+            normalizedOption = normalizedOption.replace(/^[a-dA-D]\s*[\.\)]\s*/, '').trim();
+
             // If option text is still empty/short even with images, try ALT or filename fallback
             if (normalizedOption.length < 2) {
                 const img = option.querySelector && (option.querySelector('img') || option.querySelector('picture img'));
@@ -2887,6 +2895,7 @@ if (window.tailieuExtensionLoaded) {
 
                     // STRICT EXACT MATCH (configurable)
                     if (STRICT_ANSWER_EXACT_MATCH) {
+                        // So sánh chính xác
                         if (dbExact && webExact && webExact === dbExact) {
                             applyHighlightStyle(webOpt.element);
                             const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
@@ -2895,6 +2904,30 @@ if (window.tailieuExtensionLoaded) {
                             highlightedWebIndices.add(webOpt.index);
                             break; // Thoát khỏi vòng lặp DB answers, tiếp tục với web option tiếp theo
                         }
+
+                        // PARTIAL MATCH: Kiểm tra xem text web có phải là phần cuối hoặc phần đầu của DB answer không
+                        // Điều này xử lý trường hợp đáp án trên web chỉ hiển thị một phần của đáp án đầy đủ
+                        if (dbExact && webExact && webExact.length >= 10) {
+                            // Kiểm tra nếu web text là phần cuối của DB answer (endsWith)
+                            if (dbExact.endsWith(webExact)) {
+                                applyHighlightStyle(webOpt.element);
+                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_END_WEB_TO_DB' };
+                                highlightedQA.push(qaPartial);
+                                highlightedCount++;
+                                highlightedWebIndices.add(webOpt.index);
+                                break;
+                            }
+                            // Kiểm tra nếu web text là phần đầu của DB answer (startsWith)
+                            if (dbExact.startsWith(webExact)) {
+                                applyHighlightStyle(webOpt.element);
+                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_START_WEB_TO_DB' };
+                                highlightedQA.push(qaPartial);
+                                highlightedCount++;
+                                highlightedWebIndices.add(webOpt.index);
+                                break;
+                            }
+                        }
+
                         // Debug logging for strict mode mismatch (lightweight)
                         if (debugMode && normalizedAnswers.indexOf(normalizedAns) === 0) {
                             //console.log('[Tailieu Extension][STRICT_MATCH] Checking web option:', webOpt.index, webExact.substring(0, 50));
@@ -2968,6 +3001,7 @@ if (window.tailieuExtensionLoaded) {
 
                     // STRICT EXACT MATCH (configurable)
                     if (STRICT_ANSWER_EXACT_MATCH) {
+                        // So sánh chính xác
                         if (dbExact && webExact && webExact === dbExact) {
                             applyHighlightStyle(webOpt.element);
                             const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
@@ -2976,6 +3010,30 @@ if (window.tailieuExtensionLoaded) {
                             highlightedWebIndices.add(webOpt.index);
                             // KHÔNG return, tiếp tục tìm thêm match khác trong web options
                         }
+
+                        // PARTIAL MATCH: Kiểm tra xem text web có phải là phần cuối hoặc phần đầu của DB answer không
+                        // Điều này xử lý trường hợp đáp án trên web chỉ hiển thị một phần của đáp án đầy đủ
+                        else if (dbExact && webExact && webExact.length >= 10) {
+                            // Kiểm tra nếu web text là phần cuối của DB answer (endsWith)
+                            if (dbExact.endsWith(webExact)) {
+                                applyHighlightStyle(webOpt.element);
+                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_END_DB_TO_WEB' };
+                                highlightedQA.push(qaPartial);
+                                highlightedCount++;
+                                highlightedWebIndices.add(webOpt.index);
+                                // Tiếp tục tìm thêm match khác
+                            }
+                            // Kiểm tra nếu web text là phần đầu của DB answer (startsWith)
+                            else if (dbExact.startsWith(webExact)) {
+                                applyHighlightStyle(webOpt.element);
+                                const qaPartial = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'PARTIAL_START_DB_TO_WEB' };
+                                highlightedQA.push(qaPartial);
+                                highlightedCount++;
+                                highlightedWebIndices.add(webOpt.index);
+                                // Tiếp tục tìm thêm match khác
+                            }
+                        }
+
                         // If strict mode and not exact, do not fallback to fuzzy matches
                         continue;
                     }
