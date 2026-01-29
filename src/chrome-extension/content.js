@@ -5212,8 +5212,8 @@ if (window.tailieuExtensionLoaded) {
 
         indicator.style.cssText = `
         position: fixed;
-        top: 100px;
-        right: 20px;
+        top: 50%;
+        right: 5px;
         background: rgba(33, 150, 243, 0.95);
         color: white;
         padding: 12px 20px;
@@ -5222,7 +5222,7 @@ if (window.tailieuExtensionLoaded) {
         font-size: 13px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-        animation: slideInRight 0.3s ease-out;
+        animation: slideInLeft 0.3s ease-out;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         max-width: 500px;
     `;
@@ -5232,7 +5232,7 @@ if (window.tailieuExtensionLoaded) {
             const styles = document.createElement('style');
             styles.id = 'tailieu-indicator-styles';
             styles.textContent = `
-            @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            @keyframes slideInLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
             #tailieu-panel-doc-container::-webkit-scrollbar { width: 4px; }
             #tailieu-panel-doc-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
             #tailieu-panel-doc-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
@@ -5428,7 +5428,14 @@ if (window.tailieuExtensionLoaded) {
                     if (compareNowBtn.disabled) return;
                     const state = compareNowBtn.dataset.state || 'ready';
                     if (state === 'ready') {
-                        compareNowBtn.disabled = true; compareNowBtn.textContent = '...';
+                        // Cập nhật UI ngay lập tức để button phản hồi nhanh
+                        compareNowBtn.disabled = true;
+                        compareNowBtn.textContent = '...';
+
+                        // Cho browser render UI trước khi chạy logic nặng
+                        await new Promise(r => setTimeout(r, 0));
+
+                        // Chạy logic nặng sau khi UI đã cập nhật
                         const res = await compareAndHighlightQuestions(true);
                         const matched = (res && res.matchedUniquePageCount) || (res && res.matchedQuestions) || 0;
                         compareNowBtn.textContent = `Làm lại (${matched})`;
@@ -5436,10 +5443,14 @@ if (window.tailieuExtensionLoaded) {
                         compareNowBtn.disabled = false;
                         if (nextBtn) nextBtn.style.display = 'block';
                     } else {
-                        clearAllHighlights(); highlightedQA = [];
+                        // Clear và reset cũng cần tách UI update
+                        clearAllHighlights();
+                        highlightedQA = [];
                         if (nextBtn) nextBtn.style.display = 'none';
+
                         await new Promise(r => setTimeout(r, 150));
-                        compareNowBtn.dataset.state = 'ready'; compareNowBtn.click();
+                        compareNowBtn.dataset.state = 'ready';
+                        compareNowBtn.click();
                     }
                 };
             }
@@ -5520,7 +5531,7 @@ if (window.tailieuExtensionLoaded) {
         button.style.cssText = `
         position: fixed;
         bottom: 20px;
-        right: 20px;
+        left: 10px;
         width: 50px;
         height: 50px;
         background: linear-gradient(135deg, #42A5F5, #1E88E5);
@@ -5611,8 +5622,8 @@ if (window.tailieuExtensionLoaded) {
         popup.id = 'tailieu-questions-popup';
         popup.style.cssText = `
         position: fixed;
-        bottom: 20px;
-        right: 20px;
+        bottom: 85px;
+        left: 10px;
         width: 400px;
         max-height: 500px;
         background: white;
@@ -5637,7 +5648,6 @@ if (window.tailieuExtensionLoaded) {
         justify-content: space-between;
         align-items: center;
         font-weight: 400;
-        cursor: move;
     `;
 
         const title = document.createElement('div');
@@ -5855,8 +5865,8 @@ if (window.tailieuExtensionLoaded) {
                 popup.style.height = '60px';
                 popup.style.maxHeight = '60px';
                 popup.style.bottom = '20px';
-                popup.style.right = '20px';
-                popup.style.left = 'auto';
+                popup.style.left = '10px';
+                popup.style.right = 'auto';
                 popup.style.top = 'auto';
 
                 // Ẩn content và header, hiển thị overlay
@@ -5869,8 +5879,9 @@ if (window.tailieuExtensionLoaded) {
                 popup.style.width = originalWidth;
                 popup.style.height = originalHeight;
                 popup.style.maxHeight = originalMaxHeight;
-                popup.style.bottom = '20px';
-                popup.style.right = '20px';
+                popup.style.bottom = '85px';
+                popup.style.left = '10px';
+                popup.style.right = 'auto';
 
                 // Hiển thị content và header, ẩn overlay
                 content.style.display = 'block';
@@ -5881,39 +5892,10 @@ if (window.tailieuExtensionLoaded) {
             // Trạng thái minimized chỉ duy trì trong phiên làm việc hiện tại
         });
 
-        // Make header draggable
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
+        // Draggable logic removed per user request "không di chuyển vị trí"
 
-        header.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            dragOffset.x = e.clientX - popup.offsetLeft;
-            dragOffset.y = e.clientY - popup.offsetTop;
-            header.style.cursor = 'grabbing';
-        });
 
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                popup.style.left = (e.clientX - dragOffset.x) + 'px';
-                popup.style.top = (e.clientY - dragOffset.y) + 'px';
-                popup.style.right = 'auto';
-                popup.style.bottom = 'auto';
-            }
-        });
 
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                header.style.cursor = 'move';
-                // Save position
-                localStorage.setItem('tailieu-questions-popup-position', JSON.stringify({
-                    left: popup.style.left,
-                    top: popup.style.top,
-                    right: popup.style.right,
-                    bottom: popup.style.bottom
-                }));
-            }
-        });
 
         // Restore saved state
         const savedVisible = localStorage.getItem('tailieu-questions-popup-visible');
@@ -5924,18 +5906,7 @@ if (window.tailieuExtensionLoaded) {
         // KHÔNG restore trạng thái minimized từ localStorage
         // Popup luôn bắt đầu ở trạng thái mở rộng khi reload trang
 
-        const savedPosition = localStorage.getItem('tailieu-questions-popup-position');
-        if (savedPosition) {
-            try {
-                const position = JSON.parse(savedPosition);
-                if (position.left && position.left !== 'auto') popup.style.left = position.left;
-                if (position.top && position.top !== 'auto') popup.style.top = position.top;
-                if (position.right && position.right !== 'auto') popup.style.right = position.right;
-                if (position.bottom && position.bottom !== 'auto') popup.style.bottom = position.bottom;
-            } catch (e) {
-                console.log('Could not restore popup position:', e);
-            }
-        }
+
 
         // Verify popup was added successfully
         setTimeout(() => {
