@@ -14,7 +14,9 @@ if (window.tailieuExtensionLoaded) {
     let extensionQuestions = [];
     let lastMatchedQuestions = []; // Lưu trữ danh sách câu hỏi đã so sánh thành công
     let currentPopupTab = 'all'; // 'all' hoặc 'matched'
-    let answerHighlightingEnabled = true; // New setting
+    let answerHighlightingEnabled = false; // New setting (default OFF)
+    // Expose runtime flag on window so other modules (fill-blank handler) can read it
+    try { window.answerHighlightingEnabled = answerHighlightingEnabled; } catch (e) { }
     let autoSelectEnabled = false; // New setting: controls automatic selection/compare (default OFF)
     // Track what QA pairs were highlighted in the current run
     let highlightedQA = [];
@@ -606,6 +608,13 @@ if (window.tailieuExtensionLoaded) {
                             autoSelectEnabled = !!res.tailieu_auto_select;
                         }
                     });
+                    // Restore highlight preference (default: OFF)
+                    chrome.storage.local.get('tailieu_highlight_answers', (res2) => {
+                        if (res2 && typeof res2.tailieu_highlight_answers !== 'undefined') {
+                            answerHighlightingEnabled = !!res2.tailieu_highlight_answers;
+                            try { window.answerHighlightingEnabled = answerHighlightingEnabled; } catch (e) { }
+                        }
+                    });
                 }
             } catch (e) {
                 console.warn('Could not restore autoSelect setting', e);
@@ -1175,6 +1184,20 @@ if (window.tailieuExtensionLoaded) {
                     } catch (e) { }
                 }
 
+                // Listen for highlight-preference changes
+                if (areaName === 'local') {
+                    if (changes['tailieu_highlight_answers'] && typeof changes['tailieu_highlight_answers'].newValue !== 'undefined') {
+                        try {
+                            answerHighlightingEnabled = !!changes['tailieu_highlight_answers'].newValue;
+                            try { window.answerHighlightingEnabled = answerHighlightingEnabled; } catch (e) { }
+                            if (!answerHighlightingEnabled) {
+                                // If highlight turned off, clear any existing highlights
+                                try { clearAllHighlights(); } catch (e) { }
+                            }
+                        } catch (e) { }
+                    }
+                }
+
                 // Check for other tailieu cache updates
                 const tailieusKeys = ['tailieu_selected_category', 'tailieu_selected_document'];
                 const hasRelevantChanges = tailieusKeys.some(key => changes[key]);
@@ -1365,7 +1388,12 @@ if (window.tailieuExtensionLoaded) {
 
         if (request.action === 'setAnswerHighlighting') {
             answerHighlightingEnabled = request.enabled;
+            try { window.answerHighlightingEnabled = answerHighlightingEnabled; } catch (e) { }
             sendResponse({ success: true });
+            // If highlighting was turned off via popup message, clear existing highlights immediately
+            try {
+                if (!answerHighlightingEnabled) clearAllHighlights();
+            } catch (e) { }
             return;
         }
         if (request.action === 'setAutoSelect') {
@@ -2461,32 +2489,36 @@ if (window.tailieuExtensionLoaded) {
 
                         // Direct match against normalized answers
                         if (normalizedAnswerSet.has(normVal)) {
-                            // Avoid double-highlighting
                             const p = input.closest('p') || input.parentElement || input.closest('.formulation') || input;
-                            if (p && !p.classList.contains('tailieu-fillblank-highlighted')) {
-                                p.classList.add('tailieu-fillblank-highlighted');
-                                // Style input for visibility
-                                input.style.border = '2px solid #4CAF50';
-                                input.style.backgroundColor = '#f1f8e9';
+                            const shouldHighlight = (window && typeof window.answerHighlightingEnabled !== 'undefined') ? !!window.answerHighlightingEnabled : true;
 
-                                // Add a small badge (if not exists)
-                                if (!input.dataset.tailieuBadgeAdded) {
-                                    const badge = document.createElement('span');
-                                    badge.className = 'tailieu-answer-badge';
-                                    badge.textContent = val;
-                                    badge.style.cssText = `display:inline-block;margin-left:6px;padding:2px 6px;background:#4CAF50;color:#fff;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;vertical-align:middle;`;
-                                    badge.title = 'Nhấn để sao chép/điền đáp án';
-                                    badge.addEventListener('click', (e) => {
-                                        e.preventDefault();
-                                        try { navigator.clipboard.writeText(val); } catch (e) { }
-                                    });
-                                    input.parentNode.insertBefore(badge, input.nextSibling);
-                                    input.dataset.tailieuBadgeAdded = 'true';
+                            if (shouldHighlight) {
+                                // Avoid double-highlighting
+                                if (p && !p.classList.contains('tailieu-fillblank-highlighted')) {
+                                    p.classList.add('tailieu-fillblank-highlighted');
+                                    // Style input for visibility
+                                    input.style.border = '2px solid #4CAF50';
+                                    input.style.backgroundColor = '#f1f8e9';
+
+                                    // Add a small badge (if not exists)
+                                    if (!input.dataset.tailieuBadgeAdded) {
+                                        const badge = document.createElement('span');
+                                        badge.className = 'tailieu-answer-badge';
+                                        badge.textContent = val;
+                                        badge.style.cssText = `display:inline-block;margin-left:6px;padding:2px 6px;background:#4CAF50;color:#fff;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;vertical-align:middle;`;
+                                        badge.title = 'Nhấn để sao chép/điền đáp án';
+                                        badge.addEventListener('click', (e) => {
+                                            e.preventDefault();
+                                            try { navigator.clipboard.writeText(val); } catch (e) { }
+                                        });
+                                        input.parentNode.insertBefore(badge, input.nextSibling);
+                                        input.dataset.tailieuBadgeAdded = 'true';
+                                    }
                                 }
-
-                                // Record for analytics/debug
-                                highlightedQA.push({ type: 'input-match', questionSnippet: p.textContent?.substring(0, 120), value: val });
                             }
+
+                            // Record for analytics/debug even when highlighting is disabled
+                            highlightedQA.push({ type: 'input-match', questionSnippet: p.textContent?.substring(0, 120), value: val });
                         }
                     } catch (e) { /* ignore per-input errors */ }
                 });
@@ -3131,9 +3163,12 @@ if (window.tailieuExtensionLoaded) {
         let answerContainer = pageQuestion.answerContainer || container?.querySelector('.answer');
 
         if (!element.classList.contains('tailieu-highlighted-question')) {
-            // Mark question as highlighted
-            element.style.color = 'red';
-            element.classList.add('tailieu-highlighted-question');
+            // Only apply visual highlight/class when answer highlighting is enabled
+            if (answerHighlightingEnabled) {
+                // Mark question as highlighted
+                element.style.color = 'red';
+                element.classList.add('tailieu-highlighted-question');
+            }
 
             // IMPORTANT: Get ALL correct answers from database for this question (not just one)
             const allCorrectAnswers = findAllCorrectAnswersForQuestion(extensionQuestion.question);
@@ -5162,12 +5197,36 @@ if (window.tailieuExtensionLoaded) {
             }
         });
 
+        // Also remove fill-blank highlights and reset related input styles/badges
+        const beforeFillBlank = document.querySelectorAll('.tailieu-fillblank-highlighted').length;
+        document.querySelectorAll('.tailieu-fillblank-highlighted').forEach(el => {
+            try {
+                el.classList.remove('tailieu-fillblank-highlighted');
+                const inputs = el.querySelectorAll('input[type="text"], textarea');
+                inputs.forEach(inp => {
+                    try {
+                        inp.style.border = '';
+                        inp.style.backgroundColor = '';
+                        delete inp.dataset.tailieuAutoFilled;
+                        if (inp.dataset.tailieuBadgeAdded) {
+                            const next = inp.nextSibling;
+                            if (next && next.classList && next.classList.contains('tailieu-answer-badge')) {
+                                try { next.remove(); } catch (e) { }
+                            }
+                            delete inp.dataset.tailieuBadgeAdded;
+                        }
+                    } catch (e) { }
+                });
+            } catch (e) { }
+        });
+
         // Normalize document body to merge adjacent text nodes created by unwraps
         try { document.body.normalize(); } catch (e) { }
 
         const afterQuestions = document.querySelectorAll('.tailieu-highlighted-question').length;
         const afterAnswers = document.querySelectorAll('.tailieu-answer-highlight').length;
-        if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights counts:', { beforeQuestions, beforeAnswers, afterQuestions, afterAnswers });
+        const afterFillBlank = document.querySelectorAll('.tailieu-fillblank-highlighted').length;
+        if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights counts:', { beforeQuestions, beforeAnswers, beforeFillBlank, afterQuestions, afterAnswers, afterFillBlank });
     }
 
     async function createSettingsPopup() {
@@ -5201,6 +5260,7 @@ if (window.tailieuExtensionLoaded) {
         const docList = document.getElementById('tailieu-panel-documents');
         const statusEl = document.getElementById('tailieu-panel-status');
         const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
+        const highlightToggle = document.getElementById('tailieu-highlight-toggle');
         const searchInput = document.getElementById('tailieu-panel-search');
 
         const loadPanelData = async () => {
@@ -5210,6 +5270,22 @@ if (window.tailieuExtensionLoaded) {
                 // Sync auto-select checkbox
                 if (autoSelectToggle) {
                     autoSelectToggle.checked = autoSelectEnabled;
+                }
+                // Sync highlight checkbox (default false if not set yet)
+                if (highlightToggle) {
+                    try {
+                        // Use current runtime flag if available, fallback to storage
+                        chrome.storage.local.get('tailieu_highlight_answers', (res) => {
+                            if (res && typeof res.tailieu_highlight_answers !== 'undefined') {
+                                highlightToggle.checked = !!res.tailieu_highlight_answers;
+                                answerHighlightingEnabled = !!res.tailieu_highlight_answers;
+                            } else {
+                                highlightToggle.checked = !!answerHighlightingEnabled;
+                            }
+                        });
+                    } catch (e) {
+                        highlightToggle.checked = !!answerHighlightingEnabled;
+                    }
                 }
 
                 const storage = await chrome.storage.local.get([
@@ -5296,6 +5372,22 @@ if (window.tailieuExtensionLoaded) {
                 chrome.storage.local.set({ tailieu_auto_select: autoSelectEnabled });
                 statusEl.textContent = autoSelectEnabled ? '✅ Đã bật tự động chọn' : '❌ Đã tắt tự động chọn';
                 setTimeout(() => { if (statusEl.textContent.includes('tự động')) statusEl.textContent = ''; }, 2000);
+            };
+        }
+
+        if (highlightToggle) {
+            highlightToggle.onchange = (e) => {
+                try {
+                    answerHighlightingEnabled = e.target.checked;
+                    chrome.storage.local.set({ tailieu_highlight_answers: answerHighlightingEnabled });
+                    try { window.answerHighlightingEnabled = answerHighlightingEnabled; } catch (err) { }
+                    statusEl.textContent = answerHighlightingEnabled ? '✅ Đã bật highlight đáp án' : '❌ Đã tắt highlight đáp án';
+                    // If turned off, clear existing highlights immediately
+                    if (!answerHighlightingEnabled) {
+                        try { clearAllHighlights(); } catch (err) { }
+                    }
+                    setTimeout(() => { if (statusEl.textContent.includes('highlight')) statusEl.textContent = ''; }, 2000);
+                } catch (err) { /* ignore */ }
             };
         }
 

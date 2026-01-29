@@ -12,7 +12,7 @@ let documents = [];
 let selectedDocuments = [];
 let filteredDocuments = [];
 let questions = [];
-let highlightAnswersEnabled = true;
+let highlightAnswersEnabled = false; // default OFF per user request
 let autoSelectEnabled = false;
 let debugMode = false;
 
@@ -362,6 +362,8 @@ async function restoreFromCache() {
 
     // Always notify content script of current auto-select state
     safeSendToContentScript({ action: 'setAutoSelect', enabled: !!autoSelectEnabled });
+    // Notify content script of current highlight state
+    safeSendToContentScript({ action: 'setAnswerHighlighting', enabled: !!highlightAnswersEnabled });
 
     if (hasUsefulCache) {
       showCacheSection();

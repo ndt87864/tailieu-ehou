@@ -1076,11 +1076,15 @@
     function highlightFillBlankQuestion(element, sentenceText, answers, inputElements, autoSelectEnabled = false) {
         if (!element) return;
 
-        // Mark as processed
-        if (element.classList.contains('tailieu-fillblank-highlighted')) {
-            return;
+        const shouldHighlight = (window && typeof window.answerHighlightingEnabled !== 'undefined') ? !!window.answerHighlightingEnabled : true;
+
+        // If highlighting is enabled, skip already-processed elements
+        if (shouldHighlight) {
+            if (element.classList.contains('tailieu-fillblank-highlighted')) {
+                return;
+            }
+            element.classList.add('tailieu-fillblank-highlighted');
         }
-        element.classList.add('tailieu-fillblank-highlighted');
 
         // Fix padding/margin to prevent layout distortion
         // element.style.cssText += `
@@ -1117,6 +1121,34 @@
             });
 
             console.log('[Tailieu FillBlank] AUTO-FILL: Đã tự động điền các đáp án.');
+        }
+
+        // If highlighting is enabled, add visual styles and badges
+        if (shouldHighlight) {
+            try {
+                // Add small indicator badges for inputs if not already present
+                if (inputElements && inputElements.length > 0) {
+                    inputElements.forEach(input => {
+                        try {
+                            if (!input.dataset.tailieuBadgeAdded) {
+                                const val = (input.value || input.getAttribute && input.getAttribute('value') || '').toString().trim();
+                                if (!val) return;
+                                const badge = document.createElement('span');
+                                badge.className = 'tailieu-answer-badge';
+                                badge.textContent = val;
+                                badge.style.cssText = `display:inline-block;margin-left:6px;padding:2px 6px;background:#4CAF50;color:#fff;border-radius:4px;font-size:12px;font-weight:bold;cursor:pointer;vertical-align:middle;`;
+                                badge.title = 'Nhấn để sao chép/điền đáp án';
+                                badge.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    try { navigator.clipboard.writeText(val); } catch (e) { }
+                                });
+                                input.parentNode.insertBefore(badge, input.nextSibling);
+                                input.dataset.tailieuBadgeAdded = 'true';
+                            }
+                        } catch (e) { /* ignore per-input badge errors */ }
+                    });
+                }
+            } catch (e) { /* ignore */ }
         }
         // ==================== END AUTO-FILL LOGIC ====================
 
@@ -1253,6 +1285,10 @@
      * Hiển thị các badge đáp án trực tiếp bên cạnh input
      */
     function displayAnswerBadges(inputElements, answers) {
+        // Only display badges when highlighting is enabled at runtime
+        const shouldHighlight = (window && typeof window.answerHighlightingEnabled !== 'undefined') ? !!window.answerHighlightingEnabled : true;
+        if (!shouldHighlight) return;
+
         inputElements.forEach((input, idx) => {
             if (input.dataset.tailieuBadgeAdded) return;
             input.dataset.tailieuBadgeAdded = 'true';

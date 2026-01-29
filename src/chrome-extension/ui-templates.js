@@ -125,6 +125,12 @@ const TAILIEU_TEMPLATES = {
                     <span>Tự động chọn đáp án</span>
                 </label>
             </div>
+            <div class="tailieu-input-group">
+                <label class="tailieu-checkbox-label">
+                    <input type="checkbox" id="tailieu-highlight-toggle" style="margin: 0;">
+                    <span>Highlight đáp án đúng</span>
+                </label>
+            </div>
             
             <div class="tailieu-input-group">
                 <label class="tailieu-label">Danh mục:</label>
