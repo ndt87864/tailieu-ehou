@@ -687,8 +687,9 @@ if (window.tailieuExtensionLoaded) {
         }
     }
 
-    // Auto-detected document ID
+    // Auto-detected document metadata
     let detectedDocumentId = null;
+    let detectedDocumentName = null;
 
     // Helper: Find question in DB via background
     async function findQuestionInDB(questionText) {
@@ -771,6 +772,7 @@ if (window.tailieuExtensionLoaded) {
 
         // 2. Fallback: Try FUZZY matches for candidates if exact failed
         debugLog('[Tailieu Extension] Exact match failed. Trying fuzzy search fallback...');
+        updateIndicatorStatus('Tra cứu chuyên sâu...', true);
         // Limit fuzzy to top 2 to keep it fast
         for (let i = 0; i < Math.min(2, candidateQuestions.length); i++) {
             const qObj = candidateQuestions[i];
@@ -814,6 +816,29 @@ if (window.tailieuExtensionLoaded) {
         if (questions && questions.length > 0) {
             extensionQuestions = questions;
             detectedDocumentId = documentId;
+
+            // Fetch document name for display
+            try {
+                if (chrome?.runtime?.sendMessage) {
+                    chrome.runtime.sendMessage({ action: 'getDocumentsByCategory' }, (response) => {
+                        // This might be tricky if we don't know the category. 
+                        // Better: add a dedicated 'getDocumentById' action to background.js or use the first question's metadata if available.
+                        // For now, let's assume we can get it from storage if it was recently searched.
+                    });
+                }
+            } catch (e) { }
+
+            // To be absolutely sure we have the name, we'll try to get it from the background script
+            const docInfo = await new Promise(resolve => {
+                chrome.runtime.sendMessage({ action: 'getDocumentById', documentId }, (res) => {
+                    resolve(res && res.success ? res.document : null);
+                });
+            });
+
+            if (docInfo && docInfo.title) {
+                detectedDocumentName = docInfo.title;
+            }
+
             saveCachedQuestions();
             showCachedQuestionsIndicator();
             return true;
@@ -954,6 +979,30 @@ if (window.tailieuExtensionLoaded) {
         // Let's verify if `scanQuestionsOnPage` is needed or we call `extractQuestionsFromPage`.
 
         return extractQuestionsFromPage();
+    }
+
+    // Helper: Update indicator UI status
+    function updateIndicatorStatus(message, isSearching = false) {
+        const statusEl = document.getElementById('tailieu-indicator-count');
+        const compareBtn = document.getElementById('tailieu-compare-now');
+        const docNameEl = document.getElementById('tailieu-indicator-doc-name');
+
+        if (statusEl) {
+            statusEl.textContent = message;
+            // statusEl.style.color = isSearching ? '#FFC107' : 'white';
+        }
+
+        if (compareBtn) {
+            if (isSearching) {
+                compareBtn.disabled = true;
+                compareBtn.style.opacity = '0.7';
+                compareBtn.textContent = '...';
+            } else {
+                compareBtn.disabled = false;
+                compareBtn.style.opacity = '1';
+                compareBtn.textContent = 'So sánh';
+            }
+        }
     }
 
     // Generic notification function
@@ -1343,12 +1392,16 @@ if (window.tailieuExtensionLoaded) {
                 return;
             }
 
-            const result = await chrome.storage.local.get(QUESTIONS_CACHE_KEY);
+            const result = await chrome.storage.local.get([QUESTIONS_CACHE_KEY, 'tailieu_detected_doc_id', 'tailieu_detected_doc_name']);
             if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
                 // Filter cached questions to remove any scanner_extension entries
                 extensionQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
+                detectedDocumentId = result['tailieu_detected_doc_id'] || null;
+                detectedDocumentName = result['tailieu_detected_doc_name'] || null;
             } else {
                 extensionQuestions = [];
+                detectedDocumentId = null;
+                detectedDocumentName = null;
             }
 
             try {
@@ -1376,7 +1429,11 @@ if (window.tailieuExtensionLoaded) {
                 return;
             }
 
-            await chrome.storage.local.set({ [QUESTIONS_CACHE_KEY]: extensionQuestions });
+            await chrome.storage.local.set({
+                [QUESTIONS_CACHE_KEY]: extensionQuestions,
+                'tailieu_detected_doc_id': detectedDocumentId,
+                'tailieu_detected_doc_name': detectedDocumentName
+            });
         } catch (error) {
             if (error.message.includes('Extension context invalidated')) {
                 return;
@@ -1965,14 +2022,16 @@ if (window.tailieuExtensionLoaded) {
             // If still empty OR still invalid, try AUTO-DETECT
             if (extensionQuestions.length === 0 || allQuestionsAreInvalid(pageQs, extensionQuestions)) {
                 if (isManual) {
-                    showNotification('Đang tìm kiếm tài liệu phù hợp...', 'info', 2000);
+                    updateIndicatorStatus('Đang tìm kiếm...', true);
                     const success = await detectDocumentFromPage(pageQs);
                     if (!success || extensionQuestions.length === 0) {
+                        updateIndicatorStatus('Chưa thấy tài liệu');
                         showNotification('Chưa tìm thấy tài liệu phù hợp. Vui lòng chọn thủ công.', 'warning');
                         // Return matched:[] to avoid proceed with wrong/empty data
                         isComparing = false;
                         return { matched: [], pageQuestions: [] };
                     }
+                    // Success will be handled by loadAndCacheDocumentAndNotify -> showCachedQuestionsIndicator
                 } else {
                     // In auto-mode, if invalid and detection failed, we just proceed (might find individual matches later)
                 }
@@ -5034,27 +5093,36 @@ if (window.tailieuExtensionLoaded) {
 
         // REMOVED: if (extensionQuestions.length === 0) return;
 
-        // Get selected document names for display
-        let selectedDocNames = 'Chưa chọn';
-        try {
-            const storage = await chrome.storage.local.get(['tailieu_selected_documents', 'tailieu_documents']);
-            const selectedIds = storage.tailieu_selected_documents || [];
-            const allDocs = storage.tailieu_documents || [];
-            if (selectedIds.length > 0 && allDocs.length > 0) {
-                const names = allDocs.filter(d => selectedIds.includes(d.id)).map(d => d.title);
-                if (names.length > 0) {
-                    selectedDocNames = names.join(', ');
-                    if (selectedDocNames.length > 40) selectedDocNames = selectedDocNames.substring(0, 37) + '...';
+        // Get display name: use memory variable first (for auto-detect), fallback to storage
+        let selectedDocNames = detectedDocumentName || 'Chưa chọn';
+
+        if (selectedDocNames === 'Chưa chọn') {
+            try {
+                const storage = await chrome.storage.local.get(['tailieu_selected_documents', 'tailieu_documents']);
+                const selectedIds = storage.tailieu_selected_documents || [];
+                const allDocs = storage.tailieu_documents || [];
+                if (selectedIds.length > 0 && allDocs.length > 0) {
+                    const names = allDocs.filter(d => selectedIds.includes(d.id)).map(d => d.title);
+                    if (names.length > 0) {
+                        selectedDocNames = names.join(', ');
+                    }
                 }
-            }
-        } catch (e) { }
+            } catch (e) { }
+        }
+
+        if (selectedDocNames.length > 40) {
+            selectedDocNames = selectedDocNames.substring(0, 37) + '...';
+        }
 
         const indicator = document.createElement('div');
         indicator.id = 'tailieu-cached-indicator';
+
+        const countText = extensionQuestions.length > 0 ? extensionQuestions.length + ' câu hỏi sẵn sàng' : 'Sẵn sàng nhận diện';
+
         indicator.innerHTML = `
         <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 15px;">
             <div style="display: flex; flex-direction: column;">
-                <span id="tailieu-indicator-count" style="font-weight: bold; font-size: 14px;">${extensionQuestions.length > 0 ? extensionQuestions.length + ' câu hỏi sẵn sàng' : 'Sẵn sàng nhận diện'}</span>
+                <span id="tailieu-indicator-count" style="font-weight: bold; font-size: 14px;">${countText}</span>
                 <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
                     📄 ${selectedDocNames}
                 </span>

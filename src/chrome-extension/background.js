@@ -163,6 +163,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             .catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
+
+    if (request.action === 'getDocumentById') {
+        getDocumentById(request.documentId)
+            .then(document => sendResponse({ success: true, document }))
+            .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
 });
 
 // Batch Add Logic
