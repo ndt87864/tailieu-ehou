@@ -90,7 +90,7 @@ const TAILIEU_TEMPLATES = {
 
     CACHED_INDICATOR: (countText, selectedDocNames) => `
         <div id="tailieu-indicator-header">
-            <div class="tailieu-indicator-header-title">Tailieu</div>
+            <div class="tailieu-header-title">Tailieu</div>
             <button id="tailieu-expand-indicator" title="Cài đặt">
                 ${TAILIEU_TEMPLATES.SETTINGS_ICON}
             </button>
@@ -114,7 +114,7 @@ const TAILIEU_TEMPLATES = {
 
     SETTINGS_POPUP: `
         <div id="tailieu-settings-header" class="tailieu-popup-header">
-            <div class="tailieu-indicator-header-title">Cấu hình nhận diện</div>
+            <div class="tailieu-indicator-header-title">Cấu hình</div>
             <button id="tailieu-settings-close" class="tailieu-control-btn">×</button>
         </div>
 

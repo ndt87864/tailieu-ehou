@@ -1616,16 +1616,30 @@ if (window.tailieuExtensionLoaded) {
                         // Create icon element and append to qtext (keeps it inside question element)
                         const icon = document.createElement('span');
                         icon.className = 'tailieu-answer-icon';
-                        icon.title = 'Show suggested answer(s)';
+                        icon.title = 'Nhấn để xem đáp án';
                         icon.tabIndex = 0;
                         icon.setAttribute('role', 'button');
 
                         // Simple inline SVG magnifier icon for clarity
-                        icon.innerHTML = `
-                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-                                <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16a6.471 6.471 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM10 15a5 5 0 110-10 5 5 0 010 10z"></path>
-                            </svg>
-                        `;
+                        icon.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                                            <defs>
+                                                <radialGradient id="glow" cx="50%" cy="40%" r="60%">
+                                                <stop offset="0%" stop-color="#FFF9C4"/>
+                                                <stop offset="70%" stop-color="#FFD54F"/>
+                                                <stop offset="100%" stop-color="#FFC107"/>
+                                                </radialGradient>
+                                            </defs>
+
+                                            <!-- Bóng đèn -->
+                                            <path
+                                                d="M9 21h6v-1H9v1zm3-20a7 7 0 00-4.47 12.38C8.3 14.06 9 15.1 9 16v2h6v-2c0-.9.7-1.94 1.47-2.62A7 7 0 0012 1z"
+                                                fill="url(#glow)"
+                                            />
+
+                                            <!-- Đui đèn -->
+                                            <rect x="9" y="18" width="6" height="2" fill="#FFB300"/>
+                                            </svg>
+                                        `;
 
                         // Keep icon visually inline: append at end of qtext but still inside
                         try { qtextElement.appendChild(icon); } catch (e) { /* ignore */ }
@@ -2496,6 +2510,8 @@ if (window.tailieuExtensionLoaded) {
     // Reset compare button after completion
     function resetCompareButton(matchedCount) {
         const compareBtn = document.getElementById('tailieu-compare-now');
+        const nextBtn = document.getElementById('tailieu-next-page');
+
         if (compareBtn) {
             // Remove animation
             compareBtn.style.animation = '';
@@ -2508,6 +2524,9 @@ if (window.tailieuExtensionLoaded) {
                 compareBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45A049)';
                 compareBtn.style.transform = 'scale(1.05)';
                 compareBtn.disabled = false;
+
+                // Hiển thị nút Tiếp tục nếu có kết quả
+                if (nextBtn) nextBtn.style.display = 'block';
 
                 // Small celebration effect
                 setTimeout(() => {
@@ -2565,6 +2584,9 @@ if (window.tailieuExtensionLoaded) {
                 compareBtn.textContent = 'Không tìm thấy';
                 compareBtn.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
                 compareBtn.disabled = true;
+
+                // Ẩn nút Tiếp tục nếu không có kết quả
+                if (nextBtn) nextBtn.style.display = 'none';
 
                 // Reset button after 2 seconds
                 setTimeout(() => {
@@ -3227,14 +3249,32 @@ if (window.tailieuExtensionLoaded) {
 
         document.body.appendChild(tooltip);
 
-        // Position tooltip relative to questionElement
+        // Position tooltip relative to questionElement (the icon)
         const rect = questionElement.getBoundingClientRect();
         const tw = tooltip.offsetWidth;
         const th = tooltip.offsetHeight;
-        let top = window.scrollY + rect.top - th - 8;
-        if (top < window.scrollY + 8) top = window.scrollY + rect.bottom + 8;
-        let left = window.scrollX + rect.right - tw;
-        if (left < window.scrollX + 8) left = window.scrollX + rect.left;
+
+        // Mặc định hiển thị bên phải icon
+        let left = window.scrollX + rect.right + 12;
+        let top = window.scrollY + rect.top + (rect.height / 2) - (th / 2);
+
+        // Nếu tràn bên phải màn hình thì hiển thị bên trái icon
+        if (rect.right + 12 + tw > window.innerWidth) {
+            left = window.scrollX + rect.left - tw - 12;
+        }
+
+        // Đảm bảo không tràn lề trái
+        if (left < window.scrollX + 10) left = window.scrollX + 10;
+
+        // Đảm bảo không tràn lề trên/dưới
+        const viewportTop = window.scrollY + 10;
+        const viewportBottom = window.scrollY + window.innerHeight - 10;
+
+        if (top < viewportTop) top = viewportTop;
+        if (top + th > viewportBottom) {
+            top = Math.max(viewportTop, viewportBottom - th);
+        }
+
         tooltip.style.top = top + 'px';
         tooltip.style.left = left + 'px';
 
@@ -5323,7 +5363,23 @@ if (window.tailieuExtensionLoaded) {
 
             const compareBtn = document.getElementById('tailieu-compare-now');
             if (compareBtn) {
-                compareBtn.onclick = () => compareAndHighlightQuestions(true);
+                compareBtn.onclick = async () => {
+                    const state = compareBtn.dataset.state || 'ready';
+                    if (state === 'repeat') {
+                        // Clear highlights and reset state before re-comparing
+                        clearAllHighlights();
+                        highlightedQA = [];
+
+                        const nextBtn = document.getElementById('tailieu-next-page');
+                        if (nextBtn) nextBtn.style.display = 'none';
+
+                        // Minor delay for visual reset
+                        await new Promise(r => setTimeout(r, 150));
+                        compareBtn.dataset.state = 'ready';
+                    }
+
+                    await compareAndHighlightQuestions(true);
+                };
             }
 
             const nextBtn = document.getElementById('tailieu-next-page');
