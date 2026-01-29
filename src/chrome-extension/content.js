@@ -1951,34 +1951,31 @@ if (window.tailieuExtensionLoaded) {
             return { matched: [], pageQuestions: [] };
         }
 
-        // CRITICAL: Ensure questions are loaded before comparing
-        if (extensionQuestions.length === 0) {
-            //console.log('[Tailieu Extension]  No questions loaded, trying to load from cache...');
-            await loadCachedQuestions();
+        // CRITICAL: Ensure questions are loaded before comparing. 
+        // Also check if current cache is irrelevant to the page (e.g. user moved to new quiz)
+        let pageQs = [];
+        try { pageQs = scanQuestionsOnPage(); } catch (e) { }
 
+        if (extensionQuestions.length === 0 || allQuestionsAreInvalid(pageQs, extensionQuestions)) {
+            // Try to load from cache first if empty
             if (extensionQuestions.length === 0) {
-                // If manual trigger and no cache, try AUTO-DETECT
+                await loadCachedQuestions();
+            }
+
+            // If still empty OR still invalid, try AUTO-DETECT
+            if (extensionQuestions.length === 0 || allQuestionsAreInvalid(pageQs, extensionQuestions)) {
                 if (isManual) {
                     showNotification('Đang tìm kiếm tài liệu phù hợp...', 'info', 2000);
-                    const pageQs = scanQuestionsOnPage(); // extracted from page
-                    if (pageQs && pageQs.length > 0) {
-                        const firstQText = pageQs[0].text;
-                        const detectedDoc = await detectDocumentFromPage(firstQText);
-                        if (!detectedDoc || extensionQuestions.length === 0) {
-                            showNotification('Chưa tìm thấy tài liệu phù hợp. Vui lòng chọn thủ công.', 'warning');
-                            return { matched: [], pageQuestions: [] };
-                        }
-                        // Proceed with comparison using newly loaded questions
-                    } else {
-                        showNotification('Không tìm thấy câu hỏi nào trên trang này.', 'warning');
+                    const success = await detectDocumentFromPage(pageQs);
+                    if (!success || extensionQuestions.length === 0) {
+                        showNotification('Chưa tìm thấy tài liệu phù hợp. Vui lòng chọn thủ công.', 'warning');
+                        // Return matched:[] to avoid proceed with wrong/empty data
+                        isComparing = false;
                         return { matched: [], pageQuestions: [] };
                     }
                 } else {
-                    // Auto-mode but no questions (and detectDocumentFromPage in performAutoCompare likely failed or wasn't called)
-                    return { matched: [], pageQuestions: [] };
+                    // In auto-mode, if invalid and detection failed, we just proceed (might find individual matches later)
                 }
-            } else {
-                //console.log('[Tailieu Extension] Successfully loaded', extensionQuestions.length, 'questions from cache');
             }
         }
 
@@ -2194,23 +2191,36 @@ if (window.tailieuExtensionLoaded) {
                                 source: 'individual-lookup'
                             });
 
-                            // CHECK FOR CACHE UPDATE
-                            // If this question belongs to the CURRENT detected document but wasn't in cache,
-                            // it means the document has been updated in DB. Refresh cache!
-                            if (detectedDocumentId && foundQ.documentId && foundQ.documentId === detectedDocumentId) {
-                                const isCached = extensionQuestions.some(eq => eq.id === foundQ.id);
-                                if (!isCached) {
-                                    debugLog('[Tailieu Extension] Question belongs to current document but missing from cache. Updating cache...');
-                                    const newQuestions = await loadQuestionsFromDocument(detectedDocumentId);
+                            // CHECK FOR CACHE UPDATE / DOCUMENT LOADING
+                            // If this question belongs to a document, load all questions for that document
+                            if (foundQ.documentId) {
+                                // If we don't have a document currently detected, or it's different
+                                if (!detectedDocumentId || detectedDocumentId !== foundQ.documentId) {
+                                    debugLog('[Tailieu Extension] Question belongs to a document. Loading full document questions into cache...');
+                                    const newQuestions = await loadQuestionsFromDocument(foundQ.documentId);
                                     if (newQuestions && newQuestions.length > 0) {
                                         extensionQuestions = newQuestions;
+                                        detectedDocumentId = foundQ.documentId;
                                         saveCachedQuestions();
+                                        showCachedQuestionsIndicator(); // Update banner
+
                                         // Update popup to reflect new count
                                         try {
                                             if (chrome?.runtime?.sendMessage) {
                                                 chrome.runtime.sendMessage({ action: 'updateQuestionsPopup', questions: extensionQuestions });
                                             }
                                         } catch (e) { }
+                                    }
+                                } else {
+                                    // Already in this document, but question was missing from cache (updated DB?)
+                                    const isCached = extensionQuestions.some(eq => eq.id === foundQ.id);
+                                    if (!isCached) {
+                                        debugLog('[Tailieu Extension] Question missing from current document cache. Refreshing...');
+                                        const newQuestions = await loadQuestionsFromDocument(detectedDocumentId);
+                                        if (newQuestions && newQuestions.length > 0) {
+                                            extensionQuestions = newQuestions;
+                                            saveCachedQuestions();
+                                        }
                                     }
                                 }
                             }
