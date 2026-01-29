@@ -5624,8 +5624,8 @@ if (window.tailieuExtensionLoaded) {
         position: fixed;
         bottom: 85px;
         left: 10px;
-        width: 400px;
-        max-height: 500px;
+        width: 270px;
+        max-height: 330px;
         background: white;
         border: 1px solid #ddd;
         border-radius: 12px;
@@ -5745,7 +5745,7 @@ if (window.tailieuExtensionLoaded) {
         const content = document.createElement('div');
         content.id = 'tailieu-questions-content';
         content.style.cssText = `
-        max-height: 400px;
+        max-height: 250px;
         overflow-y: auto;
         padding: 0;
     `;
@@ -5794,9 +5794,9 @@ if (window.tailieuExtensionLoaded) {
         });
 
         let isMinimized = false;
-        let originalWidth = '400px';
-        let originalHeight = '500px';
-        let originalMaxHeight = '500px';
+        let originalWidth = '270px';
+        let originalHeight = '330px';
+        let originalMaxHeight = '330px';
 
         // Tạo overlay icon để hiển thị khi thu nhỏ (thay vì thay thế innerHTML)
         const minimizedOverlay = document.createElement('div');
