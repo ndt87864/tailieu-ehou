@@ -430,6 +430,52 @@
     width: 200px;
 }
 
+/* Settings Popup */
+#tailieu-settings-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    color: #333;
+    width: 320px;
+    border-radius: 16px;
+    z-index: 100001;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    display: none;
+    overflow: hidden;
+    animation: popupFadeIn 0.3s ease-out;
+}
+
+@keyframes popupFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -45%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+#tailieu-settings-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background: #f8f9fa;
+}
+
+#tailieu-settings-header {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    padding: 15px 20px;
+    color: white;
+    border: none;
+    border-radius: 0;
+}
+
 #tailieu-indicator-header {
     display: flex;
     justify-content: flex-end;

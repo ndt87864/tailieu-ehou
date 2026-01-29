@@ -104,46 +104,48 @@ const TAILIEU_TEMPLATES = {
                     📄 ${selectedDocNames}
                 </span>
             </div>
-
-            <div id="tailieu-indicator-expanded">
-                <div class="tailieu-expanded-header">
-                    <span class="tailieu-expanded-title">Cài đặt</span>
-                    <button id="tailieu-collapse-indicator">×</button>
-                </div>
-
-                <div class="tailieu-input-group">
-                    <label class="tailieu-checkbox-label">
-                        <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
-                        <span>Tự động chọn đáp án</span>
-                    </label>
-                </div>
-                
-                <div class="tailieu-input-group">
-                    <label class="tailieu-label">Danh mục:</label>
-                    <select id="tailieu-panel-category"></select>
-                </div>
-
-                <div class="tailieu-input-group">
-                    <label class="tailieu-label">Tìm tài liệu:</label>
-                    <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa...">
-                </div>
-
-                <div id="tailieu-panel-doc-container">
-                    <label class="tailieu-label">Tài liệu:</label>
-                    <div id="tailieu-panel-documents"></div>
-                </div>
-
-                <div class="tailieu-button-row">
-                    <button id="tailieu-panel-clear-selection">Xóa</button>
-                    <button id="tailieu-panel-save">Cập nhật</button>
-                </div>
-                <div id="tailieu-panel-status"></div>
-            </div>
         </div>
 
         <div id="tailieu-indicator-footer">
             <button id="tailieu-compare-now">So sánh ngay</button>
             <button id="tailieu-next-page" style="display: none;">Tiếp tục</button>
+        </div>
+    `,
+
+    SETTINGS_POPUP: `
+        <div id="tailieu-settings-header" class="tailieu-popup-header">
+            <div class="tailieu-indicator-header-title">Cấu hình nhận diện</div>
+            <button id="tailieu-settings-close" class="tailieu-control-btn">×</button>
+        </div>
+
+        <div id="tailieu-settings-body">
+            <div class="tailieu-input-group">
+                <label class="tailieu-checkbox-label">
+                    <input type="checkbox" id="tailieu-auto-select-toggle" style="margin: 0;">
+                    <span>Tự động chọn đáp án</span>
+                </label>
+            </div>
+            
+            <div class="tailieu-input-group">
+                <label class="tailieu-label">Danh mục:</label>
+                <select id="tailieu-panel-category"></select>
+            </div>
+
+            <div class="tailieu-input-group">
+                <label class="tailieu-label">Tìm tài liệu:</label>
+                <input type="text" id="tailieu-panel-search" placeholder="Nhập từ khóa...">
+            </div>
+
+            <div id="tailieu-panel-doc-container">
+                <label class="tailieu-label">Tài liệu:</label>
+                <div id="tailieu-panel-documents"></div>
+            </div>
+
+            <div class="tailieu-button-row">
+                <button id="tailieu-panel-clear-selection">Xóa</button>
+                <button id="tailieu-panel-save">Cập nhật</button>
+            </div>
+            <div id="tailieu-panel-status"></div>
         </div>
     `,
 

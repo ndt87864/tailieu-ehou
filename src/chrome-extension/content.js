@@ -690,6 +690,7 @@ if (window.tailieuExtensionLoaded) {
     // Auto-detected document metadata
     let detectedDocumentId = null;
     let detectedDocumentName = null;
+    let detectedCategoryId = null;
 
     // Helper: Find question in DB via background
     async function findQuestionInDB(questionText) {
@@ -857,6 +858,7 @@ if (window.tailieuExtensionLoaded) {
 
             if (docInfo && docInfo.title) {
                 detectedDocumentName = docInfo.title;
+                detectedCategoryId = docInfo.categoryId || null;
             }
 
             saveCachedQuestions();
@@ -878,8 +880,8 @@ if (window.tailieuExtensionLoaded) {
         // BUT: If the user hasn't selected anything manually (cache empty), we might want to try auto-detect anyway?
         // Let's stick to the rule: if autoSelectEnabled is false, we don't do anything unless forced.
         // Wait, the user requirement is "không cần chọn danh mục và tài liệu ... người dùng chỉ cần ấn so sánh".
-        // This implies manual trigger ("ấn so sánh"). 
-        // But "performAutoCompare" is called on load. 
+        // This implies manual trigger ("ấn so sánh").
+        // But "performAutoCompare" is called on load.
         // If we want FULLY automated (on load), we need autoSelectEnabled = true (or default to true).
         // For now, let's assume this flows into the existing logic.
         if (!autoSelectEnabled && !force) {
@@ -956,7 +958,7 @@ if (window.tailieuExtensionLoaded) {
                     // If no matches found even with cache, and we haven't just auto-detected
                     // Maybe we should try to auto-detect AGAIN based on the *first unmatched* question?
                     // (Handled partially above, but if we had a cache that was WRONG, the above check
-                    // "allQuestionsAreInvalid" attempts to fix it. 
+                    // "allQuestionsAreInvalid" attempts to fix it.
                     // But what if the cache WAS valid for Q1 but not others? Mixed content?
                     // For now, assume one document per page).
                 }
@@ -1000,7 +1002,7 @@ if (window.tailieuExtensionLoaded) {
         // Wait, `extractQuestionsFromPage` in original code returned specific structure or pushed to array?
         // Checking original: `function extractQuestionsFromPage() { const questions = []; ... return questions; }`?
         // No, in original code it looked like it was inline or helper.
-        // Let's reuse the logic we see in `initializeContentScript` -> calls `extractQuestionsFromPage`? 
+        // Let's reuse the logic we see in `initializeContentScript` -> calls `extractQuestionsFromPage`?
         // Actually, the previous view showed `extractQuestionsFromPage` defined at line 1200.
         // Let's verify if `scanQuestionsOnPage` is needed or we call `extractQuestionsFromPage`.
 
@@ -1381,13 +1383,14 @@ if (window.tailieuExtensionLoaded) {
                 return;
             }
 
-            const result = await chrome.storage.local.get([QUESTIONS_CACHE_KEY, 'tailieu_detected_doc_id', 'tailieu_detected_doc_name']);
+            const result = await chrome.storage.local.get([QUESTIONS_CACHE_KEY, 'tailieu_detected_doc_id', 'tailieu_detected_doc_name', 'tailieu_detected_cat_id']);
             if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
                 // Filter cached questions to remove any scanner_extension entries
                 const rawQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
                 extensionQuestions = preProcessQuestions(rawQuestions);
                 detectedDocumentId = result['tailieu_detected_doc_id'] || null;
                 detectedDocumentName = result['tailieu_detected_doc_name'] || null;
+                detectedCategoryId = result['tailieu_detected_cat_id'] || null;
             } else {
                 extensionQuestions = [];
                 detectedDocumentId = null;
@@ -1422,7 +1425,8 @@ if (window.tailieuExtensionLoaded) {
             await chrome.storage.local.set({
                 [QUESTIONS_CACHE_KEY]: extensionQuestions,
                 'tailieu_detected_doc_id': detectedDocumentId,
-                'tailieu_detected_doc_name': detectedDocumentName
+                'tailieu_detected_doc_name': detectedDocumentName,
+                'tailieu_detected_cat_id': detectedCategoryId
             });
         } catch (error) {
             if (error.message.includes('Extension context invalidated')) {
@@ -5053,6 +5057,190 @@ if (window.tailieuExtensionLoaded) {
         if (debugMode) console.debug('[Tailieu Debug] clearAllHighlights counts:', { beforeQuestions, beforeAnswers, afterQuestions, afterAnswers });
     }
 
+    async function createSettingsPopup() {
+        let settingsPopup = document.getElementById('tailieu-settings-popup');
+        let overlay = document.getElementById('tailieu-settings-overlay');
+
+        if (!settingsPopup) {
+            overlay = document.createElement('div');
+            overlay.id = 'tailieu-settings-overlay';
+            overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:100000; display:none;';
+            safeAppendToBody(overlay);
+
+            settingsPopup = document.createElement('div');
+            settingsPopup.id = 'tailieu-settings-popup';
+            settingsPopup.innerHTML = window.TAILIEU_TEMPLATES.SETTINGS_POPUP;
+            safeAppendToBody(settingsPopup);
+
+            // Add close on overlay click
+            overlay.onclick = () => {
+                settingsPopup.style.display = 'none';
+                overlay.style.display = 'none';
+            };
+        }
+
+        // Local state for panel
+        let currentCategories = [];
+        let currentDocuments = [];
+        let selectedDocIds = [];
+
+        const catSelect = document.getElementById('tailieu-panel-category');
+        const docList = document.getElementById('tailieu-panel-documents');
+        const statusEl = document.getElementById('tailieu-panel-status');
+        const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
+        const searchInput = document.getElementById('tailieu-panel-search');
+
+        const loadPanelData = async () => {
+            try {
+                statusEl.textContent = 'Đang tải...';
+
+                // Sync auto-select checkbox
+                if (autoSelectToggle) {
+                    autoSelectToggle.checked = autoSelectEnabled;
+                }
+
+                const storage = await chrome.storage.local.get([
+                    'tailieu_selected_category',
+                    'tailieu_selected_documents',
+                    'tailieu_detected_doc_id',
+                    'tailieu_detected_cat_id'
+                ]);
+
+                // Fallback to detected values if no selected ones exist
+                const savedCatId = storage.tailieu_selected_category || detectedCategoryId || storage.tailieu_detected_cat_id;
+                selectedDocIds = (storage.tailieu_selected_documents && storage.tailieu_selected_documents.length > 0)
+                    ? storage.tailieu_selected_documents
+                    : (detectedDocumentId ? [detectedDocumentId] : (storage.tailieu_detected_doc_id ? [storage.tailieu_detected_doc_id] : []));
+
+                chrome.runtime.sendMessage({ action: 'getCategories' }, (res) => {
+                    if (res && res.success) {
+                        currentCategories = res.categories;
+                        catSelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
+                        currentCategories.forEach(cat => {
+                            const opt = document.createElement('option');
+                            opt.value = cat.id;
+                            opt.textContent = cat.title;
+                            opt.selected = cat.id === savedCatId;
+                            catSelect.appendChild(opt);
+                        });
+                        if (savedCatId) loadDocsPanel(savedCatId);
+                        statusEl.textContent = '';
+                    }
+                });
+            } catch (e) { statusEl.textContent = 'Lỗi tải dữ liệu'; }
+        };
+
+        const loadDocsPanel = (catId) => {
+            if (!catId) {
+                docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Vui lòng chọn danh mục');
+                return;
+            }
+            chrome.runtime.sendMessage({ action: 'getDocumentsByCategory', categoryId: catId }, (res) => {
+                if (res && res.success) {
+                    currentDocuments = res.documents;
+                    renderDocumentsList();
+                }
+            });
+        };
+
+        const renderDocumentsList = () => {
+            const searchTerm = searchInput?.value?.toLowerCase() || '';
+            const filtered = currentDocuments.filter(d => d.title.toLowerCase().includes(searchTerm));
+
+            docList.innerHTML = '';
+            if (filtered.length === 0) {
+                docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Không tìm thấy tài liệu');
+                return;
+            }
+
+            filtered.forEach(doc => {
+                const isSelected = selectedDocIds.includes(doc.id);
+                const docWrapper = document.createElement('div');
+                docWrapper.innerHTML = window.TAILIEU_TEMPLATES.DOC_ITEM(doc.id, doc.title, isSelected);
+                const itemEl = docWrapper.firstElementChild;
+
+                itemEl.onclick = () => {
+                    if (selectedDocIds.includes(doc.id)) {
+                        selectedDocIds = selectedDocIds.filter(id => id !== doc.id);
+                    } else {
+                        selectedDocIds.push(doc.id);
+                    }
+                    renderDocumentsList();
+                };
+                docList.appendChild(itemEl);
+            });
+        };
+
+        // --- Event Listeners ---
+        document.getElementById('tailieu-settings-close').onclick = () => {
+            settingsPopup.style.display = 'none';
+            if (overlay) overlay.style.display = 'none';
+        };
+
+        if (autoSelectToggle) {
+            autoSelectToggle.onchange = (e) => {
+                autoSelectEnabled = e.target.checked;
+                chrome.storage.local.set({ tailieu_auto_select: autoSelectEnabled });
+                statusEl.textContent = autoSelectEnabled ? '✅ Đã bật tự động chọn' : '❌ Đã tắt tự động chọn';
+                setTimeout(() => { if (statusEl.textContent.includes('tự động')) statusEl.textContent = ''; }, 2000);
+            };
+        }
+
+        catSelect.onchange = (e) => {
+            selectedDocIds = [];
+            loadDocsPanel(e.target.value);
+        };
+
+        if (searchInput) {
+            searchInput.oninput = () => renderDocumentsList();
+        }
+
+        document.getElementById('tailieu-panel-clear-selection').onclick = () => {
+            selectedDocIds = [];
+            renderDocumentsList();
+        };
+
+        document.getElementById('tailieu-panel-save').onclick = async () => {
+            if (selectedDocIds.length === 0) {
+                statusEl.textContent = '⚠️ Vui lòng chọn tài liệu';
+                return;
+            }
+
+            statusEl.textContent = '⏳ Đang cập nhật...';
+            try {
+                await chrome.storage.local.set({
+                    tailieu_selected_category: catSelect.value,
+                    tailieu_selected_documents: selectedDocIds,
+                    tailieu_db_updated: true
+                });
+
+                statusEl.textContent = '✅ Đã cập nhật thành công!';
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                    settingsPopup.style.display = 'none';
+                    if (overlay) overlay.style.display = 'none';
+                    showCachedQuestionsIndicator(); // Refresh indicator doc list
+                }, 1500);
+
+                // Trigger reload questions
+                await loadCachedQuestions();
+                if (extensionQuestions.length > 0) {
+                    performAutoCompare(false);
+                }
+            } catch (e) {
+                statusEl.textContent = '❌ Lỗi khi lưu';
+            }
+        };
+
+        // Expose refresh function
+        settingsPopup.refresh = loadPanelData;
+
+        // Initial load
+        await loadPanelData();
+
+        return { settingsPopup, overlay };
+    }
+
     // Show cached questions indicator
     async function showCachedQuestionsIndicator() {
         // Remove existing indicator
@@ -5117,211 +5305,34 @@ if (window.tailieuExtensionLoaded) {
                 });
             } catch (e) { }
 
-            // Local state for panel
-            let currentCategories = [];
-            let currentDocuments = [];
-            let selectedDocIds = [];
-
-            const collapsedEl = document.getElementById('tailieu-indicator-collapsed');
-            const expandedEl = document.getElementById('tailieu-indicator-expanded');
-            const catSelect = document.getElementById('tailieu-panel-category');
-            const docList = document.getElementById('tailieu-panel-documents');
-            const statusEl = document.getElementById('tailieu-panel-status');
-
-            // --- Toggle Functions ---
-            const togglePanel = async (expand) => {
-                if (expand) {
-                    expandedEl.style.display = 'flex';
-                    loadPanelData();
-
-                    // Auto-minimize questions popup when settings opened
-                    const questionsMinimizeBtn = document.getElementById('tailieu-questions-minimize-btn');
-                    const questionsOverlay = document.getElementById('tailieu-minimized-overlay');
-                    if (questionsMinimizeBtn && questionsOverlay && questionsOverlay.style.display === 'none') {
-                        questionsMinimizeBtn.click();
-                    }
-                } else {
-                    expandedEl.style.display = 'none';
-                    collapsedEl.style.display = 'flex';
-                }
-            };
-
-            const loadPanelData = async () => {
-                try {
-                    statusEl.textContent = 'Đang tải...';
-
-                    // Sync auto-select checkbox
-                    const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
-                    if (autoSelectToggle) {
-                        autoSelectToggle.checked = autoSelectEnabled;
-                    }
-
-                    const storage = await chrome.storage.local.get(['tailieu_selected_category', 'tailieu_selected_documents']);
-                    const savedCatId = storage.tailieu_selected_category;
-                    selectedDocIds = storage.tailieu_selected_documents || [];
-
-                    chrome.runtime.sendMessage({ action: 'getCategories' }, (res) => {
-                        if (res && res.success) {
-                            currentCategories = res.categories;
-                            catSelect.innerHTML = '<option value="">-- Chọn danh mục --</option>';
-                            currentCategories.forEach(cat => {
-                                const opt = document.createElement('option');
-                                opt.value = cat.id;
-                                opt.textContent = cat.title;
-                                opt.selected = cat.id === savedCatId;
-                                catSelect.appendChild(opt);
-                            });
-                            if (savedCatId) loadDocsPanel(savedCatId);
-                            statusEl.textContent = '';
-                        }
-                    });
-                } catch (e) { statusEl.textContent = 'Lỗi tải dữ liệu'; }
-            };
-
-            const loadDocsPanel = (catId) => {
-                if (!catId) {
-                    docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Vui lòng chọn danh mục');
-                    return;
-                }
-                chrome.runtime.sendMessage({ action: 'getDocumentsByCategory', categoryId: catId }, (res) => {
-                    if (res && res.success) {
-                        currentDocuments = res.documents;
-                        renderDocumentsList();
-                    }
-                });
-            };
-
-            const renderDocumentsList = () => {
-                const searchTerm = document.getElementById('tailieu-panel-search')?.value?.toLowerCase() || '';
-                const filtered = currentDocuments.filter(d => d.title.toLowerCase().includes(searchTerm));
-
-                docList.innerHTML = '';
-                if (filtered.length === 0) {
-                    docList.innerHTML = window.TAILIEU_TEMPLATES.PANEL_MESSAGE('Không tìm thấy tài liệu');
-                    return;
-                }
-
-                filtered.forEach(doc => {
-                    const isSelected = selectedDocIds.includes(doc.id);
-                    const docItem = document.createElement('div');
-                    docItem.innerHTML = window.TAILIEU_TEMPLATES.DOC_ITEM(doc.id, doc.title, isSelected);
-                    const itemEl = docItem.firstElementChild;
-
-                    itemEl.onclick = () => {
-                        if (selectedDocIds.includes(doc.id)) {
-                            selectedDocIds = selectedDocIds.filter(id => id !== doc.id);
-                        } else {
-                            selectedDocIds.push(doc.id);
-                        }
-                        renderDocumentsList();
-                    };
-                    docList.appendChild(itemEl);
-                });
-            };
-
             // --- Event Listeners ---
-            document.getElementById('tailieu-expand-indicator').onclick = () => togglePanel(true);
-            document.getElementById('tailieu-collapse-indicator').onclick = () => togglePanel(false);
-
-            const autoSelectToggle = document.getElementById('tailieu-auto-select-toggle');
-            if (autoSelectToggle) {
-                autoSelectToggle.onchange = (e) => {
-                    autoSelectEnabled = e.target.checked;
-                    chrome.storage.local.set({ tailieu_auto_select: autoSelectEnabled });
-                    statusEl.textContent = autoSelectEnabled ? 'Đã bật tự động chọn' : 'Đã tắt tự động chọn';
-                    setTimeout(() => { if (statusEl.textContent.includes('tự động')) statusEl.textContent = ''; }, 2000);
+            const expandBtn = document.getElementById('tailieu-expand-indicator');
+            if (expandBtn) {
+                expandBtn.onclick = async () => {
+                    const { settingsPopup, overlay } = await createSettingsPopup();
+                    if (settingsPopup.refresh) await settingsPopup.refresh();
+                    settingsPopup.style.display = 'block';
+                    if (overlay) overlay.style.display = 'block';
                 };
             }
 
-            catSelect.onchange = (e) => {
-                selectedDocIds = []; // Reset selections when changing category
-                loadDocsPanel(e.target.value);
-            };
-
-            const searchInput = document.getElementById('tailieu-panel-search');
-            if (searchInput) {
-                searchInput.oninput = () => renderDocumentsList();
+            const hideBtn = document.getElementById('tailieu-hide-indicator');
+            if (hideBtn) {
+                hideBtn.onclick = () => indicator.remove();
             }
 
-            document.getElementById('tailieu-panel-save').onclick = async () => {
-                const cbs = expandedEl.querySelectorAll('.tailieu-doc-cb:checked');
-                const newSelectedIds = Array.from(cbs).map(cb => cb.value);
-                if (newSelectedIds.length === 0) {
-                    statusEl.textContent = 'Vui lòng chọn ít nhất 1 tài liệu';
-                    return;
-                }
+            const compareBtn = document.getElementById('tailieu-compare-now');
+            if (compareBtn) {
+                compareBtn.onclick = () => compareAndHighlightQuestions(true);
+            }
 
-                statusEl.textContent = 'Đang cập nhật...';
-                await chrome.storage.local.set({
-                    tailieu_selected_category: catSelect.value,
-                    tailieu_selected_documents: newSelectedIds,
-                    tailieu_documents: currentDocuments // cache docs to show names later
-                });
-
-                chrome.runtime.sendMessage({ action: 'getQuestionsByDocuments', documentIds: newSelectedIds }, (res) => {
-                    if (res && res.success) {
-                        chrome.storage.local.set({ tailieu_questions: res.questions, tailieu_db_updated: false }, () => {
-                            statusEl.textContent = 'Thành công! Đang tải lại...';
-                            setTimeout(() => window.location.reload(), 1000);
-                        });
-                    }
-                });
-            };
-
-            document.getElementById('tailieu-panel-clear-selection').onclick = () => {
-                selectedDocIds = [];
-                const cbs = expandedEl.querySelectorAll('.tailieu-doc-cb');
-                cbs.forEach(cb => cb.checked = false);
-                statusEl.textContent = 'Đã xóa các lựa chọn';
-                setTimeout(() => { if (statusEl.textContent.includes('lựa chọn')) statusEl.textContent = ''; }, 2000);
-            };
-
-            // --- Original Comparison Logic ---
-            const compareNowBtn = document.getElementById('tailieu-compare-now');
             const nextBtn = document.getElementById('tailieu-next-page');
-
-            if (compareNowBtn) {
-                compareNowBtn.onclick = async () => {
-                    if (compareNowBtn.disabled) return;
-                    const state = compareNowBtn.dataset.state || 'ready';
-                    if (state === 'ready') {
-                        // Cập nhật UI ngay lập tức để button phản hồi nhanh
-                        compareNowBtn.disabled = true;
-                        compareNowBtn.textContent = '...';
-
-                        // Cho browser render UI trước khi chạy logic nặng
-                        await new Promise(r => setTimeout(r, 0));
-
-                        // Chạy logic nặng sau khi UI đã cập nhật
-                        const res = await compareAndHighlightQuestions(true);
-                        const matched = (res && res.matchedUniquePageCount) || (res && res.matchedQuestions) || 0;
-                        compareNowBtn.textContent = `Làm lại (${matched})`;
-                        compareNowBtn.dataset.state = 'repeat';
-                        compareNowBtn.disabled = false;
-                        if (nextBtn) nextBtn.style.display = 'block';
-                    } else {
-                        // Clear và reset cũng cần tách UI update
-                        clearAllHighlights();
-                        highlightedQA = [];
-                        if (nextBtn) nextBtn.style.display = 'none';
-
-                        await new Promise(r => setTimeout(r, 150));
-                        compareNowBtn.dataset.state = 'ready';
-                        compareNowBtn.click();
-                    }
-                };
-            }
-
             if (nextBtn) {
                 nextBtn.onclick = () => {
                     const possibleButtons = [
-                        'input[name="next"]',
-                        'button.next',
-                        '.mod_quiz-next-nav input',
-                        '.submitbtns input[value="Trang sau"]',
-                        '.submitbtns input[value="Tiếp theo"]',
-                        '.submitbtns .btn-primary:not([name="previous"])',
-                        'a[title="Next page"]'
+                        'input[name="next"]', 'button.next', '.mod_quiz-next-nav input',
+                        '.submitbtns input[value="Trang sau"]', '.submitbtns input[value="Tiếp theo"]',
+                        '.submitbtns .btn-primary:not([name="previous"])', 'a[title="Next page"]'
                     ];
 
                     let found = false;
@@ -5352,8 +5363,6 @@ if (window.tailieuExtensionLoaded) {
                     }
                 };
             }
-
-            document.getElementById('tailieu-hide-indicator').onclick = () => indicator.remove();
         });
     }
 
