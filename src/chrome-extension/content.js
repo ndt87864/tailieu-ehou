@@ -103,7 +103,24 @@ if (window.tailieuExtensionLoaded) {
         // Lần 2: Loại bỏ tất cả khoảng trắng và so sánh lại
         const s1NoSpace = s1.replace(/\s+/g, '');
         const s2NoSpace = s2.replace(/\s+/g, '');
-        return s1NoSpace === s2NoSpace && s1NoSpace.length > 0;
+        if (s1NoSpace === s2NoSpace && s1NoSpace.length > 0) return true;
+
+        // Lần 3: So sánh không phân biệt dấu (strip diacritics)
+        try {
+            const stripDiacritics = (str) => {
+                if (!str) return '';
+                if (str.normalize) {
+                    // NFD -> remove combining marks
+                    return str.normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, '').toLowerCase();
+                }
+                return str.replace(/[^\u0000-\u007F]/g, '').replace(/\s+/g, '').toLowerCase();
+            };
+            const a = stripDiacritics(s1);
+            const b = stripDiacritics(s2);
+            return a === b && a.length > 0;
+        } catch (e) {
+            return false;
+        }
     }
 
     // Helper to clean question text (strip reading passages and prefixes)
@@ -2118,6 +2135,20 @@ if (window.tailieuExtensionLoaded) {
                 return true;
             }
 
+            // Lần 3: FALLBACK - So sánh không phân biệt dấu (strip diacritics)
+            try {
+                const stripDiacritics = (str) => {
+                    if (!str) return '';
+                    if (str.normalize) return str.normalize('NFD').replace(/\p{M}/gu, '').replace(/\s+/g, '').toLowerCase();
+                    return str.replace(/[^\u0000-\u007F]/g, '').replace(/\s+/g, '').toLowerCase();
+                };
+                const s1 = stripDiacritics(n1);
+                const s2 = stripDiacritics(n2);
+                if (s1 && s2 && s1 === s2) return true;
+            } catch (e) {
+                // ignore
+            }
+
             return false;
         } catch (e) {
             return normalizeTextForMatching(q1) === normalizeTextForMatching(q2);
@@ -2214,7 +2245,7 @@ if (window.tailieuExtensionLoaded) {
         try {
             const nPage = normalizeForExactMatch(pageQuestionRaw || '');
             const nDb = normalizeForExactMatch(dbQuestionRaw || '');
-            if (nPage && nDb && nPage === nDb) {
+            if (nPage && nDb && compareNormalized(nPage, nDb)) {
                 return { isValid: true, reason: 'Exact normalized match', confidence: 1 };
             }
 
@@ -2895,8 +2926,8 @@ if (window.tailieuExtensionLoaded) {
 
                     // STRICT EXACT MATCH (configurable)
                     if (STRICT_ANSWER_EXACT_MATCH) {
-                        // So sánh chính xác
-                        if (dbExact && webExact && webExact === dbExact) {
+                        // So sánh chính xác (dùng compareNormalized để cho phép fallback không phân biệt dấu)
+                        if (dbExact && webExact && compareNormalized(webExact, dbExact)) {
                             applyHighlightStyle(webOpt.element);
                             const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_WEB_TO_DB' };
                             highlightedQA.push(qaExact);
@@ -3001,8 +3032,8 @@ if (window.tailieuExtensionLoaded) {
 
                     // STRICT EXACT MATCH (configurable)
                     if (STRICT_ANSWER_EXACT_MATCH) {
-                        // So sánh chính xác
-                        if (dbExact && webExact && webExact === dbExact) {
+                        // So sánh chính xác (dùng compareNormalized để cho phép fallback không phân biệt dấu)
+                        if (dbExact && webExact && compareNormalized(webExact, dbExact)) {
                             applyHighlightStyle(webOpt.element);
                             const qaExact = { question: pageQuestion?.text || pageQuestion?.originalText || 'unknown', dbAnswer: Array.isArray(originalAnswer) ? originalAnswer.join(' | ') : originalAnswer, matchedText: webOpt.originalText, matchType: 'EXACT_DB_TO_WEB' };
                             highlightedQA.push(qaExact);
