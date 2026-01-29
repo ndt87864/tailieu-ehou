@@ -28,6 +28,12 @@
 .tailieu-answer-icon:hover { color: #1a5ca2 !important; transform: scale(1.05); }
 .tailieu-answer-icon:focus { outline: 2px solid rgba(42,122,226,0.18); border-radius: 3px; }
 
+/* Fill-blank specific icon (yellow lamp) */
+.tailieu-fillblank-icon {
+    color: #FFB300 !important;
+}
+.tailieu-fillblank-icon:hover { color: #FF9800 !important; transform: scale(1.05); }
+
 /* Animations */
 @keyframes highlightPulse {
     0% {

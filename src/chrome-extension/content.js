@@ -1687,7 +1687,8 @@ if (window.tailieuExtensionLoaded) {
 
                                 if (answers && answers.length > 0) {
                                     // Use icon as anchor so tooltip appears near it
-                                    createAnswerTooltip(icon, answers);
+                                    const showFn = (window && window.tailieuShowAnswerTooltip) ? window.tailieuShowAnswerTooltip : createAnswerTooltip;
+                                    showFn(icon, answers);
                                 } else {
                                     // No suggestion found — brief user feedback
                                     try { showNotification('Không có đề xuất đáp án cho câu này', 'warning', 2500); } catch (e) { }
@@ -2350,6 +2351,70 @@ if (window.tailieuExtensionLoaded) {
                         type: 'fill-blank',
                         autoFilled: fb.autoFilled || false
                     });
+
+                    // Also attach a persistent yellow answer icon to the fill-blank element
+                    try {
+                        const targetEl = fb.element;
+                        if (targetEl && !targetEl.dataset.tailieuIconAttached) {
+                            targetEl.dataset.tailieuIconAttached = '1';
+
+                            const icon = document.createElement('span');
+                            icon.className = 'tailieu-answer-icon tailieu-fillblank-icon';
+                            icon.title = 'Nhấn để xem gợi ý trả lời';
+                            icon.tabIndex = 0;
+                            icon.setAttribute('role', 'button');
+
+                            // Reuse same lamp SVG used for MCQ icon (yellow glow)
+                            icon.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                                                <defs>
+                                                    <radialGradient id="glow-fillblank" cx="50%" cy="40%" r="60%">
+                                                        <stop offset="0%" stop-color="#FFF9C4"/>
+                                                        <stop offset="70%" stop-color="#FFD54F"/>
+                                                        <stop offset="100%" stop-color="#FFC107"/>
+                                                    </radialGradient>
+                                                </defs>
+                                                <path d="M9 21h6v-1H9v1zm3-20a7 7 0 00-4.47 12.38C8.3 14.06 9 15.1 9 16v2h6v-2c0-.9.7-1.94 1.47-2.62A7 7 0 0012 1z" fill="url(#glow-fillblank)"/>
+                                                <rect x="9" y="18" width="6" height="2" fill="#FFB300"/>
+                                            </svg>`;
+
+                            // Append icon to the target element if possible
+                            try { targetEl.appendChild(icon); } catch (e) { /* ignore */ }
+
+                            // Store answers on element for fast retrieval by tooltip
+                            try { targetEl.dataset.tailieuAnswers = JSON.stringify(fb.answers.map(a => `${a.index}. ${a.answer}`)); } catch (e) { /* ignore */ }
+
+                            // Click handler shows popup tooltip near icon
+                            icon.addEventListener('click', (ev) => {
+                                ev.stopPropagation(); ev.preventDefault();
+                                const existing = document.querySelector('.tailieu-answer-tooltip');
+                                if (existing) { hideAnswerTooltip(targetEl); return; }
+
+                                let answers = null;
+                                try {
+                                    if (targetEl && targetEl.dataset && targetEl.dataset.tailieuAnswers) {
+                                        answers = JSON.parse(targetEl.dataset.tailieuAnswers);
+                                    }
+                                } catch (e) { answers = null; }
+
+                                if (!answers || answers.length === 0) {
+                                    answers = fb.answers.map(a => `${a.index}. ${a.answer}`);
+                                }
+
+                                if (answers && answers.length > 0) {
+                                    const showFn = (window && window.tailieuShowAnswerTooltip) ? window.tailieuShowAnswerTooltip : createAnswerTooltip;
+                                    showFn(icon, answers);
+                                } else {
+                                    try { showNotification('Không có đề xuất đáp án cho câu này', 'warning', 2500); } catch (e) { }
+                                }
+                            });
+
+                            icon.addEventListener('keydown', (ev) => {
+                                if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); icon.click(); }
+                            });
+                        }
+                    } catch (err) {
+                        // ignore errors attaching fill-blank icon
+                    }
                 });
             }
         } catch (fillBlankError) {
@@ -3293,6 +3358,14 @@ if (window.tailieuExtensionLoaded) {
         const all = document.querySelectorAll('.tailieu-answer-tooltip');
         all.forEach(t => t.remove());
     }
+
+    // Expose safe wrappers so other modules won't accidentally override tooltip behavior
+    try {
+        if (typeof window !== 'undefined') {
+            window.tailieuShowAnswerTooltip = createAnswerTooltip;
+            window.tailieuHideAnswerTooltip = hideAnswerTooltip;
+        }
+    } catch (e) { /* ignore */ }
 
     // Helper function to highlight matching options - IMPROVED FOR MULTIPLE DB ANSWERS
     // Now highlights ALL matching options instead of just the first one
