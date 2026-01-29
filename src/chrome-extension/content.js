@@ -731,38 +731,96 @@ if (window.tailieuExtensionLoaded) {
     }
 
     // Core Auto-detection logic: Try to detect document from the first question on the page
-    async function detectDocumentFromPage(firstQuestionText) {
-        if (!firstQuestionText) return false;
+    async function detectDocumentFromPage(firstQuestionTextOrCandidates = null) {
+        let candidateQuestions = [];
 
-        debugLog('[Tailieu Extension] Auto-detecting document for question:', firstQuestionText.substring(0, 50) + '...');
+        // Handle input (could be a string from legacy calls or an array of questions)
+        if (Array.isArray(firstQuestionTextOrCandidates)) {
+            candidateQuestions = firstQuestionTextOrCandidates;
+        } else if (typeof firstQuestionTextOrCandidates === 'string' && firstQuestionTextOrCandidates) {
+            candidateQuestions.push({ text: firstQuestionTextOrCandidates });
+        }
 
-        // 1. Find the question in DB
-        const question = await findQuestionInDB(firstQuestionText);
-
-        if (question && question.documentId) {
-            debugLog('[Tailieu Extension] Detected document ID:', question.documentId);
-
-            // 2. Load all questions from this document
-            const questions = await loadQuestionsFromDocument(question.documentId);
-
-            if (questions.length > 0) {
-                extensionQuestions = questions;
-                detectedDocumentId = question.documentId;
-
-                // Save to cache so next time we don't need to re-fetch immediately
-                // Note: We might want a separate cache key or just use the same one
-                // Using the same key makes it seamless with manual selection
-                if (chrome?.runtime?.sendMessage) {
-                    // Optional: Notify popup that we detected a document (not critical)
-                }
-
-                return true;
+        // If we don't have enough candidates, scan the page
+        if (candidateQuestions.length < 3) {
+            try {
+                const scanned = scanQuestionsOnPage();
+                // Merge and deduplicate
+                const scannedCandidates = scanned.filter(q => (q.text || '').length > 15 && !candidateQuestions.some(c => c.text === q.text));
+                candidateQuestions = candidateQuestions.concat(scannedCandidates).slice(0, 5);
+            } catch (e) {
+                if (candidateQuestions.length === 0) return false;
             }
-        } else {
-            debugLog('[Tailieu Extension] Could not detect document from question.');
+        }
+
+        if (candidateQuestions.length === 0) return false;
+
+        debugLog(`[Tailieu Extension] Auto-detecting document using ${candidateQuestions.length} candidates...`);
+
+        // 1. Try EXACT matches for each candidate
+        for (const qObj of candidateQuestions) {
+            const cleanText = cleanQuestionText(qObj.text || '');
+            if (!cleanText || cleanText.length < 10) continue;
+
+            const question = await findQuestionInDB(cleanText);
+            if (question && question.documentId) {
+                debugLog('[Tailieu Extension] Detected document ID (Exact match):', question.documentId);
+                return await loadAndCacheDocumentAndNotify(question.documentId);
+            }
+        }
+
+        // 2. Fallback: Try FUZZY matches for candidates if exact failed
+        debugLog('[Tailieu Extension] Exact match failed. Trying fuzzy search fallback...');
+        // Limit fuzzy to top 2 to keep it fast
+        for (let i = 0; i < Math.min(2, candidateQuestions.length); i++) {
+            const qObj = candidateQuestions[i];
+            const cleanText = cleanQuestionText(qObj.text || '');
+            if (!cleanText || cleanText.length < 20) continue;
+
+            const fuzzyMatch = await findQuestionInDBFuzzy(cleanText);
+            if (fuzzyMatch && fuzzyMatch.documentId) {
+                debugLog('[Tailieu Extension] Detected document ID (Fuzzy match):', fuzzyMatch.documentId);
+                return await loadAndCacheDocumentAndNotify(fuzzyMatch.documentId);
+            }
+        }
+
+        debugLog('[Tailieu Extension] Could not detect document from any candidate.');
+        return false;
+    }
+
+    // Helper: Find question in DB via background (Fuzzy)
+    async function findQuestionInDBFuzzy(questionText) {
+        return new Promise((resolve) => {
+            if (chrome?.runtime?.sendMessage) {
+                chrome.runtime.sendMessage(
+                    { action: 'findQuestionsByTextFuzzy', questionText, limit: 1 },
+                    (response) => {
+                        if (response && response.success && response.questions && response.questions.length > 0) {
+                            resolve(response.questions[0]);
+                        } else {
+                            resolve(null);
+                        }
+                    }
+                );
+            } else {
+                resolve(null);
+            }
+        });
+    }
+
+    // Helper: Load and cache document questions
+    async function loadAndCacheDocumentAndNotify(documentId) {
+        const questions = await loadQuestionsFromDocument(documentId);
+        if (questions && questions.length > 0) {
+            extensionQuestions = questions;
+            detectedDocumentId = documentId;
+            saveCachedQuestions();
+            showCachedQuestionsIndicator();
+            return true;
         }
         return false;
     }
+
 
     // Perform auto-compare if we have cached questions OR try to auto-detect
     async function performAutoCompare(force = false) {
@@ -812,16 +870,12 @@ if (window.tailieuExtensionLoaded) {
             debugLog('[Tailieu Extension] Cache invalid or empty. Attempting auto-detection...');
 
             // Try to detect document from the first valid question on the page
-            if (pageQuestions.length > 0) {
-                const firstQ = pageQuestions[0];
-                const cleanText = cleanQuestionText(firstQ.text || '');
-                const success = await detectDocumentFromPage(cleanText);
+            const success = await detectDocumentFromPage(pageQuestions);
 
-                if (success) {
-                    debugLog('[Tailieu Extension] Auto-detection successful! Loaded questions for document:', detectedDocumentId);
-                    // Save the newly loaded questions to cache persistent
-                    saveCachedQuestions();
-                }
+            if (success) {
+                debugLog('[Tailieu Extension] Auto-detection successful! Loaded questions for document:', detectedDocumentId);
+                // Save the newly loaded questions to cache persistent
+                saveCachedQuestions();
             }
         }
         // END: Auto-detect logic
@@ -1293,16 +1347,18 @@ if (window.tailieuExtensionLoaded) {
             if (result[QUESTIONS_CACHE_KEY] && result[QUESTIONS_CACHE_KEY].length > 0) {
                 // Filter cached questions to remove any scanner_extension entries
                 extensionQuestions = (result[QUESTIONS_CACHE_KEY] || []).filter(q => !(q && q.source && q.source === 'scanner_extension'));
-                try {
-                    // Show cached questions indicator (safely)
-                    showCachedQuestionsIndicator();
+            } else {
+                extensionQuestions = [];
+            }
 
-                    // Update questions popup with cached questions (safely)
-                    updateQuestionsPopup(extensionQuestions);
-                } catch (uiError) {
+            try {
+                // ALWAYS show cached questions indicator (safely)
+                showCachedQuestionsIndicator();
 
-                    // Continue execution even if UI updates fail
-                }
+                // Update questions popup with cached questions (safely)
+                updateQuestionsPopup(extensionQuestions);
+            } catch (uiError) {
+                // Continue execution even if UI updates fail
             }
         } catch (error) {
             if (error.message.includes('Extension context invalidated')) {
@@ -1901,12 +1957,26 @@ if (window.tailieuExtensionLoaded) {
             await loadCachedQuestions();
 
             if (extensionQuestions.length === 0) {
-                //console.log('[Tailieu Extension] Still no questions after loading cache');
-                // Show user-friendly message
+                // If manual trigger and no cache, try AUTO-DETECT
                 if (isManual) {
-                    showNotification('Chưa có câu hỏi nào được tải. Vui lòng chọn danh mục và tài liệu trước.', 'warning');
+                    showNotification('Đang tìm kiếm tài liệu phù hợp...', 'info', 2000);
+                    const pageQs = scanQuestionsOnPage(); // extracted from page
+                    if (pageQs && pageQs.length > 0) {
+                        const firstQText = pageQs[0].text;
+                        const detectedDoc = await detectDocumentFromPage(firstQText);
+                        if (!detectedDoc || extensionQuestions.length === 0) {
+                            showNotification('Chưa tìm thấy tài liệu phù hợp. Vui lòng chọn thủ công.', 'warning');
+                            return { matched: [], pageQuestions: [] };
+                        }
+                        // Proceed with comparison using newly loaded questions
+                    } else {
+                        showNotification('Không tìm thấy câu hỏi nào trên trang này.', 'warning');
+                        return { matched: [], pageQuestions: [] };
+                    }
+                } else {
+                    // Auto-mode but no questions (and detectDocumentFromPage in performAutoCompare likely failed or wasn't called)
+                    return { matched: [], pageQuestions: [] };
                 }
-                return { matched: [], pageQuestions: [] };
             } else {
                 //console.log('[Tailieu Extension] Successfully loaded', extensionQuestions.length, 'questions from cache');
             }
@@ -4952,7 +5022,7 @@ if (window.tailieuExtensionLoaded) {
             return;
         }
 
-        if (extensionQuestions.length === 0) return;
+        // REMOVED: if (extensionQuestions.length === 0) return;
 
         // Get selected document names for display
         let selectedDocNames = 'Chưa chọn';
@@ -4974,7 +5044,7 @@ if (window.tailieuExtensionLoaded) {
         indicator.innerHTML = `
         <div id="tailieu-indicator-collapsed" style="display: flex; align-items: center; gap: 15px;">
             <div style="display: flex; flex-direction: column;">
-                <span style="font-weight: bold; font-size: 14px;">${extensionQuestions.length} câu hỏi sẵn sàng</span>
+                <span id="tailieu-indicator-count" style="font-weight: bold; font-size: 14px;">${extensionQuestions.length > 0 ? extensionQuestions.length + ' câu hỏi sẵn sàng' : 'Sẵn sàng nhận diện'}</span>
                 <span id="tailieu-indicator-doc-name" style="font-size: 11px; opacity: 0.9; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${selectedDocNames}">
                     📄 ${selectedDocNames}
                 </span>

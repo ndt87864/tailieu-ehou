@@ -719,50 +719,81 @@ function updateControlsState() {
 }
 
 function showQuestionsStatus(count) {
+  // Always setup the compare button first
+  const compareBtn = document.getElementById('compareNowBtn');
+  const closeBannerBtn = document.getElementById('closeBannerBtn');
+  const notificationBanner = document.getElementById('notificationBanner');
+
+  if (compareBtn) {
+    // Disable the button until the content page is fully loaded to avoid premature clicks
+    compareBtn.disabled = true;
+    compareBtn.title = 'Chờ trang web tải xong để so sánh…';
+
+    let _tries = 0;
+    const _maxTries = 30; // ~15s max
+    const _checkLoaded = async () => {
+      const res = await safeSendToContentScript({ action: 'isPageLoaded' });
+      if (res.success && res.response && res.response.loaded) {
+        compareBtn.disabled = false;
+        compareBtn.title = '';
+        compareBtn.addEventListener('mouseenter', () => compareBtn.style.background = '#45A049');
+        compareBtn.addEventListener('mouseleave', () => compareBtn.style.background = '#4CAF50');
+      } else {
+        _tries++;
+        if (_tries < _maxTries) setTimeout(_checkLoaded, 500);
+        else compareBtn.title = 'Trang chưa sẵn sàng để so sánh';
+      }
+    };
+    _checkLoaded();
+
+    // Ensure listener is not added multiple times (simple way: clone node or just rely on addEventListener dedupe if function ref was same, but here it's anonymous wrapper often. Better to let it be or clean up. 
+    // Since this runs once usually, it's fine. For safety, remove old if possible or just use onclick)
+    compareBtn.onclick = compareQuestionsWithPage;
+  }
+
+  if (closeBannerBtn && notificationBanner) {
+    closeBannerBtn.onclick = () => notificationBanner.style.display = 'none';
+    // Insert close svg into closeBannerBtn if empty
+    if (!closeBannerBtn.hasChildNodes()) {
+      try { closeBannerBtn.appendChild(svgIcon('close', 14)); } catch (e) { }
+    }
+  }
+
+  // Now handle the display logic based on count
   if (count === 0) {
-    questionsList.innerHTML = '<div class="no-questions">Không có câu hỏi nào cho tài liệu này.</div>';
-    document.getElementById('questionsCount').textContent = 'Không có câu hỏi';
-  } else {
-    const compareBtn = document.getElementById('compareNowBtn');
-    const closeBannerBtn = document.getElementById('closeBannerBtn');
-    const notificationBanner = document.getElementById('notificationBanner');
+    questionsList.innerHTML = `
+        <div class="no-questions" style="text-align: center; padding: 20px; color: #666;">
+            <p>Chưa có dữ liệu.</p>
+            <p style="font-size: 0.9em; margin-bottom: 15px;">
+                Nhấn <strong>"So sánh ngay"</strong> để tự động nhận diện tài liệu<br>
+                hoặc chọn thủ công bên dưới.
+            </p>
+            <button id="manualSelectLink" style="background:none; border:none; color:#0d6efd; text-decoration:underline; cursor:pointer;">
+                Chọn thủ công
+            </button>
+        </div>`;
 
+    setTimeout(() => {
+      const link = document.getElementById('manualSelectLink');
+      if (link) link.onclick = () => toggleSelectionForm(true);
+    }, 100);
+
+    document.getElementById('questionsCount').textContent = 'Sẵn sàng nhận diện';
+
+    // Auto-detect mode: show button as "Auto Detect"
     if (compareBtn) {
-      // Disable the button until the content page is fully loaded to avoid premature clicks
-      compareBtn.disabled = true;
-      compareBtn.title = 'Chờ trang web tải xong để so sánh…';
-
-      let _tries = 0;
-      const _maxTries = 30; // ~15s max
-      const _checkLoaded = async () => {
-        const res = await safeSendToContentScript({ action: 'isPageLoaded' });
-        if (res.success && res.response && res.response.loaded) {
-          compareBtn.disabled = false;
-          compareBtn.title = '';
-          compareBtn.addEventListener('mouseenter', () => compareBtn.style.background = '#45A049');
-          compareBtn.addEventListener('mouseleave', () => compareBtn.style.background = '#4CAF50');
-        } else {
-          _tries++;
-          if (_tries < _maxTries) setTimeout(_checkLoaded, 500);
-          else compareBtn.title = 'Trang chưa sẵn sàng để so sánh';
-        }
-      };
-      _checkLoaded();
-
-      compareBtn.addEventListener('click', compareQuestionsWithPage);
+      compareBtn.innerHTML = 'So sánh ngay <span style="font-size:0.8em; opacity:0.8">(Tự động)</span>';
     }
 
-    if (closeBannerBtn && notificationBanner) {
-      closeBannerBtn.addEventListener('click', () => notificationBanner.style.display = 'none');
-      // Insert close svg into closeBannerBtn
-      try {
-        closeBannerBtn.appendChild(svgIcon('close', 14));
-      } catch (e) { }
-    }
+    // Hide cache section if empty
+    if (cacheSection) cacheSection.style.display = 'none';
 
+  } else {
+    // Normal case with questions
     document.getElementById('questionsCount').textContent = `${count} câu hỏi sẵn sàng`;
+    if (compareBtn) compareBtn.textContent = ' So sánh ngay';
 
-    // Kiểm tra dữ liệu lỗi thời
+    // Check outdated data logic
     setTimeout(async () => {
       try {
         const isDbUpdated = await getFromCache(CACHE_KEYS.DB_UPDATED);
@@ -772,7 +803,6 @@ function showQuestionsStatus(count) {
           const remoteCount = await getQuestionsCountByDocuments(selectedDocuments);
           if (remoteCount !== count) {
             isMismatched = true;
-            // Cập nhật cờ hiệu vào storage để các context khác (content script) cũng biết
             await saveToCache(CACHE_KEYS.DB_UPDATED, true);
           }
         }
@@ -787,42 +817,28 @@ function showQuestionsStatus(count) {
               warningDiv.style.cssText = 'color: #FFEB3B; font-size: 11px; margin-top: 8px; font-weight: 600; width: 100%; text-align: left; padding: 0 5px; line-height: 1.4;';
               warningDiv.textContent = ' Dữ liệu câu hỏi đã lỗi thời. Vui lòng cập nhật dữ liệu mới nhất!';
 
-              // Chèn vào dưới info div
               const infoDiv = banner.querySelector('div');
               if (infoDiv) {
-                // Wrap content to allow multiline warning
                 banner.style.flexDirection = 'column';
                 banner.style.alignItems = 'flex-start';
-
-                // Content row containing info and buttons
                 const contentRow = document.createElement('div');
                 contentRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; width: 100%;';
-
-                // Move existing elements to content row
-                while (banner.firstChild) {
-                  contentRow.appendChild(banner.firstChild);
-                }
-
+                while (banner.firstChild) { contentRow.appendChild(banner.firstChild); }
                 banner.appendChild(contentRow);
                 banner.appendChild(warningDiv);
               }
             }
           }
         }
-      } catch (e) {
-        console.error('Error checking outdated data:', e);
-      }
+      } catch (e) { console.error('Error checking outdated data:', e); }
     }, 500);
+
+    saveToCache(CACHE_KEYS.QUESTIONS, questions);
+    if (typeof showCacheSection === 'function') showCacheSection();
+    toggleSelectionForm(false);
   }
 
   questionsSection.style.display = 'block';
-
-  if (count > 0) {
-    saveToCache(CACHE_KEYS.QUESTIONS, questions);
-    showCacheSection();
-    // Ẩn form chọn khi đã có câu hỏi
-    toggleSelectionForm(false);
-  }
 }
 
 /**
